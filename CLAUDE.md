@@ -41,10 +41,21 @@ router in `api/routers/` and its own independent tests.
 
 - **Always use `Decimal` for all monetary amounts and rates. Never `float`.** Floating point
   errors are unacceptable in tax calculations.
+- **Always round tax amounts using `ROUND_HALF_UP`. Never use Python's built-in `round()`.**
+  Use a shared `round_tax()` helper in `services/common.py`.
 - Tax bracket data lives in `data/brackets/federal_{year}.json` and `data/brackets/{state}_{year}.json`.
   Adding a new tax year means adding a new file — never modify existing year files.
 - Saved user scenarios are stored as JSON in `data/scenarios/`.
 
+---
+
+## Coding Style
+
+- **Prefer small, single-purpose functions.** If a function is doing more than one 
+  logical thing, break it into smaller functions. Each function should be 
+  describable in one sentence.
+- Functions that calculate, functions that load data, and functions that orchestrate 
+  others should be kept separate.
 ---
 
 ## Testing Philosophy
