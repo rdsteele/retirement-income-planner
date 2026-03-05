@@ -96,6 +96,22 @@ It appears as a discrete jump in the MER curve at the threshold.
 
 ---
 
+## EMR Component Attribution Bias
+
+When the SS torpedo is active, the sum of EMR components (`emr_ordinary + emr_ss_torpedo +
+emr_pref_stacking + emr_niit + emr_ohio`) diverges from `emr` by approximately **0.002**.
+This is structural, not a bug to fix.
+
+**Cause:** `emr_ordinary` is assigned the statutory bracket rate analytically (e.g. `0.12`),
+but the actual ordinary tax delta is computed per-bracket with `round_tax()` in
+`federal_tax.py`. When the torpedo is active, `taxable_ordinary` changes by a non-integer
+multiple of `sweep_step` (e.g. 1.85×), causing per-bracket rounding to produce a tax delta
+that differs from `bracket_rate × Δtaxable_ordinary` by up to $1. Over a $100 step this
+yields a ~0.002 rate discrepancy. The bias is persistent at every torpedo-active sweep point,
+not just at bracket boundaries.
+
+---
+
 ## Filing Status
 
 All bracket thresholds and SS provisional income thresholds vary by filing status.
