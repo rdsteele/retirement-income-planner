@@ -176,3 +176,10 @@ class TestEdgeCases:
         assert result.marginal_bracket_rate == D("0.37")
         assert result.ordinary_income_tax > D("0")
         assert result.bracket_breakdown[-1].rate == D("0.37")
+
+    def test_preferential_income_in_twenty_percent_ltcg_bracket(self):
+        # ordinary=$500,000 pushes stack base into the 15%/20% LTCG boundary ($533,400)
+        # preferential $100,000 straddles: $33,400 at 15% + $66,600 at 20%
+        # exercises the top-bracket path where b_to is None
+        result = calculate_federal_tax(D("500000"), D("100000"), "single", 2025)
+        assert result.preferential_income_tax == D("18330")
