@@ -1,0 +1,13 @@
+{
+  "single": {
+    "tier_1_threshold": "25000",
+    "tier_2_threshold": "34000"
+  },
+  "mfj": {
+    "tier_1_threshold": "32000",
+    "tier_2_threshold": "44000"
+  },
+  "tier_1_inclusion_rate": "0.50",
+  "tier_2_inclusion_rate": "0.85",
+  "maximum_inclusion_rate": "0.85"
+}
