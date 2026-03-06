@@ -363,6 +363,38 @@ def _build_regular_sweep(floor: Decimal, ceiling: Decimal,
     return points
 
 
+def _compute_ohio_boundaries(
+    ohio_agi_base: Decimal,
+    ohio_medical_deduction: Decimal,
+    tax_year: int,
+) -> list[Decimal]:
+    """Return Ohio-specific boundary sweep_values for zero-rate and MAGI credit thresholds.
+
+    ohio_agi_base is total non-SS income at sweep_value=0 (ohio_agi = ohio_agi_base + sweep_value).
+    Boundary points are approximate — ohio_medical_deduction is included in the zero-rate
+    threshold but personal exemption is taken from the expected tier at each boundary.
+    """
+    ohio_data = _load_ohio_data(tax_year)
+    boundaries: list[Decimal] = []
+
+    # Zero-rate threshold: ohio_tax_base enters the first taxable bracket
+    # ohio_tax_base = ohio_agi - personal_exemption - ohio_medical_deduction = brackets[1]["from"]
+    # At this ohio_agi the personal_exemption is from the lowest tier (ohio_agi < $40,000)
+    zero_bracket = Decimal(ohio_data["brackets"][1]["from"])          # $26,050
+    exemption_low = Decimal(ohio_data["personal_exemption"][0]["amount"])  # $2,400
+    ohio_agi_zero = zero_bracket + exemption_low + ohio_medical_deduction
+    boundaries.append(ohio_agi_zero - ohio_agi_base)
+
+    # MAGI credit threshold: ohio_agi - personal_exemption crosses $100,000
+    # At this ohio_agi (> $80,000) the personal_exemption is the highest tier
+    magi_threshold = Decimal(ohio_data["magi_credit_threshold"])      # $100,000
+    exemption_high = Decimal(ohio_data["personal_exemption"][-1]["amount"])  # $1,900
+    ohio_agi_magi = magi_threshold + exemption_high
+    boundaries.append(ohio_agi_magi - ohio_agi_base)
+
+    return boundaries
+
+
 def _compute_ordinary_boundaries(
     fixed_ordinary: Decimal,
     total_preferential: Decimal,
@@ -372,6 +404,8 @@ def _compute_ordinary_boundaries(
     niit_threshold: Decimal,
     filing_status: str,
     tax_year: int,
+    include_ohio: bool = False,
+    ohio_medical_deduction: Decimal = _ZERO,
 ) -> list[Decimal]:
     """Compute approximate boundary points for ORDINARY sweep mode."""
     data = _load_federal_data(tax_year)
@@ -420,6 +454,12 @@ def _compute_ordinary_boundaries(
     # NIIT threshold (approximate — ignores ss_taxable in AGI)
     boundaries.append(niit_threshold - fixed_ordinary - total_preferential)
 
+    # Ohio discontinuity boundaries
+    if include_ohio:
+        ohio_agi_base = fixed_ordinary + total_preferential
+        boundaries.extend(
+            _compute_ohio_boundaries(ohio_agi_base, ohio_medical_deduction, tax_year))
+
     return boundaries
 
 
@@ -434,6 +474,8 @@ def _compute_preferential_boundaries(
     niit_threshold: Decimal,
     filing_status: str,
     tax_year: int,
+    include_ohio: bool = False,
+    ohio_medical_deduction: Decimal = _ZERO,
 ) -> list[Decimal]:
     """Compute approximate boundary points for PREFERENTIAL sweep mode."""
     data = _load_federal_data(tax_year)
@@ -473,6 +515,12 @@ def _compute_preferential_boundaries(
 
     # NIIT threshold (approximate)
     boundaries.append(niit_threshold - total_ordinary - fixed_pref)
+
+    # Ohio discontinuity boundaries
+    if include_ohio:
+        ohio_agi_base = total_ordinary + fixed_pref
+        boundaries.extend(
+            _compute_ohio_boundaries(ohio_agi_base, ohio_medical_deduction, tax_year))
 
     return boundaries
 
@@ -548,12 +596,16 @@ def calculate_emr(
             fixed_ordinary, total_preferential_fixed, ss_benefit,
             tax_exempt_interest, std_deduction, niit_threshold,
             filing_status, tax_year,
+            include_ohio=include_ohio,
+            ohio_medical_deduction=ohio_medical_deduction,
         )
     else:
         boundaries = _compute_preferential_boundaries(
             fixed_ordinary, variable_ordinary, qualified_dividends,
             fixed_ltcg, ss_benefit, tax_exempt_interest, std_deduction,
             niit_threshold, filing_status, tax_year,
+            include_ohio=include_ohio,
+            ohio_medical_deduction=ohio_medical_deduction,
         )
 
     sweep_array = _build_sweep_array(

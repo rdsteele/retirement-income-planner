@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EMR Analyzer</title>
+  <script src="/static/plotly-2.26.0.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      background: #f8f9fa;
+      color: #212529;
+      padding: 16px;
+    }
+
+    .page { max-width: 960px; margin: 0 auto; }
+
+    h1 { font-size: 22px; font-weight: 600; margin-bottom: 16px; color: #1a1a2e; }
+
+    /* ── Cards ── */
+    .card {
+      background: #fff;
+      border: 1px solid #dee2e6;
+      border-radius: 6px;
+      margin-bottom: 12px;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    /* ── Collapsible sections ── */
+    details { border-bottom: 1px solid #dee2e6; }
+    details:last-of-type { border-bottom: none; }
+
+    summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 10px 14px;
+      font-weight: 600;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #495057;
+      user-select: none;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    summary::-webkit-details-marker { display: none; }
+    summary::before {
+      content: '▶';
+      font-size: 9px;
+      transition: transform 0.15s;
+      display: inline-block;
+    }
+    details[open] > summary::before { transform: rotate(90deg); }
+    details[open] > summary { color: #1a1a2e; }
+
+    .section-body {
+      padding: 12px 14px 16px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px 20px;
+    }
+
+    /* ── Form fields ── */
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    .field label { font-size: 12px; color: #6c757d; font-weight: 500; }
+    .field input, .field select {
+      width: 100%;
+      padding: 6px 8px;
+      border: 1px solid #ced4da;
+      border-radius: 4px;
+      font-size: 14px;
+      background: #fff;
+      color: #212529;
+    }
+    .field input:focus, .field select:focus {
+      outline: none;
+      border-color: #4c6ef5;
+      box-shadow: 0 0 0 2px rgba(76,110,245,0.15);
+    }
+    .field-wide { grid-column: 1 / -1; }
+
+    /* checkbox row */
+    .checkbox-row {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 0;
+    }
+    .checkbox-row label { font-size: 13px; color: #495057; cursor: pointer; }
+    .checkbox-row input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
+
+    /* hidden field wrapper */
+    .hidden { display: none !important; }
+
+    /* ── Run button ── */
+    .run-wrap { padding: 12px 14px 14px; }
+    #run-btn {
+      width: 100%;
+      padding: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      background: #1a1a2e;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    #run-btn:hover:not(:disabled) { background: #2d2d5e; }
+    #run-btn:disabled { background: #6c757d; cursor: not-allowed; }
+
+    /* ── Error ── */
+    #error-msg {
+      margin-top: 8px;
+      padding: 8px 12px;
+      border-radius: 4px;
+      background: #fff5f5;
+      border: 1px solid #f5c6cb;
+      color: #721c24;
+      font-size: 13px;
+      display: none;
+    }
+
+    /* ── Planning signals ── */
+    #signals-bar {
+      display: none;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 12px 14px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    .badge-green  { background: #d4edda; color: #155724; }
+    .badge-amber  { background: #fff3cd; color: #856404; }
+    .badge-blue   { background: #d0ebff; color: #1864ab; }
+    .badge-gray   { background: #e9ecef; color: #495057; }
+
+    /* ── Chart area ── */
+    #chart-section { display: none; }
+
+    .chart-toolbar {
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid #dee2e6;
+      flex-wrap: wrap;
+    }
+
+    .toolbar-label { font-size: 12px; color: #6c757d; font-weight: 500; }
+
+    .toggle-btn {
+      padding: 4px 12px;
+      border: 1px solid #ced4da;
+      border-radius: 4px;
+      background: #fff;
+      font-size: 13px;
+      cursor: pointer;
+      color: #495057;
+    }
+    .toggle-btn.active {
+      background: #1a1a2e;
+      color: #fff;
+      border-color: #1a1a2e;
+    }
+
+    .irmaa-toggle {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 13px;
+      color: #495057;
+      margin-left: auto;
+      cursor: pointer;
+    }
+
+    #chart { width: 100%; height: 500px; }
+  </style>
+</head>
+<body>
+<div class="page">
+  <h1>EMR Analyzer</h1>
+
+  <!-- ── Input form ── -->
+  <div class="card" id="form-card">
+
+    <!-- Section 1: Ordinary Income (open) -->
+    <details open>
+      <summary>Ordinary Income</summary>
+      <div class="section-body">
+        <div class="field"><label>Pension / Annuity</label><input type="number" id="pension" min="0" step="1" placeholder="0"></div>
+        <div class="field"><label>Taxable Interest</label><input type="number" id="interest" min="0" step="1" placeholder="0"></div>
+        <div class="field"><label>Ordinary Dividends</label><input type="number" id="ordinary_dividends" min="0" step="1" placeholder="0"></div>
+        <div class="field"><label>Inherited IRA RMD</label><input type="number" id="inherited_ira_rmd" min="0" step="1" placeholder="0"></div>
+      </div>
+    </details>
+
+    <!-- Section 2: Preferential Income -->
+    <details>
+      <summary>Preferential Income</summary>
+      <div class="section-body">
+        <div class="field"><label>Qualified Dividends</label><input type="number" id="qualified_dividends" min="0" step="1" placeholder="0"></div>
+        <div class="field"><label>Fixed LTCG</label><input type="number" id="fixed_ltcg" min="0" step="1" placeholder="0"></div>
+      </div>
+    </details>
+
+    <!-- Section 3: Social Security -->
+    <details>
+      <summary>Social Security</summary>
+      <div class="section-body">
+        <div class="field"><label>SS Annual Benefit</label><input type="number" id="ss_benefit" min="0" step="1" placeholder="0"></div>
+        <div class="field"><label>Tax-Exempt Interest</label><input type="number" id="tax_exempt_interest" min="0" step="1" placeholder="0"></div>
+      </div>
+    </details>
+
+    <!-- Section 4: Sweep Settings -->
+    <details>
+      <summary>Sweep Settings</summary>
+      <div class="section-body">
+        <div class="field">
+          <label>Sweep Mode</label>
+          <select id="sweep_mode">
+            <option value="ordinary">Ordinary</option>
+            <option value="preferential">Preferential</option>
+          </select>
+        </div>
+        <div class="field" id="variable-ordinary-wrap">
+          <label>Variable Ordinary (Preferential mode)</label>
+          <input type="number" id="variable_ordinary" min="0" step="1" placeholder="0">
+        </div>
+        <div class="field">
+          <label>Filing Status</label>
+          <select id="filing_status">
+            <option value="single">Single</option>
+            <option value="mfj">Married Filing Jointly</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Tax Year</label>
+          <select id="tax_year">
+            <option value="2025">2025</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Sweep Floor</label>
+          <input type="number" id="sweep_floor" min="0" step="1" placeholder="0">
+        </div>
+        <div class="field">
+          <label>Sweep Ceiling (blank = service default)</label>
+          <input type="number" id="sweep_ceiling" min="1" step="1" placeholder="default">
+        </div>
+        <div class="field">
+          <label>Sweep Step</label>
+          <input type="number" id="sweep_step" min="1" step="100" value="100">
+        </div>
+
+        <!-- Ohio toggle -->
+        <div class="checkbox-row">
+          <input type="checkbox" id="include_ohio">
+          <label for="include_ohio">Include Ohio State Tax</label>
+        </div>
+
+        <!-- Ohio sub-fields -->
+        <div class="field hidden" id="ohio-medical-wrap">
+          <label>Ohio Medical Deduction</label>
+          <input type="number" id="ohio_medical_deduction" min="0" step="1" placeholder="0">
+        </div>
+        <div class="field hidden" id="ohio-retirement-wrap">
+          <label>Qualifying Retirement Income</label>
+          <input type="number" id="ohio_qualifying_retirement_income" min="0" step="1" placeholder="0">
+        </div>
+      </div>
+    </details>
+
+    <!-- Run button -->
+    <div class="run-wrap">
+      <button id="run-btn" type="button">Run Analysis</button>
+      <div id="error-msg"></div>
+    </div>
+  </div>
+
+  <!-- ── Planning signals ── -->
+  <div class="card" id="signals-wrap" style="display:none;">
+    <div id="signals-bar"></div>
+  </div>
+
+  <!-- ── Chart ── -->
+  <div class="card" id="chart-section" style="width:100%;">
+    <div class="chart-toolbar">
+      <span class="toolbar-label">Chart type:</span>
+      <button class="toggle-btn active" id="btn-stacked">Stacked Area</button>
+      <button class="toggle-btn" id="btn-lines">Lines</button>
+      <label class="irmaa-toggle">
+        <input type="checkbox" id="irmaa-toggle" checked>
+        IRMAA lines
+      </label>
+    </div>
+    <div id="chart" style="width:100%; height:500px; min-height:500px;"></div>
+  </div>
+
+</div>
+
+<script>
+  // ── State ────────────────────────────────────────────────────────────────
+  let lastResult = null;    // raw API response
+  let chartMode  = 'stacked'; // 'stacked' | 'lines'
+
+  // Component metadata: key, label, color
+  const COMPONENTS = [
+    { key: 'ordinary',     label: 'Ordinary',      color: '#4a86c8' },
+    { key: 'ss_torpedo',   label: 'SS Torpedo',     color: '#f59e0b' },
+    { key: 'pref_stacking',label: 'Pref Stacking',  color: '#8b5cf6' },
+    { key: 'niit',         label: 'NIIT',           color: '#ef4444' },
+    { key: 'ohio',         label: 'Ohio',           color: '#0d9488' },
+  ];
+
+  // ── DOM refs ─────────────────────────────────────────────────────────────
+  const runBtn       = document.getElementById('run-btn');
+  const errorMsg     = document.getElementById('error-msg');
+  const signalsWrap  = document.getElementById('signals-wrap');
+  const signalsBar   = document.getElementById('signals-bar');
+  const chartSection = document.getElementById('chart-section');
+  const btnStacked   = document.getElementById('btn-stacked');
+  const btnLines     = document.getElementById('btn-lines');
+  const irmaaToggle  = document.getElementById('irmaa-toggle');
+
+  // ── Field helpers ─────────────────────────────────────────────────────────
+  const el   = id => document.getElementById(id);
+  const fnum = id => parseFloat(el(id).value) || 0;
+
+  // ── Conditional field visibility ──────────────────────────────────────────
+  el('sweep_mode').addEventListener('change', () => {
+    const pref = el('sweep_mode').value === 'preferential';
+    el('variable-ordinary-wrap').classList.toggle('hidden', !pref);
+  });
+  // init: hide on page load (default is ordinary)
+  el('variable-ordinary-wrap').classList.add('hidden');
+
+  el('include_ohio').addEventListener('change', () => {
+    const checked = el('include_ohio').checked;
+    el('ohio-medical-wrap').classList.toggle('hidden', !checked);
+    el('ohio-retirement-wrap').classList.toggle('hidden', !checked);
+  });
+
+  // ── Build payload ─────────────────────────────────────────────────────────
+  function buildPayload() {
+    const ceilVal = el('sweep_ceiling').value;
+    return {
+      pension:                          fnum('pension'),
+      interest:                         fnum('interest'),
+      ordinary_dividends:               fnum('ordinary_dividends'),
+      inherited_ira_rmd:                fnum('inherited_ira_rmd'),
+      ss_benefit:                       fnum('ss_benefit'),
+      qualified_dividends:              fnum('qualified_dividends'),
+      fixed_ltcg:                       fnum('fixed_ltcg'),
+      tax_exempt_interest:              fnum('tax_exempt_interest'),
+      sweep_mode:                       el('sweep_mode').value,
+      variable_ordinary:                fnum('variable_ordinary'),
+      filing_status:                    el('filing_status').value,
+      tax_year:                         parseInt(el('tax_year').value),
+      sweep_floor:                      fnum('sweep_floor'),
+      sweep_ceiling:                    ceilVal ? parseFloat(ceilVal) : null,
+      sweep_step:                       fnum('sweep_step') || 100,
+      include_ohio:                     el('include_ohio').checked,
+      ohio_medical_deduction:           fnum('ohio_medical_deduction'),
+      ohio_qualifying_retirement_income: fnum('ohio_qualifying_retirement_income'),
+    };
+  }
+
+  // ── Show / hide error ─────────────────────────────────────────────────────
+  function showError(msg) {
+    errorMsg.textContent = msg;
+    errorMsg.style.display = 'block';
+  }
+  function clearError() {
+    errorMsg.style.display = 'none';
+    errorMsg.textContent = '';
+  }
+
+  // ── Run Analysis ──────────────────────────────────────────────────────────
+  runBtn.addEventListener('click', async () => {
+    clearError();
+    runBtn.disabled = true;
+    runBtn.textContent = 'Running…';
+
+    try {
+      const resp = await fetch('/api/emr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildPayload()),
+      });
+
+      if (!resp.ok) {
+        const body = await resp.json().catch(() => ({}));
+        if (resp.status === 422) {
+          const detail = body.detail;
+          showError(typeof detail === 'string'
+            ? detail
+            : JSON.stringify(detail));
+        } else {
+          showError('An unexpected error occurred. Please try again.');
+        }
+        return;
+      }
+
+      lastResult = await resp.json();
+      renderSignals(lastResult.planning_signals);
+      chartSection.style.display = 'block';
+      signalsWrap.style.display  = 'block';
+      Plotly.Plots.resize(document.getElementById('chart'));
+      renderChart();
+
+    } catch (_) {
+      showError('Could not reach the server. Is the API running?');
+    } finally {
+      runBtn.disabled = false;
+      runBtn.textContent = 'Run Analysis';
+    }
+  });
+
+  // ── Planning signals ──────────────────────────────────────────────────────
+  function fmt$(n) {
+    return '$' + Math.round(n).toLocaleString('en-US');
+  }
+
+  function renderSignals(s) {
+    const badges = [];
+
+    // Torpedo
+    if (s.torpedo_active) {
+      badges.push({ cls: 'badge-amber', text: '⚡ SS Torpedo Active' });
+    } else {
+      badges.push({ cls: 'badge-green', text: 'SS Torpedo: Inactive' });
+    }
+
+    // SS fully taxable
+    if (s.ss_fully_taxable) {
+      badges.push({ cls: 'badge-amber', text: 'SS: Fully Taxable (85%)' });
+    }
+
+    // LTCG 0%
+    if (s.ltcg_0pct_remaining !== null) {
+      badges.push({ cls: 'badge-green', text: '0% LTCG Space: ' + fmt$(s.ltcg_0pct_remaining) });
+    } else {
+      badges.push({ cls: 'badge-gray', text: '0% LTCG Space: None' });
+    }
+
+    // Distance to 22%
+    if (s.distance_to_22pct !== null) {
+      badges.push({ cls: 'badge-blue', text: 'To 22%: ' + fmt$(s.distance_to_22pct) });
+    } else {
+      badges.push({ cls: 'badge-gray', text: 'At 22%+' });
+    }
+
+    // Distance to 24%
+    if (s.distance_to_24pct !== null) {
+      badges.push({ cls: 'badge-blue', text: 'To 24%: ' + fmt$(s.distance_to_24pct) });
+    } else {
+      badges.push({ cls: 'badge-gray', text: 'At 24%+' });
+    }
+
+    signalsBar.innerHTML = badges
+      .map(b => `<span class="badge ${b.cls}">${b.text}</span>`)
+      .join('');
+    signalsBar.style.display = 'flex';
+  }
+
+  // ── Chart rendering ───────────────────────────────────────────────────────
+
+  // Return true if all values in array are zero
+  function allZero(arr) { return arr.every(v => v === 0); }
+
+  function pctFmt(v) { return (v * 100).toFixed(1) + '%'; }
+
+  function buildIrmaaShapes(thresholds, show) {
+    if (!show) return [];
+    return thresholds.map((t, i) => ({
+      type: 'line',
+      x0: t, x1: t,
+      y0: 0, y1: 1,
+      yref: 'paper',
+      line: { color: 'gray', dash: 'dash', width: 1 },
+    }));
+  }
+
+  function buildIrmaaAnnotations(thresholds, show) {
+    if (!show) return [];
+    return thresholds.map((t, i) => ({
+      x: t, y: 1, yref: 'paper',
+      text: 'IRMAA ' + (i + 1),
+      showarrow: false,
+      font: { size: 10, color: 'gray' },
+      xanchor: 'left',
+      yanchor: 'top',
+    }));
+  }
+
+  function buildLayout() {
+    const chartEl = document.getElementById('chart');
+    return {
+      width: chartEl.parentElement.offsetWidth || 800,
+      height: 500,
+      xaxis: {
+        title: { text: 'Variable Income ($)' },
+        tickformat: ',.0f',
+      },
+      yaxis: {
+        title: { text: 'Effective Marginal Rate' },
+        tickformat: '.0%',
+      },
+      legend: { orientation: 'h', y: -0.25 },
+      margin: { t: 20, b: 80, l: 60, r: 20 },
+      shapes: [],
+      annotations: [],
+      hovermode: 'x unified',
+    };
+  }
+
+  function buildStackedTraces(pts) {
+    const traces = [];
+    const x = pts.income;
+    let first = true;
+    for (const comp of COMPONENTS) {
+      const y = pts.components[comp.key];
+      if (allZero(y)) continue;
+      traces.push({
+        type: 'scatter',
+        x,
+        y,
+        name: comp.label,
+        fill: first ? 'tozeroy' : 'tonexty',
+        stackgroup: 'emr',
+        line: { color: comp.color, width: 0 },
+        fillcolor: comp.color,
+        hovertemplate: comp.label + ': %{y:.2%}<extra></extra>',
+      });
+      first = false;
+    }
+    return traces;
+  }
+
+  function buildLineTraces(pts) {
+    const traces = [];
+    const x = pts.income;
+
+    // Component lines
+    for (const comp of COMPONENTS) {
+      const y = pts.components[comp.key];
+      if (allZero(y)) continue;
+      traces.push({
+        type: 'scatter',
+        x,
+        y,
+        name: comp.label,
+        mode: 'lines',
+        line: { color: comp.color, width: 2 },
+        hovertemplate: comp.label + ': %{y:.2%}<extra></extra>',
+      });
+    }
+
+    // Total EMR bold line
+    traces.push({
+      type: 'scatter',
+      x,
+      y: pts.emr,
+      name: 'Total EMR',
+      mode: 'lines',
+      line: { color: '#212529', width: 3 },
+      hovertemplate: 'Total EMR: %{y:.2%}<extra></extra>',
+    });
+
+    return traces;
+  }
+
+  async function renderChart() {
+    if (!lastResult) return;
+    const pts = lastResult.points;
+    const traces = chartMode === 'stacked'
+      ? buildStackedTraces(pts)
+      : buildLineTraces(pts);
+    await Plotly.newPlot('chart', traces, buildLayout(), { responsive: true });
+    if (irmaaToggle.checked) {
+      const thresholds = lastResult.irmaa_thresholds;
+      const currentRange = document.getElementById('chart').layout.xaxis.range;
+      Plotly.relayout('chart', {
+        shapes:            buildIrmaaShapes(thresholds, true),
+        annotations:       buildIrmaaAnnotations(thresholds, true),
+        'xaxis.range':     currentRange,
+        'xaxis.autorange': false,
+      });
+    }
+  }
+
+  // ── Chart mode toggles ────────────────────────────────────────────────────
+  btnStacked.addEventListener('click', () => {
+    chartMode = 'stacked';
+    btnStacked.classList.add('active');
+    btnLines.classList.remove('active');
+    renderChart();
+  });
+
+  btnLines.addEventListener('click', () => {
+    chartMode = 'lines';
+    btnLines.classList.add('active');
+    btnStacked.classList.remove('active');
+    renderChart();
+  });
+
+  // ── IRMAA toggle — relayout only, no re-render ────────────────────────────
+  irmaaToggle.addEventListener('change', () => {
+    if (!lastResult) return;
+    const thresholds = lastResult.irmaa_thresholds;
+    const show = irmaaToggle.checked;
+    if (show) {
+      const currentRange = document.getElementById('chart').layout.xaxis.range;
+      Plotly.relayout('chart', {
+        shapes:              buildIrmaaShapes(thresholds, true),
+        annotations:         buildIrmaaAnnotations(thresholds, true),
+        'xaxis.range':       currentRange,
+        'xaxis.autorange':   false,
+      });
+    } else {
+      Plotly.relayout('chart', {
+        shapes:            [],
+        annotations:       [],
+        'xaxis.autorange': true,
+      });
+    }
+  });
+</script>
+<script>
+  window.debugPlotly = function() {
+    Plotly.newPlot('chart', [{
+      x: [1, 2, 3, 4, 5],
+      y: [0.10, 0.12, 0.22, 0.27, 0.22],
+      type: 'scatter',
+      fill: 'tozeroy',
+      name: 'Test'
+    }], {
+      yaxis: { tickformat: '.0%' },
+      title: 'Debug Test'
+    });
+  }
+</script>
+</body>
+</html>

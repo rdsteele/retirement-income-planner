@@ -717,6 +717,86 @@ class TestIRMAAThresholds:
 
 
 # ---------------------------------------------------------------------------
+# Ohio boundary insertion — zero-rate threshold and MAGI credit threshold
+# _compute_ordinary_boundaries must insert exact sweep points at both Ohio
+# discontinuities when include_ohio=True.
+# ---------------------------------------------------------------------------
+
+class TestOhioBoundaryInsertion:
+    """Verify Ohio discontinuity boundary points are present in sweep output."""
+
+    def setup_method(self):
+        self.fed_patcher = patch(_PATCH_FED, side_effect=_mock_federal_single)
+        self.ss_patcher = patch(_PATCH_SS, side_effect=_mock_ss_single)
+        self.ohio_patcher = patch(_PATCH_OHIO, side_effect=_mock_ohio)
+        self.mock_fed = self.fed_patcher.start()
+        self.mock_ss = self.ss_patcher.start()
+        self.mock_ohio = self.ohio_patcher.start()
+
+        # All fixed income = 0 so ohio_agi_base = 0 and ohio_agi = sweep_value.
+        # Zero-rate boundary:  ohio_tax_base = 26050 → ohio_agi = 26050 + 2400 = 28450
+        # MAGI credit boundary: ohio_agi - exemption = 100000 → ohio_agi = 101900
+        # sweep_step=10000 ensures neither boundary falls on a regular point.
+        self.result = calculate_emr(
+            pension=D("0"), interest=D("0"),
+            ordinary_dividends=D("0"), inherited_ira_rmd=D("0"),
+            ss_benefit=D("0"), qualified_dividends=D("0"),
+            fixed_ltcg=D("0"), tax_exempt_interest=D("0"),
+            ohio_qualifying_retirement_income=D("10000"),
+            sweep_mode=SweepMode.ORDINARY,
+            filing_status="single", tax_year=2025,
+            sweep_step=D("10000"),
+            sweep_floor=D("0"), sweep_ceiling=D("150000"),
+            include_ohio=True,
+        )
+        self.incomes = [pt.income for pt in self.result.points]
+
+    def teardown_method(self):
+        self.fed_patcher.stop()
+        self.ss_patcher.stop()
+        self.ohio_patcher.stop()
+
+    def test_zero_rate_boundary_present(self):
+        # ohio_tax_base crosses $26,050 at ohio_agi = 26050 + personal_exemption(2400) = 28450.
+        # Without this boundary point the spike can appear at a random $10,000-step interval.
+        assert D("28450") in self.incomes, (
+            "Ohio zero-rate boundary 28450 missing from sweep output; "
+            f"incomes={sorted(self.incomes)}"
+        )
+
+    def test_magi_credit_boundary_present(self):
+        # Retirement income credit drops from $200 to $0 at ohio_agi - exemption(1900) = 100000,
+        # i.e. ohio_agi = 101900.  Without this point the ~200% EMR spike appears at the
+        # wrong x-coordinate.
+        assert D("101900") in self.incomes, (
+            "Ohio MAGI credit boundary 101900 missing from sweep output; "
+            f"incomes={sorted(self.incomes)}"
+        )
+
+    def test_boundaries_absent_when_ohio_excluded(self):
+        # When include_ohio=False the Ohio-specific boundary points must not be inserted
+        # (they are unused and would only add sweep overhead).
+        result_no_ohio = calculate_emr(
+            pension=D("0"), interest=D("0"),
+            ordinary_dividends=D("0"), inherited_ira_rmd=D("0"),
+            ss_benefit=D("0"), qualified_dividends=D("0"),
+            fixed_ltcg=D("0"), tax_exempt_interest=D("0"),
+            sweep_mode=SweepMode.ORDINARY,
+            filing_status="single", tax_year=2025,
+            sweep_step=D("10000"),
+            sweep_floor=D("0"), sweep_ceiling=D("150000"),
+            include_ohio=False,
+        )
+        incomes_no_ohio = [pt.income for pt in result_no_ohio.points]
+        assert D("28450") not in incomes_no_ohio, (
+            "Ohio zero-rate boundary 28450 should be absent when include_ohio=False"
+        )
+        assert D("101900") not in incomes_no_ohio, (
+            "Ohio MAGI credit boundary 101900 should be absent when include_ohio=False"
+        )
+
+
+# ---------------------------------------------------------------------------
 # Error handling
 # ---------------------------------------------------------------------------
 
