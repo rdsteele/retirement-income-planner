@@ -1,7 +1,6 @@
 # Retirement Income Planning
 
-A FastAPI web application for modeling retirement income scenarios, including
-tax bracket analysis, Social Security timing, and withdrawal strategies.
+A FastAPI web application for modeling retirement income and tax planning. Supports federal and state tax calculations, Social Security taxability analysis, marginal effective tax rate (MER) calculations, and multi-stream annual income planning.
 
 ## Requirements
 
