@@ -1,0 +1,22 @@
+{
+  "tax_year": 2026,
+  "brackets": [
+    {"from": "0",     "to": "26050", "base": "0",      "rate": "0.0000", "excess_over": "0"},
+    {"from": "26050", "to": null,    "base": "332.00", "rate": "0.0275", "excess_over": "26050"}
+  ],
+  "personal_exemption": [
+    {"agi_up_to": "40000", "amount": "2400"},
+    {"agi_up_to": "80000", "amount": "2150"},
+    {"agi_up_to": null,    "amount": "1900"}
+  ],
+  "retirement_income_credit": [
+    {"income_up_to": "500",  "credit": "0"},
+    {"income_up_to": "1500", "credit": "25"},
+    {"income_up_to": "3000", "credit": "50"},
+    {"income_up_to": "5000", "credit": "80"},
+    {"income_up_to": "8000", "credit": "130"},
+    {"income_up_to": null,   "credit": "200"}
+  ],
+  "medical_expense_floor_rate": "0.075",
+  "magi_credit_threshold": "100000"
+}

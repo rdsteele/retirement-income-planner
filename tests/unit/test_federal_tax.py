@@ -183,3 +183,33 @@ class TestEdgeCases:
         # exercises the top-bracket path where b_to is None
         result = calculate_federal_tax(D("500000"), D("100000"), "single", 2025)
         assert result.preferential_income_tax == D("18330")
+
+
+# ---------------------------------------------------------------------------
+# Federal 2026 — IRS Rev. Proc. 2025-32
+#   Standard deduction single: $16,100
+#   Ordinary bracket 10%/12% crossover: $12,225
+# ---------------------------------------------------------------------------
+
+class TestFederal2026Data:
+    def test_standard_deduction_single(self):
+        import json
+        from pathlib import Path
+        path = Path(__file__).parent.parent.parent / "data/brackets/federal_2026.json"
+        data = json.loads(path.read_text())
+        assert data["standard_deduction"]["single"] == "16100"
+
+    def test_first_bracket_top_single(self):
+        # At exactly $12,225 of taxable ordinary income (the 2026 10% ceiling),
+        # all income falls in the 10% bracket.
+        # Tax = 12,225 × 0.10 = 1222.5 → ROUND_HALF_UP = $1,223
+        result = calculate_federal_tax(
+            ordinary_income=D("12225"),
+            preferential_income=D("0"),
+            filing_status="single",
+            tax_year=2026,
+        )
+        assert len(result.bracket_breakdown) == 1
+        assert result.bracket_breakdown[0].rate == D("0.10")
+        assert result.bracket_breakdown[0].income_taxed == D("12225")
+        assert result.bracket_breakdown[0].tax_amount == D("1223")

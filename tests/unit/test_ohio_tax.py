@@ -279,6 +279,56 @@ class TestEdgeCases:
         assert result.retirement_income_credit == D("200")
         assert result.ohio_tax == D("0")
 
+
+# ---------------------------------------------------------------------------
+# Ohio 2026 — flat 2.75% rate, base changes from $342 to $332 (HB96)
+# ---------------------------------------------------------------------------
+#
+# Setup: no medical expenses, no qualifying retirement income.
+# federal_agi=52150 → ohio_agi=52150 → exemption=$2,150 (40K < agi ≤ 80K)
+#   → ohio_tax_base = 52,150 − 2,150 = 50,000
+# federal_agi=151900 → ohio_agi=151900 → exemption=$1,900 (agi > 80K)
+#   → ohio_tax_base = 151,900 − 1,900 = 150,000
+
+class TestOhio2026FlatRate:
+    def setup_method(self):
+        self.result_50k = calculate_ohio_tax(
+            federal_agi=D("52150"),
+            gross_medical_expenses=D("0"),
+            qualifying_retirement_income=D("0"),
+            ss_taxable_federal=D("0"),
+            tax_year=2026,
+        )
+        self.result_150k = calculate_ohio_tax(
+            federal_agi=D("151900"),
+            gross_medical_expenses=D("0"),
+            qualifying_retirement_income=D("0"),
+            ss_taxable_federal=D("0"),
+            tax_year=2026,
+        )
+
+    def test_50k_tax_base(self):
+        assert self.result_50k.ohio_tax_base == D("50000")
+
+    def test_50k_ohio_tax_uses_2026_base(self):
+        # 332 + 2.75% × (50,000 − 26,050) = 332 + 658.625 = 990.625 → $991
+        assert self.result_50k.ohio_tax == D("991")
+
+    def test_150k_tax_base(self):
+        assert self.result_150k.ohio_tax_base == D("150000")
+
+    def test_150k_still_275_rate_no_upper_bracket(self):
+        # 2026 has no 3.125% bracket — 2.75% applies beyond $26,050 without limit
+        # 332 + 2.75% × (150,000 − 26,050) = 332 + 3408.625 = 3740.625 → $3,741
+        assert self.result_150k.ohio_tax == D("3741")
+
+    def test_no_bracket_jump_between_50k_and_150k(self):
+        # In 2025 a 3.125% upper bracket caused a rate increase above $100,000.
+        # In 2026 the incremental rate across the full range should be a flat 2.75%.
+        delta_tax = self.result_150k.ohio_tax - self.result_50k.ohio_tax
+        delta_base = self.result_150k.ohio_tax_base - self.result_50k.ohio_tax_base
+        assert delta_tax / delta_base == D("0.0275")
+
     def test_unsupported_tax_year_raises_value_error(self):
         with pytest.raises(ValueError, match="Unsupported tax year"):
             calculate_ohio_tax(D("50000"), D("0"), D("0"), D("0"), 2099)
