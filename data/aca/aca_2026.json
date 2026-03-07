@@ -1,0 +1,12 @@
+{
+  "tax_year": 2026,
+  "filing_status_cliffs": {
+    "single": 62600,
+    "mfj": 128600
+  },
+  "fpl_100pct": {
+    "single": 15650,
+    "mfj": 32150
+  },
+  "applicable_percentage_400pct": "0.0996"
+}
