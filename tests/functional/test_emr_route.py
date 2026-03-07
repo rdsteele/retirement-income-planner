@@ -5,6 +5,7 @@ Uses FastAPI TestClient with real bracket data — no mocks.
 
 from decimal import Decimal
 
+import pytest
 from fastapi.testclient import TestClient
 
 from api.main import app
@@ -351,3 +352,114 @@ class TestValidationErrors:
         assert resp.status_code == 422
         assert isinstance(body["detail"], str)
         assert "2099" in body["detail"]
+
+
+# ── Ohio functional tests ─────────────────────────────────────────────────
+
+# Base Ohio inputs: base ordinary (pension+interest) = 22,000; plus preferential
+# 15,000. Federal/Ohio AGI at sweep=0 ≈ 37,000 — already above the $26,050
+# Ohio zero-rate bracket threshold.
+_OHIO_BASE = {
+    "pension": 20000.0,
+    "interest": 2000.0,
+    "ordinary_dividends": 0.0,
+    "inherited_ira_rmd": 0.0,
+    "ss_benefit": 0.0,
+    "qualified_dividends": 5000.0,
+    "fixed_ltcg": 10000.0,
+    "tax_exempt_interest": 0.0,
+    "sweep_mode": "ordinary",
+    "filing_status": "single",
+    "tax_year": 2025,
+    "sweep_floor": 0.0,
+    "sweep_ceiling": 20000.0,
+    "sweep_step": 1000.0,
+    "include_ohio": True,
+    "ohio_medical_deduction": 3000.0,
+    "ohio_qualifying_retirement_income": 20000.0,
+}
+
+
+class TestOhioFunctional:
+    def test_ohio_included_smoke(self):
+        resp = client.post("/api/emr", json=_OHIO_BASE)
+        assert resp.status_code == 200
+        body = resp.json()
+        ohio_tax = body["points"]["ohio_tax"]
+        ohio_emrs = body["points"]["components"]["ohio"]
+        incomes = body["points"]["income"]
+
+        # Every sweep point is above the zero-rate bracket — ohio_tax must be non-zero
+        assert all(t > 0 for t in ohio_tax)
+
+        # In the clean 2.75% bracket range (above the personal-exemption tier
+        # boundary at ~income=3,000 and clear of the next bracket), emr_ohio ≈ 0.0275
+        clean_emrs = [e for i, e in zip(incomes, ohio_emrs) if 6000 <= i <= 15000]
+        assert clean_emrs, "no clean-range points found"
+        for emr in clean_emrs:
+            assert emr == pytest.approx(0.0275, abs=0.005), (
+                f"emr_ohio={emr} at income not approximately 0.0275"
+            )
+
+    def test_ohio_excluded_all_zero(self):
+        payload = {**_OHIO_BASE, "include_ohio": False}
+        resp = client.post("/api/emr", json=payload)
+        assert resp.status_code == 200
+        body = resp.json()
+        assert all(v == 0.0 for v in body["points"]["components"]["ohio"])
+        assert all(v == 0.0 for v in body["points"]["ohio_tax"])
+
+    def test_ohio_magi_credit_boundary_spike(self):
+        # pension=80,000; sweep crosses ~$21,900 where (ohio_agi - personal_exemption)
+        # exceeds $100,000, eliminating the $200 retirement income credit.
+        # Credit loss over the $1,000 EMR compute window → emr_ohio spike ≈ 0.24.
+        payload = {
+            "pension": 80000.0,
+            "interest": 0.0,
+            "ordinary_dividends": 0.0,
+            "inherited_ira_rmd": 0.0,
+            "ss_benefit": 0.0,
+            "qualified_dividends": 0.0,
+            "fixed_ltcg": 0.0,
+            "tax_exempt_interest": 0.0,
+            "sweep_mode": "ordinary",
+            "filing_status": "single",
+            "tax_year": 2025,
+            "sweep_floor": 0.0,
+            "sweep_ceiling": 30000.0,
+            "sweep_step": 1000.0,
+            "include_ohio": True,
+            "ohio_qualifying_retirement_income": 80000.0,
+        }
+        resp = client.post("/api/emr", json=payload)
+        assert resp.status_code == 200
+        body = resp.json()
+        incomes = body["points"]["income"]
+        ohio_emrs = body["points"]["components"]["ohio"]
+
+        max_emr = max(ohio_emrs)
+        assert max_emr > 0.10, (
+            f"expected MAGI boundary spike > 0.10, got max emr_ohio={max_emr}"
+        )
+        spike_income = incomes[ohio_emrs.index(max_emr)]
+        assert 15000.0 <= spike_income <= 28000.0, (
+            f"spike at income={spike_income}, expected near MAGI boundary (~21,900)"
+        )
+
+    def test_ohio_above_the_line_reduces_ohio_tax(self):
+        # above_the_line_adjustments reduce federal AGI → Ohio AGI → lower Ohio tax.
+        # At 2.75% rate, $5,000 AGI reduction ≈ $137.50 less tax (observed: $138).
+        base = {**_OHIO_BASE, "sweep_ceiling": 5000.0}
+        resp_no_adj = client.post("/api/emr", json=base)
+        resp_with_adj = client.post("/api/emr", json={**base, "above_the_line_adjustments": 5000.0})
+        assert resp_no_adj.status_code == 200
+        assert resp_with_adj.status_code == 200
+
+        ohio_no = resp_no_adj.json()["points"]["ohio_tax"][0]
+        ohio_adj = resp_with_adj.json()["points"]["ohio_tax"][0]
+        assert ohio_adj < ohio_no
+
+        diff = ohio_no - ohio_adj
+        assert diff == pytest.approx(137.50, abs=50.0), (
+            f"expected ~$137.50 reduction in ohio_tax, got {diff}"
+        )
