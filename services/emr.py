@@ -8,21 +8,17 @@ Returns an array of (income, emr, component_breakdown) points suitable for
 visualization and withdrawal decision support.
 """
 
-import json
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import Enum
-from functools import lru_cache
-from pathlib import Path
 from typing import TypedDict
 
 from services.common import round_rate, round_tax
+from services.data_loader import load_federal_data, load_ohio_data, load_ss_data
 from services.federal_tax import calculate_federal_tax
 from services.ohio_tax import calculate_ohio_tax
 from services.social_security import calculate_social_security_taxability
 
-_DATA_DIR = Path(__file__).parent.parent / "data" / "brackets"
-_SS_PATH = Path(__file__).parent.parent / "data" / "ss_thresholds.json"
 _ZERO = Decimal("0")
 _HALF = Decimal("0.50")
 _EMR_COMPUTE_STEP = Decimal("1000")  # larger step reduces whole-dollar rounding noise
@@ -74,54 +70,26 @@ class _TaxSnapshot:
     total_tax: Decimal
 
 
-# ---------------------------------------------------------------------------
-# Data loading
-# ---------------------------------------------------------------------------
-
-@lru_cache(maxsize=None)
-def _load_federal_data(tax_year: int) -> dict:
-    path = _DATA_DIR / f"federal_{tax_year}.json"
-    if not path.exists():
-        raise ValueError(f"Unsupported tax year: {tax_year}")
-    with path.open() as f:
-        return json.load(f)
-
-
-@lru_cache(maxsize=None)
-def _load_ss_data() -> dict:
-    with _SS_PATH.open() as f:
-        return json.load(f)
-
-
-@lru_cache(maxsize=None)
-def _load_ohio_data(tax_year: int) -> dict:
-    path = _DATA_DIR / f"ohio_{tax_year}.json"
-    if not path.exists():
-        raise ValueError(f"Unsupported tax year: {tax_year}")
-    with path.open() as f:
-        return json.load(f)
-
-
 def _get_standard_deduction(filing_status: str, tax_year: int) -> Decimal:
-    return Decimal(_load_federal_data(tax_year)["standard_deduction"][filing_status])
+    return Decimal(load_federal_data(tax_year)["standard_deduction"][filing_status])
 
 
 def _get_niit_threshold(filing_status: str, tax_year: int) -> Decimal:
-    return Decimal(_load_federal_data(tax_year)["niit"][filing_status])
+    return Decimal(load_federal_data(tax_year)["niit"][filing_status])
 
 
 def _get_niit_rate(tax_year: int) -> Decimal:
-    return Decimal(_load_federal_data(tax_year)["niit"]["rate"])
+    return Decimal(load_federal_data(tax_year)["niit"]["rate"])
 
 
 def _get_irmaa_thresholds(filing_status: str, tax_year: int) -> list[Decimal]:
     return [Decimal(t) for t in
-            _load_federal_data(tax_year)["irmaa_thresholds"][filing_status]]
+            load_federal_data(tax_year)["irmaa_thresholds"][filing_status]]
 
 
 def _get_default_sweep_ceiling(filing_status: str, tax_year: int) -> Decimal:
     """Return the top of the 24% ordinary bracket."""
-    for bracket in _load_federal_data(tax_year)["ordinary"][filing_status]:
+    for bracket in load_federal_data(tax_year)["ordinary"][filing_status]:
         if Decimal(bracket["rate"]) == Decimal("0.24"):
             return Decimal(bracket["to"])
     raise ValueError(f"No 24% bracket found for {filing_status} {tax_year}")
@@ -230,7 +198,7 @@ def _compute_ohio_tax_at_point(
     tax_year: int,
 ) -> Decimal:
     """Compute Ohio tax, reverse-engineering gross medical for fixed deduction."""
-    ohio_floor_rate = Decimal(_load_ohio_data(tax_year)["medical_expense_floor_rate"])
+    ohio_floor_rate = Decimal(load_ohio_data(tax_year)["medical_expense_floor_rate"])
     ohio_agi = agi - ss_taxable
     medical_floor = round_tax(ohio_agi * ohio_floor_rate)
     gross_medical = ohio_medical_deduction + medical_floor
@@ -417,7 +385,7 @@ def _compute_ohio_boundaries(
     Boundary points are approximate — ohio_medical_deduction is included in the zero-rate
     threshold but personal exemption is taken from the expected tier at each boundary.
     """
-    ohio_data = _load_ohio_data(tax_year)
+    ohio_data = load_ohio_data(tax_year)
     boundaries: list[Decimal] = []
 
     # Zero-rate threshold: ohio_tax_base enters the first taxable bracket
@@ -453,7 +421,7 @@ def _compute_ordinary_boundaries(
     additional_deductions: Decimal = _ZERO,
 ) -> list[Decimal]:
     """Compute approximate boundary points for ORDINARY sweep mode."""
-    data = _load_federal_data(tax_year)
+    data = load_federal_data(tax_year)
     boundaries: list[Decimal] = []
     total_deduction = std_deduction + additional_deductions + above_the_line_adjustments
 
@@ -480,7 +448,7 @@ def _compute_ordinary_boundaries(
         half_ss = ss_benefit * _HALF
         base_prov = (fixed_ordinary + total_preferential - above_the_line_adjustments
                      + tax_exempt_interest + half_ss)
-        ss_data = _load_ss_data()
+        ss_data = load_ss_data()
         tier_1 = Decimal(ss_data[filing_status]["tier_1_threshold"])
         tier_2 = Decimal(ss_data[filing_status]["tier_2_threshold"])
         boundaries.append(tier_1 - base_prov)
@@ -526,7 +494,7 @@ def _compute_preferential_boundaries(
     additional_deductions: Decimal = _ZERO,
 ) -> list[Decimal]:
     """Compute approximate boundary points for PREFERENTIAL sweep mode."""
-    data = _load_federal_data(tax_year)
+    data = load_federal_data(tax_year)
     boundaries: list[Decimal] = []
 
     total_ordinary = fixed_ordinary + variable_ordinary
@@ -547,7 +515,7 @@ def _compute_preferential_boundaries(
         half_ss = ss_benefit * _HALF
         base_prov = (total_ordinary + fixed_pref - above_the_line_adjustments
                      + tax_exempt_interest + half_ss)
-        ss_data = _load_ss_data()
+        ss_data = load_ss_data()
         tier_1 = Decimal(ss_data[filing_status]["tier_1_threshold"])
         tier_2 = Decimal(ss_data[filing_status]["tier_2_threshold"])
         boundaries.append(tier_1 - base_prov)

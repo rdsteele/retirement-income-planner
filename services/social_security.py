@@ -5,15 +5,12 @@ provisional income formula. Standalone service — no dependency on the
 federal_tax or ohio_tax services.
 """
 
-import json
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
-from functools import lru_cache
-from pathlib import Path
 
 from services.common import round_rate, round_tax
+from services.data_loader import load_ss_data
 
-_DATA_PATH = Path(__file__).parent.parent / "data" / "ss_thresholds.json"
 _TWO_PLACES = Decimal("0.01")
 
 
@@ -23,12 +20,6 @@ class SocialSecurityResult:
     taxable_ss: Decimal
     inclusion_rate: Decimal
     tier: str
-
-
-@lru_cache(maxsize=None)
-def _load_thresholds() -> dict:
-    with _DATA_PATH.open() as f:
-        return json.load(f)
 
 
 def _round2(amount: Decimal) -> Decimal:
@@ -93,7 +84,7 @@ def calculate_social_security_taxability(
             tier="none",
         )
 
-    thresholds = _load_thresholds()
+    thresholds = load_ss_data()
     fs = thresholds[filing_status]
     tier_1 = Decimal(fs["tier_1_threshold"])
     tier_2 = Decimal(fs["tier_2_threshold"])

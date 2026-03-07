@@ -8,15 +8,11 @@ Ohio starts from federal AGI and applies its own adjustments before applying
 the bracket schedule. Single filer only; tax year 2025.
 """
 
-import json
 from dataclasses import dataclass
 from decimal import Decimal
-from functools import lru_cache
-from pathlib import Path
 
 from services.common import round_rate, round_tax
-
-_DATA_DIR = Path(__file__).parent.parent / "data" / "brackets"
+from services.data_loader import load_ohio_data
 
 
 @dataclass
@@ -29,15 +25,6 @@ class OhioTaxResult:
     retirement_income_credit: Decimal
     ohio_tax: Decimal
     effective_rate: Decimal
-
-
-@lru_cache(maxsize=None)
-def _load_ohio_data(tax_year: int) -> dict:
-    path = _DATA_DIR / f"ohio_{tax_year}.json"
-    if not path.exists():
-        raise ValueError(f"Unsupported tax year: {tax_year}")
-    with path.open() as f:
-        return json.load(f)
 
 
 def _compute_ohio_agi(federal_agi: Decimal, ss_taxable_federal: Decimal) -> Decimal:
@@ -113,7 +100,7 @@ def calculate_ohio_tax(
     ss_taxable_federal: Decimal,
     tax_year: int,
 ) -> OhioTaxResult:
-    data = _load_ohio_data(tax_year)
+    data = load_ohio_data(tax_year)
 
     ohio_agi = _compute_ohio_agi(federal_agi, ss_taxable_federal)
     personal_exemption = _lookup_personal_exemption(ohio_agi, data["personal_exemption"])

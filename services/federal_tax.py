@@ -9,15 +9,11 @@ This service receives pre-computed taxable income. Deductions, Social Security
 taxability, NIIT, and AMT are out of scope.
 """
 
-import json
 from dataclasses import dataclass
 from decimal import Decimal
-from functools import lru_cache
-from pathlib import Path
 
 from services.common import round_rate, round_tax
-
-_DATA_DIR = Path(__file__).parent.parent / "data" / "brackets"
+from services.data_loader import load_federal_data
 
 
 @dataclass
@@ -35,15 +31,6 @@ class FederalTaxResult:
     effective_rate: Decimal
     marginal_bracket_rate: Decimal
     bracket_breakdown: list[BracketDetail]
-
-
-@lru_cache(maxsize=None)
-def _load_brackets(tax_year: int) -> dict:
-    path = _DATA_DIR / f"federal_{tax_year}.json"
-    if not path.exists():
-        raise ValueError(f"Unsupported tax year: {tax_year}")
-    with path.open() as f:
-        return json.load(f)
 
 
 def _apply_ordinary_brackets(
@@ -117,7 +104,7 @@ def calculate_federal_tax(
     if filing_status not in ("single", "mfj"):
         raise ValueError(f"Unsupported filing status: {filing_status!r}")
 
-    data = _load_brackets(tax_year)
+    data = load_federal_data(tax_year)
     ordinary_tax, marginal_rate, breakdown = _apply_ordinary_brackets(
         ordinary_income, data["ordinary"][filing_status]
     )
