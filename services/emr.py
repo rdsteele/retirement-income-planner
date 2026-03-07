@@ -8,12 +8,13 @@ Returns an array of (income, emr, component_breakdown) points suitable for
 visualization and withdrawal decision support.
 """
 
+import json
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import Enum
 from functools import lru_cache
 from pathlib import Path
-import json
+from typing import TypedDict
 
 from services.common import round_rate, round_tax
 from services.federal_tax import calculate_federal_tax
@@ -247,6 +248,27 @@ def _compute_ohio_tax_at_point(
 # ---------------------------------------------------------------------------
 # Full tax snapshot at a single sweep point
 # ---------------------------------------------------------------------------
+
+class _SnapshotKwargs(TypedDict, total=False):
+    sweep_mode: SweepMode
+    fixed_ordinary: Decimal
+    variable_ordinary: Decimal
+    qualified_dividends: Decimal
+    fixed_ltcg: Decimal
+    ss_benefit: Decimal
+    tax_exempt_interest: Decimal
+    std_deduction: Decimal
+    niit_threshold: Decimal
+    niit_rate: Decimal
+    filing_status: str
+    tax_year: int
+    include_ohio: bool
+    ohio_medical_deduction: Decimal
+    ohio_qualifying_retirement_income: Decimal
+    investment_ordinary: Decimal
+    above_the_line_adjustments: Decimal
+    additional_deductions: Decimal
+
 
 def _compute_tax_snapshot(
     sweep_value: Decimal,
@@ -651,7 +673,7 @@ def calculate_emr(
         sweep_floor, sweep_ceiling, sweep_step, boundaries)
 
     # Shared keyword args for _compute_tax_snapshot
-    shared = dict(
+    shared: _SnapshotKwargs = dict(
         sweep_mode=sweep_mode,
         fixed_ordinary=fixed_ordinary,
         variable_ordinary=variable_ordinary,

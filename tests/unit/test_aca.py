@@ -9,9 +9,7 @@ Filing status: single unless noted.  Tax year: 2026.
 
 from decimal import Decimal
 
-import pytest
-
-from services.aca import ACAResult, calculate_aca_subsidy
+from services.aca import calculate_aca_subsidy
 
 
 def D(s: str) -> Decimal:

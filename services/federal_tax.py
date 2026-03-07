@@ -9,11 +9,11 @@ This service receives pre-computed taxable income. Deductions, Social Security
 taxability, NIIT, and AMT are out of scope.
 """
 
+import json
 from dataclasses import dataclass
 from decimal import Decimal
 from functools import lru_cache
 from pathlib import Path
-import json
 
 from services.common import round_rate, round_tax
 

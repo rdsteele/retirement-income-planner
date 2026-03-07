@@ -10,7 +10,9 @@
 # applied differently in the spreadsheet. The IRS uses ROUND_HALF_UP.
 
 from decimal import Decimal
+
 import pytest
+
 from services.federal_tax import calculate_federal_tax
 
 

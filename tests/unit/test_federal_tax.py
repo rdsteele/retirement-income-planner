@@ -8,7 +8,7 @@ from decimal import Decimal
 
 import pytest
 
-from services.federal_tax import BracketDetail, FederalTaxResult, calculate_federal_tax
+from services.federal_tax import BracketDetail, calculate_federal_tax
 
 
 def D(s: str) -> Decimal:

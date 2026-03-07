@@ -3,7 +3,6 @@
 Uses FastAPI TestClient with real bracket data — no mocks.
 """
 
-from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient

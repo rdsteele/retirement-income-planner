@@ -5,11 +5,11 @@ provisional income formula. Standalone service — no dependency on the
 federal_tax or ohio_tax services.
 """
 
+import json
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 from functools import lru_cache
 from pathlib import Path
-import json
 
 from services.common import round_rate, round_tax
 

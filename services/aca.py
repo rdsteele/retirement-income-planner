@@ -8,11 +8,11 @@ For 2026, the enhanced ARP/IRA subsidies expired. Standard ACA rules apply:
 subsidies are available only to households with MAGI at or below 400% FPL.
 """
 
+import json
 from dataclasses import dataclass
 from decimal import Decimal
 from functools import lru_cache
 from pathlib import Path
-import json
 
 from services.common import round_tax
 

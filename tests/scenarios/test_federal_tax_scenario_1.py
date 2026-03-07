@@ -19,7 +19,9 @@
 #       rounding variance across individual line items.
 
 from decimal import Decimal
+
 import pytest
+
 from services.federal_tax import calculate_federal_tax
 
 

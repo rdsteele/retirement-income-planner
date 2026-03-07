@@ -8,11 +8,11 @@ Ohio starts from federal AGI and applies its own adjustments before applying
 the bracket schedule. Single filer only; tax year 2025.
 """
 
+import json
 from dataclasses import dataclass
 from decimal import Decimal
 from functools import lru_cache
 from pathlib import Path
-import json
 
 from services.common import round_rate, round_tax
 

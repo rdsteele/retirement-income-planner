@@ -11,8 +11,6 @@ Tests cover:
 
 from decimal import Decimal
 
-import pytest
-
 from services.emr import SweepMode, calculate_emr
 from services.total_cost import calculate_total_cost
 

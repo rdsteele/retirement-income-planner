@@ -27,7 +27,9 @@
 #   Ohio tax:                      $527
 
 from decimal import Decimal
+
 import pytest
+
 from services.ohio_tax import calculate_ohio_tax
 
 

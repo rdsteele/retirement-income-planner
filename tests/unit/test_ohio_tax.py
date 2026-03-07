@@ -8,7 +8,7 @@ from decimal import Decimal
 
 import pytest
 
-from services.ohio_tax import OhioTaxResult, calculate_ohio_tax
+from services.ohio_tax import calculate_ohio_tax
 
 
 def D(s: str) -> Decimal:
