@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>EMR Analyzer</title>
   <script src="/static/plotly-2.26.0.min.js"></script>
@@ -206,9 +207,9 @@
         <div class="field"><label>Pension / Annuity</label><input type="number" id="pension" min="0" step="1" placeholder="0"></div>
         <div class="field"><label>Taxable Interest</label><input type="number" id="interest" min="0" step="1" placeholder="0"></div>
         <div class="field"><label>Ordinary Dividends</label><input type="number" id="ordinary_dividends" min="0" step="1" placeholder="0"></div>
-        <div class="field"><label>Inherited IRA RMD</label><input type="number" id="inherited_ira_rmd" min="0" step="1" placeholder="0"></div>
-        <div class="field"><label>Above-the-Line Adjustments</label><input type="number" id="above_the_line_adjustments" min="0" step="1" placeholder="0"><span class="field-hint">e.g. HSA contributions</span></div>
-        <div class="field"><label>Additional Deductions</label><input type="number" id="additional_deductions" min="0" step="1" placeholder="0"><span class="field-hint">e.g. QBI deduction</span></div>
+        <div class="field"><label>RMDs</label><input type="number" id="inherited_ira_rmd" min="0" step="1" placeholder="0"></div>
+        <div class="field"><label>Above-the-Line Adjustments</label><input type="number" id="above_the_line_adjustments" min="0" step="1" placeholder="0"><span class="field-hint">e.g. HSA contributions, IRA deductions</span></div>
+        <div class="field"><label>Additional Deductions</label><input type="number" id="additional_deductions" min="0" step="1" placeholder="0"><span class="field-hint">e.g. QBI, excess itemized deductions</span></div>
       </div>
     </details>
 
@@ -264,7 +265,7 @@
         </div>
         <div class="field">
           <label>Sweep Ceiling (blank = service default)</label>
-          <input type="number" id="sweep_ceiling" min="1" step="1" placeholder="default">
+          <input type="number" id="sweep_ceiling" min="1" step="1" placeholder="197,300 (default)">
         </div>
         <div class="field">
           <label>Sweep Step</label>
@@ -309,7 +310,7 @@
       <button class="toggle-btn" id="btn-lines">Lines</button>
       <label class="irmaa-toggle">
         <input type="checkbox" id="irmaa-toggle" checked>
-        IRMAA lines
+        IRMAA Thresholds
       </label>
     </div>
     <div id="chart" style="width:100%; height:500px; min-height:500px;"></div>
@@ -525,7 +526,11 @@
       width: chartEl.parentElement.offsetWidth || 800,
       height: 500,
       xaxis: {
-        title: { text: 'Variable Income ($)' },
+        title: {
+          text: lastResult && lastResult.sweep_mode === 'preferential'
+            ? 'Additional Preferential Income ($)'
+            : 'Additional Ordinary Income ($)',
+        },
         tickformat: ',.0f',
       },
       yaxis: {
