@@ -15,20 +15,7 @@ _EMR_COMPUTE_STEP = Decimal("1000")
 
 
 @dataclass
-class TotalCostPoint:
-    # Pass-through from EMRPoint
-    income: Decimal
-    total_tax: Decimal
-    emr: Decimal
-    emr_ordinary: Decimal
-    emr_ss_torpedo: Decimal
-    emr_pref_stacking: Decimal
-    emr_niit: Decimal
-    emr_ohio: Decimal
-    ohio_tax: Decimal
-    ss_taxable: Decimal
-    ss_inclusion_rate: Decimal
-    taxable_ordinary: Decimal
+class TotalCostPoint(EMRPoint):
     # ACA additions
     aca_magi: Decimal
     aptc_annual: Decimal
