@@ -13,6 +13,8 @@ class EMRRequest(BaseModel):
     qualified_dividends: float = Field(default=0.0, ge=0)
     fixed_ltcg: float = Field(default=0.0, ge=0)
     tax_exempt_interest: float = Field(default=0.0, ge=0)
+    above_the_line_adjustments: float = Field(default=0.0, ge=0)
+    additional_deductions: float = Field(default=0.0, ge=0)
 
     # Mode and sweep fields
     sweep_mode: str

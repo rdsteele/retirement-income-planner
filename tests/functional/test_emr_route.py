@@ -137,8 +137,8 @@ class TestPreferentialSweep:
     def test_ltcg_0pct_remaining_present(self):
         signals = self.body["planning_signals"]
         remaining = signals["ltcg_0pct_remaining"]
-        # taxable_ordinary = 20000, qualified_divs = 2000
-        # 0% LTCG space = 48350 - 20000 - 2000 = 26350
+        # taxable_ordinary = 19250, qualified_divs = 2000
+        # 0% LTCG space = 48350 - 19250 - 2000 = 27100
         assert remaining is not None
         assert isinstance(remaining, (int, float))
         assert remaining > 0
@@ -252,6 +252,54 @@ class TestPlanningSignals:
         resp = client.post("/api/emr", json=payload)
         body = resp.json()
         assert body["planning_signals"]["torpedo_active"] is True
+
+
+# ── above_the_line_adjustments and additional_deductions ─────────────────
+
+class TestAdjustmentFields:
+    def test_above_the_line_reduces_ss_taxable(self):
+        # With ss_benefit and high pension, HSA adjustment reduces SS taxable amount.
+        base = {**_BASE_ORDINARY, "ss_benefit": 20000.0, "pension": 30000.0,
+                "sweep_ceiling": 1000.0}
+        resp_no_adj = client.post("/api/emr", json=base)
+        resp_with_adj = client.post("/api/emr", json={**base,
+                                    "above_the_line_adjustments": 10000.0})
+        assert resp_no_adj.status_code == 200
+        assert resp_with_adj.status_code == 200
+        ss_no = resp_no_adj.json()["points"]["ss_taxable"][0]
+        ss_adj = resp_with_adj.json()["points"]["ss_taxable"][0]
+        assert ss_adj < ss_no
+
+    def test_additional_deductions_reduces_taxable_ordinary(self):
+        base = {**_BASE_ORDINARY, "sweep_ceiling": 1000.0}
+        resp_no_ded = client.post("/api/emr", json=base)
+        resp_with_ded = client.post("/api/emr", json={**base,
+                                    "additional_deductions": 5000.0})
+        assert resp_no_ded.status_code == 200
+        assert resp_with_ded.status_code == 200
+        ord_no = resp_no_ded.json()["points"]["taxable_ordinary"][0]
+        ord_ded = resp_with_ded.json()["points"]["taxable_ordinary"][0]
+        assert ord_ded < ord_no
+
+    def test_defaults_to_zero(self):
+        # Omitting both fields should give same result as passing zero.
+        base = {**_BASE_ORDINARY, "sweep_ceiling": 1000.0}
+        resp_omit = client.post("/api/emr", json=base)
+        resp_zero = client.post("/api/emr", json={**base,
+                                "above_the_line_adjustments": 0.0,
+                                "additional_deductions": 0.0})
+        assert resp_omit.json()["points"]["taxable_ordinary"] == \
+               resp_zero.json()["points"]["taxable_ordinary"]
+
+    def test_negative_above_the_line_rejected(self):
+        payload = {**_BASE_ORDINARY, "above_the_line_adjustments": -100.0}
+        resp = client.post("/api/emr", json=payload)
+        assert resp.status_code == 422
+
+    def test_negative_additional_deductions_rejected(self):
+        payload = {**_BASE_ORDINARY, "additional_deductions": -100.0}
+        resp = client.post("/api/emr", json=payload)
+        assert resp.status_code == 422
 
 
 # ── Validation errors (422) ──────────────────────────────────────────────

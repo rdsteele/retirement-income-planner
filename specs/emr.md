@@ -60,6 +60,8 @@ output so the visualization knows what is on the x-axis.
 | `qualified_dividends`  | Qualified dividends (preferential rate) — fixed in ORDINARY mode, fixed component in PREFERENTIAL mode |
 | `fixed_ltcg`           | Fixed LTCG already realized — fixed in ORDINARY mode     |
 | `tax_exempt_interest`  | Tax-exempt interest (counts toward SS provisional income)|
+| `above_the_line_adjustments` | Above-the-line deductions that reduce federal AGI (e.g. HSA contributions). Default `0`. |
+| `additional_deductions` | Deductions above the standard deduction (e.g. QBI, excess itemized). Default `0`. |
 
 ### Mode and Sweep Inputs
 
@@ -149,16 +151,22 @@ total_preferential = qualified_dividends + fixed_ltcg + sweep_value
 ### 4. SS Taxability
 At each sweep point, compute provisional income and call `social_security` service:
 ```
-provisional_income = total_ordinary + total_preferential
-                   + tax_exempt_interest + (ss_benefit × 0.50)
+agi_excluding_ss = total_ordinary + total_preferential - above_the_line_adjustments
+provisional_income = agi_excluding_ss + tax_exempt_interest + (ss_benefit × 0.50)
 ```
+`above_the_line_adjustments` reduces provisional income — HSA contributions lower
+the amount of SS that becomes taxable, which is an important planning interaction.
 `ss_taxable` is dynamic — it changes at each sweep point as variable income rises.
 
 ### 5. AGI and Taxable Income
 ```
-agi = total_ordinary + ss_taxable + total_preferential
-taxable_ordinary = max(0, total_ordinary + ss_taxable - standard_deduction)
+agi = total_ordinary + ss_taxable + total_preferential - above_the_line_adjustments
+taxable_ordinary = max(0, total_ordinary + ss_taxable - standard_deduction - additional_deductions)
 ```
+`above_the_line_adjustments` reduces AGI before SS taxability flows to Ohio.
+`additional_deductions` reduces taxable ordinary income below the standard deduction
+(e.g. QBI deduction, or excess itemized deductions over the standard deduction amount).
+Neither field affects `total_preferential` or the preferential tax calculation.
 
 ### 6. Federal Tax
 Call `federal_tax` service with:

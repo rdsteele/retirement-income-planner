@@ -83,6 +83,7 @@
       box-shadow: 0 0 0 2px rgba(76,110,245,0.15);
     }
     .field-wide { grid-column: 1 / -1; }
+    .field-hint { font-size: 10px; color: #adb5bd; margin-top: -2px; }
 
     /* checkbox row */
     .checkbox-row {
@@ -206,6 +207,8 @@
         <div class="field"><label>Taxable Interest</label><input type="number" id="interest" min="0" step="1" placeholder="0"></div>
         <div class="field"><label>Ordinary Dividends</label><input type="number" id="ordinary_dividends" min="0" step="1" placeholder="0"></div>
         <div class="field"><label>Inherited IRA RMD</label><input type="number" id="inherited_ira_rmd" min="0" step="1" placeholder="0"></div>
+        <div class="field"><label>Above-the-Line Adjustments</label><input type="number" id="above_the_line_adjustments" min="0" step="1" placeholder="0"><span class="field-hint">e.g. HSA contributions</span></div>
+        <div class="field"><label>Additional Deductions</label><input type="number" id="additional_deductions" min="0" step="1" placeholder="0"><span class="field-hint">e.g. QBI deduction</span></div>
       </div>
     </details>
 
@@ -373,6 +376,8 @@
       qualified_dividends:              fnum('qualified_dividends'),
       fixed_ltcg:                       fnum('fixed_ltcg'),
       tax_exempt_interest:              fnum('tax_exempt_interest'),
+      above_the_line_adjustments:       fnum('above_the_line_adjustments'),
+      additional_deductions:            fnum('additional_deductions'),
       sweep_mode:                       el('sweep_mode').value,
       variable_ordinary:                fnum('variable_ordinary'),
       filing_status:                    el('filing_status').value,

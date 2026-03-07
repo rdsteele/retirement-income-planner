@@ -131,6 +131,9 @@ def post_emr(request: EMRRequest):
             ohio_medical_deduction=_to_decimal(request.ohio_medical_deduction),
             ohio_qualifying_retirement_income=_to_decimal(
                 request.ohio_qualifying_retirement_income),
+            above_the_line_adjustments=_to_decimal(
+                request.above_the_line_adjustments),
+            additional_deductions=_to_decimal(request.additional_deductions),
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))

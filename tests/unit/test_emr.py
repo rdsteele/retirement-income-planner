@@ -212,7 +212,7 @@ _PATCH_OHIO = "services.emr.calculate_ohio_tax"
 
 # ---------------------------------------------------------------------------
 # Example A — Ordinary Sweep, No SS
-# Pension/interest income in 10%/12% brackets. Preferential stacking at ~26350.
+# Pension/interest income in 10%/12% brackets. Preferential stacking at ~27100.
 # ---------------------------------------------------------------------------
 
 class TestExampleAOrdinarySweepNoSS:
@@ -248,14 +248,14 @@ class TestExampleAOrdinarySweepNoSS:
         pt = _find_point(self.result, D("0"))
         assert pt is not None
         assert pt.emr == D("0.1000")
-        assert pt.total_tax == D("700")
-        assert pt.taxable_ordinary == D("7000")
+        assert pt.total_tax == D("625")
+        assert pt.taxable_ordinary == D("6250")
 
     def test_emr_in_12_bracket(self):
-        pt = _find_point(self.result, D("5000"))
+        pt = _find_point(self.result, D("6000"))
         assert pt is not None
         assert pt.emr == D("0.1200")
-        assert pt.total_tax == D("1202")
+        assert pt.total_tax == D("1232")
 
     def test_emr_stacking_zone(self):
         pt = _find_point(self.result, D("30000"))
@@ -281,13 +281,13 @@ class TestExampleAOrdinarySweepNoSS:
         self.mock_ohio.assert_not_called()
 
     def test_component_sums_at_spec_points(self):
-        for income in (D("0"), D("5000"), D("30000"), D("100000")):
+        for income in (D("0"), D("6000"), D("30000"), D("100000")):
             pt = _find_point(self.result, income)
             _assert_component_sum(pt)
 
     def test_boundary_point_stacking_start(self):
-        pt = _find_point(self.result, D("26350"))
-        assert pt is not None, "Stacking boundary 26350 missing from output"
+        pt = _find_point(self.result, D("27100"))
+        assert pt is not None, "Stacking boundary 27100 missing from output"
         assert pt.emr == D("0.2700")
 
 
@@ -326,15 +326,15 @@ class TestExampleBSSTorpedo:
         assert pt is not None
         # 0.2220: $1000 × 12% + $1000 × 85% × 12% = $120 + $102 = $222 → 22.2%
         assert pt.emr == D("0.2220")
-        assert pt.total_tax == D("2180")
+        assert pt.total_tax == D("2090")
         assert pt.ss_taxable == D("12150")
-        assert pt.taxable_ordinary == D("20150")
+        assert pt.taxable_ordinary == D("19400")
 
     def test_emr_torpedo_at_5000(self):
         pt = _find_point(self.result, D("5000"))
         assert pt is not None
         assert pt.emr == D("0.2220")
-        assert pt.total_tax == D("3290")
+        assert pt.total_tax == D("3200")
         assert pt.ss_taxable == D("16400")
 
     def test_torpedo_component_at_5000(self):
@@ -361,7 +361,7 @@ class TestExampleBSSTorpedo:
         pt = _find_point(self.result, D("15000"))
         assert pt is not None
         assert pt.emr == D("0.2700")
-        assert pt.total_tax == D("5428")
+        assert pt.total_tax == D("5225")
 
     def test_emr_22_bracket(self):
         pt = _find_point(self.result, D("25000"))
@@ -373,7 +373,7 @@ class TestExampleBSSTorpedo:
         pt = _find_point(self.result, D("80000"))
         assert pt is not None
         assert pt.emr == D("0.2400")
-        assert pt.total_tax == D("20064")
+        assert pt.total_tax == D("19884")
 
     def test_ss_service_called(self):
         assert self.mock_ss.call_count > 0
@@ -423,22 +423,22 @@ class TestExampleCPreferentialSweep:
             pt = _find_point(self.result, income)
             assert pt is not None
             assert pt.emr == D("0.0000"), f"Expected 0% at income={income}"
-            assert pt.total_tax == D("2162")
+            assert pt.total_tax == D("2072")
 
     def test_emr_15pct_after_boundary(self):
         pt = _find_point(self.result, D("30000"))
         assert pt is not None
         assert pt.emr == D("0.1500")
-        assert pt.total_tax == D("2710")
+        assert pt.total_tax == D("2507")
 
-    def test_boundary_point_26350_present(self):
-        pt = _find_point(self.result, D("26350"))
-        assert pt is not None, "Boundary point 26350 missing from output"
+    def test_boundary_point_27100_present(self):
+        pt = _find_point(self.result, D("27100"))
+        assert pt is not None, "Boundary point 27100 missing from output"
 
-    def test_boundary_point_26350_emr(self):
-        pt = _find_point(self.result, D("26350"))
+    def test_boundary_point_27100_emr(self):
+        pt = _find_point(self.result, D("27100"))
         assert pt.emr == D("0.1500")
-        assert pt.total_tax == D("2162")
+        assert pt.total_tax == D("2072")
 
     def test_emr_ordinary_zero_in_pref_mode(self):
         for pt in self.result.points:
@@ -449,7 +449,7 @@ class TestExampleCPreferentialSweep:
 
     def test_taxable_ordinary_fixed(self):
         for pt in self.result.points:
-            assert pt.taxable_ordinary == D("20000")
+            assert pt.taxable_ordinary == D("19250")
 
     def test_component_sums(self):
         for pt in self.result.points:
@@ -795,6 +795,115 @@ class TestOhioBoundaryInsertion:
         assert D("101900") not in incomes_no_ohio, (
             "Ohio MAGI credit boundary 101900 should be absent when include_ohio=False"
         )
+
+
+# ---------------------------------------------------------------------------
+# above_the_line_adjustments — reduces provisional income → lowers SS taxability
+# ---------------------------------------------------------------------------
+
+class TestAboveTheLineAdjustments:
+    """HSA-style adjustments reduce agi_excluding_ss and therefore ss_taxable."""
+
+    def setup_method(self):
+        self.fed_patcher = patch(_PATCH_FED, side_effect=_mock_federal_single)
+        self.ss_patcher = patch(_PATCH_SS, side_effect=_mock_ss_single)
+        self.ohio_patcher = patch(_PATCH_OHIO)
+        self.mock_fed = self.fed_patcher.start()
+        self.mock_ss = self.ss_patcher.start()
+        self.mock_ohio = self.ohio_patcher.start()
+
+        # pension=30000 (ordinary), ss_benefit=20000
+        # Without adjustment: agi_excl=30000, prov=30000+10000=40000 → 85% tier
+        # With adjustment=10000: agi_excl=20000, prov=20000+10000=30000 → 50% tier
+        self.result_no_adj = calculate_emr(
+            pension=D("30000"), interest=D("0"),
+            ordinary_dividends=D("0"), inherited_ira_rmd=D("0"),
+            ss_benefit=D("20000"), qualified_dividends=D("0"),
+            fixed_ltcg=D("0"), tax_exempt_interest=D("0"),
+            sweep_mode=SweepMode.ORDINARY,
+            filing_status="single", tax_year=2025,
+            sweep_floor=D("0"), sweep_ceiling=D("0"), sweep_step=D("100"),
+        )
+        self.result_with_adj = calculate_emr(
+            pension=D("30000"), interest=D("0"),
+            ordinary_dividends=D("0"), inherited_ira_rmd=D("0"),
+            ss_benefit=D("20000"), qualified_dividends=D("0"),
+            fixed_ltcg=D("0"), tax_exempt_interest=D("0"),
+            sweep_mode=SweepMode.ORDINARY,
+            filing_status="single", tax_year=2025,
+            sweep_floor=D("0"), sweep_ceiling=D("0"), sweep_step=D("100"),
+            above_the_line_adjustments=D("10000"),
+        )
+
+    def teardown_method(self):
+        self.fed_patcher.stop()
+        self.ss_patcher.stop()
+        self.ohio_patcher.stop()
+
+    def test_adjustment_reduces_ss_taxable(self):
+        pt_no = _find_point(self.result_no_adj, D("0"))
+        pt_adj = _find_point(self.result_with_adj, D("0"))
+        assert pt_adj.ss_taxable < pt_no.ss_taxable
+
+    def test_adjustment_reduces_total_tax(self):
+        pt_no = _find_point(self.result_no_adj, D("0"))
+        pt_adj = _find_point(self.result_with_adj, D("0"))
+        assert pt_adj.total_tax < pt_no.total_tax
+
+
+# ---------------------------------------------------------------------------
+# additional_deductions — reduces taxable_ordinary below standard deduction
+# ---------------------------------------------------------------------------
+
+class TestAdditionalDeductions:
+    """QBI / excess itemized deductions reduce taxable_ordinary further."""
+
+    def setup_method(self):
+        self.fed_patcher = patch(_PATCH_FED, side_effect=_mock_federal_single)
+        self.ss_patcher = patch(_PATCH_SS, side_effect=_mock_ss_single)
+        self.ohio_patcher = patch(_PATCH_OHIO)
+        self.mock_fed = self.fed_patcher.start()
+        self.mock_ss = self.ss_patcher.start()
+        self.mock_ohio = self.ohio_patcher.start()
+
+        # pension=20000 → taxable_ordinary = 20000-15750=4250 without extra deduction
+        # With additional_deductions=4000: taxable_ordinary = 4250-4000=250
+        self.result_no_ded = calculate_emr(
+            pension=D("20000"), interest=D("0"),
+            ordinary_dividends=D("0"), inherited_ira_rmd=D("0"),
+            ss_benefit=D("0"), qualified_dividends=D("0"),
+            fixed_ltcg=D("0"), tax_exempt_interest=D("0"),
+            sweep_mode=SweepMode.ORDINARY,
+            filing_status="single", tax_year=2025,
+            sweep_floor=D("0"), sweep_ceiling=D("0"), sweep_step=D("100"),
+        )
+        self.result_with_ded = calculate_emr(
+            pension=D("20000"), interest=D("0"),
+            ordinary_dividends=D("0"), inherited_ira_rmd=D("0"),
+            ss_benefit=D("0"), qualified_dividends=D("0"),
+            fixed_ltcg=D("0"), tax_exempt_interest=D("0"),
+            sweep_mode=SweepMode.ORDINARY,
+            filing_status="single", tax_year=2025,
+            sweep_floor=D("0"), sweep_ceiling=D("0"), sweep_step=D("100"),
+            additional_deductions=D("4000"),
+        )
+
+    def teardown_method(self):
+        self.fed_patcher.stop()
+        self.ss_patcher.stop()
+        self.ohio_patcher.stop()
+
+    def test_additional_deduction_reduces_taxable_ordinary(self):
+        pt_no = _find_point(self.result_no_ded, D("0"))
+        pt_ded = _find_point(self.result_with_ded, D("0"))
+        assert pt_ded.taxable_ordinary < pt_no.taxable_ordinary
+        # Reduction equals the additional deduction amount
+        assert pt_no.taxable_ordinary - pt_ded.taxable_ordinary == D("4000")
+
+    def test_additional_deduction_reduces_total_tax(self):
+        pt_no = _find_point(self.result_no_ded, D("0"))
+        pt_ded = _find_point(self.result_with_ded, D("0"))
+        assert pt_ded.total_tax < pt_no.total_tax
 
 
 # ---------------------------------------------------------------------------
