@@ -12,14 +12,14 @@ from decimal import Decimal
 from services.aca import calculate_aca_subsidy
 
 
-def D(s: str) -> Decimal:
+def dec(s: str) -> Decimal:
     return Decimal(s)
 
 
-CLIFF_SINGLE = D("62600")
-CLIFF_MFJ = D("128600")
-KNOWN_APTC = D("6240")
-SLCSP = D("10000")   # clean round number for formula tests
+CLIFF_SINGLE = dec("62600")
+CLIFF_MFJ = dec("128600")
+KNOWN_APTC = dec("6240")
+SLCSP = dec("10000")   # clean round number for formula tests
 TAX_YEAR = 2026
 
 
@@ -30,7 +30,7 @@ TAX_YEAR = 2026
 class TestBelowCliff:
     def setup_method(self):
         self.result = calculate_aca_subsidy(
-            magi=D("50000"),
+            magi=dec("50000"),
             slcsp_annual_premium=SLCSP,
             filing_status="single",
             tax_year=TAX_YEAR,
@@ -44,17 +44,17 @@ class TestBelowCliff:
         assert self.result.aptc_annual == KNOWN_APTC
 
     def test_aptc_monthly(self):
-        assert self.result.aptc_monthly == D("520")
+        assert self.result.aptc_monthly == dec("520")
 
     def test_subsidy_loss_zero(self):
-        assert self.result.subsidy_loss == D("0")
+        assert self.result.subsidy_loss == dec("0")
 
     def test_distance_to_cliff_positive(self):
-        assert self.result.distance_to_cliff == D("12600")
+        assert self.result.distance_to_cliff == dec("12600")
 
     def test_marginal_subsidy_loss_zero(self):
         # Below cliff — no marginal loss until cliff is crossed
-        assert self.result.marginal_subsidy_loss == D("0")
+        assert self.result.marginal_subsidy_loss == dec("0")
 
 
 # ---------------------------------------------------------------------------
@@ -79,10 +79,10 @@ class TestAtExactCliff:
         assert self.result.aptc_annual == KNOWN_APTC
 
     def test_subsidy_loss_zero(self):
-        assert self.result.subsidy_loss == D("0")
+        assert self.result.subsidy_loss == dec("0")
 
     def test_distance_to_cliff_zero(self):
-        assert self.result.distance_to_cliff == D("0")
+        assert self.result.distance_to_cliff == dec("0")
 
     def test_marginal_subsidy_loss_equals_aptc(self):
         # At the cliff, adding $1 more loses the entire APTC
@@ -96,7 +96,7 @@ class TestAtExactCliff:
 class TestOneDollarOverCliff:
     def setup_method(self):
         self.result = calculate_aca_subsidy(
-            magi=CLIFF_SINGLE + D("1"),
+            magi=CLIFF_SINGLE + dec("1"),
             slcsp_annual_premium=SLCSP,
             filing_status="single",
             tax_year=TAX_YEAR,
@@ -107,20 +107,20 @@ class TestOneDollarOverCliff:
         assert self.result.is_eligible is False
 
     def test_aptc_annual_zero(self):
-        assert self.result.aptc_annual == D("0")
+        assert self.result.aptc_annual == dec("0")
 
     def test_aptc_monthly_zero(self):
-        assert self.result.aptc_monthly == D("0")
+        assert self.result.aptc_monthly == dec("0")
 
     def test_subsidy_loss_full(self):
         assert self.result.subsidy_loss == KNOWN_APTC
 
     def test_distance_negative_one(self):
-        assert self.result.distance_to_cliff == D("-1")
+        assert self.result.distance_to_cliff == dec("-1")
 
     def test_marginal_subsidy_loss_zero(self):
         # Already over — no further marginal loss
-        assert self.result.marginal_subsidy_loss == D("0")
+        assert self.result.marginal_subsidy_loss == dec("0")
 
 
 # ---------------------------------------------------------------------------
@@ -133,32 +133,32 @@ class TestKnownAptcOverride:
         # required = round_tax(50000 × 0.0996) = 4980
         # formula_aptc = max(0, 10000 - 4980) = 5020
         formula_result = calculate_aca_subsidy(
-            magi=D("50000"),
+            magi=dec("50000"),
             slcsp_annual_premium=SLCSP,
             filing_status="single",
             tax_year=TAX_YEAR,
         )
         override_result = calculate_aca_subsidy(
-            magi=D("50000"),
+            magi=dec("50000"),
             slcsp_annual_premium=SLCSP,
             filing_status="single",
             tax_year=TAX_YEAR,
-            known_aptc_annual=D("8000"),
+            known_aptc_annual=dec("8000"),
         )
-        assert formula_result.aptc_annual == D("5020")
-        assert override_result.aptc_annual == D("8000")
+        assert formula_result.aptc_annual == dec("5020")
+        assert override_result.aptc_annual == dec("8000")
 
     def test_override_does_not_affect_over_cliff(self):
         # When over cliff, aptc=0 regardless of known_aptc value
         result = calculate_aca_subsidy(
-            magi=CLIFF_SINGLE + D("1"),
+            magi=CLIFF_SINGLE + dec("1"),
             slcsp_annual_premium=SLCSP,
             filing_status="single",
             tax_year=TAX_YEAR,
-            known_aptc_annual=D("8000"),
+            known_aptc_annual=dec("8000"),
         )
-        assert result.aptc_annual == D("0")
-        assert result.subsidy_loss == D("8000")
+        assert result.aptc_annual == dec("0")
+        assert result.subsidy_loss == dec("8000")
 
 
 # ---------------------------------------------------------------------------
@@ -168,35 +168,35 @@ class TestKnownAptcOverride:
 class TestDistanceAccuracy:
     def test_well_below_cliff(self):
         result = calculate_aca_subsidy(
-            magi=D("40000"), slcsp_annual_premium=SLCSP,
+            magi=dec("40000"), slcsp_annual_premium=SLCSP,
             filing_status="single", tax_year=TAX_YEAR,
         )
-        assert result.distance_to_cliff == D("22600")
+        assert result.distance_to_cliff == dec("22600")
 
     def test_near_cliff(self):
         result = calculate_aca_subsidy(
-            magi=D("62500"), slcsp_annual_premium=SLCSP,
+            magi=dec("62500"), slcsp_annual_premium=SLCSP,
             filing_status="single", tax_year=TAX_YEAR,
         )
-        assert result.distance_to_cliff == D("100")
+        assert result.distance_to_cliff == dec("100")
 
     def test_one_over_cliff(self):
         result = calculate_aca_subsidy(
-            magi=CLIFF_SINGLE + D("1"), slcsp_annual_premium=SLCSP,
+            magi=CLIFF_SINGLE + dec("1"), slcsp_annual_premium=SLCSP,
             filing_status="single", tax_year=TAX_YEAR,
         )
-        assert result.distance_to_cliff == D("-1")
+        assert result.distance_to_cliff == dec("-1")
 
     def test_far_over_cliff(self):
         result = calculate_aca_subsidy(
-            magi=D("80000"), slcsp_annual_premium=SLCSP,
+            magi=dec("80000"), slcsp_annual_premium=SLCSP,
             filing_status="single", tax_year=TAX_YEAR,
         )
-        assert result.distance_to_cliff == D("-17400")
+        assert result.distance_to_cliff == dec("-17400")
 
     def test_cliff_magi_is_correct(self):
         result = calculate_aca_subsidy(
-            magi=D("50000"), slcsp_annual_premium=SLCSP,
+            magi=dec("50000"), slcsp_annual_premium=SLCSP,
             filing_status="single", tax_year=TAX_YEAR,
         )
         assert result.cliff_magi == CLIFF_SINGLE
@@ -209,11 +209,11 @@ class TestDistanceAccuracy:
 class TestMFJCliff:
     def setup_method(self):
         self.result = calculate_aca_subsidy(
-            magi=D("120000"),
-            slcsp_annual_premium=D("15000"),
+            magi=dec("120000"),
+            slcsp_annual_premium=dec("15000"),
             filing_status="mfj",
             tax_year=TAX_YEAR,
-            known_aptc_annual=D("10000"),
+            known_aptc_annual=dec("10000"),
         )
 
     def test_cliff_is_mfj_threshold(self):
@@ -223,19 +223,19 @@ class TestMFJCliff:
         assert self.result.is_eligible is True
 
     def test_distance_to_mfj_cliff(self):
-        assert self.result.distance_to_cliff == D("8600")
+        assert self.result.distance_to_cliff == dec("8600")
 
     def test_mfj_over_cliff(self):
         result = calculate_aca_subsidy(
-            magi=CLIFF_MFJ + D("1"),
-            slcsp_annual_premium=D("15000"),
+            magi=CLIFF_MFJ + dec("1"),
+            slcsp_annual_premium=dec("15000"),
             filing_status="mfj",
             tax_year=TAX_YEAR,
-            known_aptc_annual=D("10000"),
+            known_aptc_annual=dec("10000"),
         )
         assert result.is_eligible is False
-        assert result.aptc_annual == D("0")
-        assert result.distance_to_cliff == D("-1")
+        assert result.aptc_annual == dec("0")
+        assert result.distance_to_cliff == dec("-1")
 
 
 # ---------------------------------------------------------------------------
@@ -246,28 +246,28 @@ class TestMFJCliff:
 class TestWorkedExample:
     def setup_method(self):
         self.result = calculate_aca_subsidy(
-            magi=D("62072"),
-            slcsp_annual_premium=D("5617.08"),
+            magi=dec("62072"),
+            slcsp_annual_premium=dec("5617.08"),
             filing_status="single",
             tax_year=2026,
-            known_aptc_annual=D("6240"),
+            known_aptc_annual=dec("6240"),
         )
 
     def test_aptc_annual(self):
-        assert self.result.aptc_annual == D("6240")
+        assert self.result.aptc_annual == dec("6240")
 
     def test_aptc_monthly(self):
-        assert self.result.aptc_monthly == D("520")
+        assert self.result.aptc_monthly == dec("520")
 
     def test_distance_to_cliff(self):
-        assert self.result.distance_to_cliff == D("528")
+        assert self.result.distance_to_cliff == dec("528")
 
     def test_is_eligible(self):
         assert self.result.is_eligible is True
 
     def test_subsidy_loss_zero(self):
-        assert self.result.subsidy_loss == D("0")
+        assert self.result.subsidy_loss == dec("0")
 
     def test_marginal_subsidy_loss_zero(self):
         # $528 below cliff — no marginal loss yet
-        assert self.result.marginal_subsidy_loss == D("0")
+        assert self.result.marginal_subsidy_loss == dec("0")

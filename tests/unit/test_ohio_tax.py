@@ -11,7 +11,7 @@ import pytest
 from services.ohio_tax import calculate_ohio_tax
 
 
-def D(s: str) -> Decimal:
+def dec(s: str) -> Decimal:
     return Decimal(s)
 
 
@@ -23,36 +23,36 @@ def D(s: str) -> Decimal:
 class TestExample1IncomeProfileProxy:
     def setup_method(self):
         self.result = calculate_ohio_tax(
-            federal_agi=D("45370"),
-            gross_medical_expenses=D("6557"),
-            qualifying_retirement_income=D("47089"),
-            ss_taxable_federal=D("0"),
+            federal_agi=dec("45370"),
+            gross_medical_expenses=dec("6557"),
+            qualifying_retirement_income=dec("47089"),
+            ss_taxable_federal=dec("0"),
             tax_year=2025,
         )
 
     def test_ohio_agi(self):
-        assert self.result.ohio_agi == D("45370")
+        assert self.result.ohio_agi == dec("45370")
 
     def test_personal_exemption(self):
-        assert self.result.personal_exemption == D("2150")
+        assert self.result.personal_exemption == dec("2150")
 
     def test_medical_deduction(self):
-        assert self.result.medical_deduction == D("3154")
+        assert self.result.medical_deduction == dec("3154")
 
     def test_ohio_tax_base(self):
-        assert self.result.ohio_tax_base == D("40066")
+        assert self.result.ohio_tax_base == dec("40066")
 
     def test_tax_before_credits(self):
-        assert self.result.tax_before_credits == D("727")
+        assert self.result.tax_before_credits == dec("727")
 
     def test_retirement_income_credit(self):
-        assert self.result.retirement_income_credit == D("200")
+        assert self.result.retirement_income_credit == dec("200")
 
     def test_ohio_tax(self):
-        assert self.result.ohio_tax == D("527")
+        assert self.result.ohio_tax == dec("527")
 
     def test_effective_rate(self):
-        assert self.result.effective_rate == D("0.0116")
+        assert self.result.effective_rate == dec("0.0116")
 
 
 # ---------------------------------------------------------------------------
@@ -62,36 +62,36 @@ class TestExample1IncomeProfileProxy:
 class TestExample2CleanRoundNumbers:
     def setup_method(self):
         self.result = calculate_ohio_tax(
-            federal_agi=D("60000"),
-            gross_medical_expenses=D("8000"),
-            qualifying_retirement_income=D("50000"),
-            ss_taxable_federal=D("0"),
+            federal_agi=dec("60000"),
+            gross_medical_expenses=dec("8000"),
+            qualifying_retirement_income=dec("50000"),
+            ss_taxable_federal=dec("0"),
             tax_year=2025,
         )
 
     def test_ohio_agi(self):
-        assert self.result.ohio_agi == D("60000")
+        assert self.result.ohio_agi == dec("60000")
 
     def test_personal_exemption(self):
-        assert self.result.personal_exemption == D("2150")
+        assert self.result.personal_exemption == dec("2150")
 
     def test_medical_deduction(self):
-        assert self.result.medical_deduction == D("3500")
+        assert self.result.medical_deduction == dec("3500")
 
     def test_ohio_tax_base(self):
-        assert self.result.ohio_tax_base == D("54350")
+        assert self.result.ohio_tax_base == dec("54350")
 
     def test_tax_before_credits(self):
-        assert self.result.tax_before_credits == D("1120")
+        assert self.result.tax_before_credits == dec("1120")
 
     def test_retirement_income_credit(self):
-        assert self.result.retirement_income_credit == D("200")
+        assert self.result.retirement_income_credit == dec("200")
 
     def test_ohio_tax(self):
-        assert self.result.ohio_tax == D("920")
+        assert self.result.ohio_tax == dec("920")
 
     def test_effective_rate(self):
-        assert self.result.effective_rate == D("0.0153")
+        assert self.result.effective_rate == dec("0.0153")
 
 
 # ---------------------------------------------------------------------------
@@ -102,38 +102,38 @@ class TestExample2CleanRoundNumbers:
 class TestExample3BelowZeroBracket:
     def setup_method(self):
         self.result = calculate_ohio_tax(
-            federal_agi=D("28000"),
-            gross_medical_expenses=D("3000"),
-            qualifying_retirement_income=D("20000"),
-            ss_taxable_federal=D("0"),
+            federal_agi=dec("28000"),
+            gross_medical_expenses=dec("3000"),
+            qualifying_retirement_income=dec("20000"),
+            ss_taxable_federal=dec("0"),
             tax_year=2025,
         )
 
     def test_ohio_agi(self):
-        assert self.result.ohio_agi == D("28000")
+        assert self.result.ohio_agi == dec("28000")
 
     def test_personal_exemption(self):
-        assert self.result.personal_exemption == D("2400")
+        assert self.result.personal_exemption == dec("2400")
 
     def test_medical_deduction(self):
-        assert self.result.medical_deduction == D("900")
+        assert self.result.medical_deduction == dec("900")
 
     def test_ohio_tax_base(self):
-        assert self.result.ohio_tax_base == D("24700")
+        assert self.result.ohio_tax_base == dec("24700")
 
     def test_tax_before_credits(self):
-        assert self.result.tax_before_credits == D("0")
+        assert self.result.tax_before_credits == dec("0")
 
     def test_retirement_income_credit(self):
         # Credit is $200 even though it cannot be applied — nonrefundable
-        assert self.result.retirement_income_credit == D("200")
+        assert self.result.retirement_income_credit == dec("200")
 
     def test_ohio_tax(self):
         # Credit cannot reduce tax below zero
-        assert self.result.ohio_tax == D("0")
+        assert self.result.ohio_tax == dec("0")
 
     def test_effective_rate(self):
-        assert self.result.effective_rate == D("0.0000")
+        assert self.result.effective_rate == dec("0.0000")
 
 
 # ---------------------------------------------------------------------------
@@ -144,37 +144,37 @@ class TestExample3BelowZeroBracket:
 class TestExample4HighMedicalExpenses:
     def setup_method(self):
         self.result = calculate_ohio_tax(
-            federal_agi=D("40000"),
-            gross_medical_expenses=D("10000"),
-            qualifying_retirement_income=D("30000"),
-            ss_taxable_federal=D("0"),
+            federal_agi=dec("40000"),
+            gross_medical_expenses=dec("10000"),
+            qualifying_retirement_income=dec("30000"),
+            ss_taxable_federal=dec("0"),
             tax_year=2025,
         )
 
     def test_ohio_agi(self):
-        assert self.result.ohio_agi == D("40000")
+        assert self.result.ohio_agi == dec("40000")
 
     def test_personal_exemption(self):
         # AGI exactly at $40,000 boundary → $2,400 tier
-        assert self.result.personal_exemption == D("2400")
+        assert self.result.personal_exemption == dec("2400")
 
     def test_medical_deduction(self):
-        assert self.result.medical_deduction == D("7000")
+        assert self.result.medical_deduction == dec("7000")
 
     def test_ohio_tax_base(self):
-        assert self.result.ohio_tax_base == D("30600")
+        assert self.result.ohio_tax_base == dec("30600")
 
     def test_tax_before_credits(self):
-        assert self.result.tax_before_credits == D("467")
+        assert self.result.tax_before_credits == dec("467")
 
     def test_retirement_income_credit(self):
-        assert self.result.retirement_income_credit == D("200")
+        assert self.result.retirement_income_credit == dec("200")
 
     def test_ohio_tax(self):
-        assert self.result.ohio_tax == D("267")
+        assert self.result.ohio_tax == dec("267")
 
     def test_effective_rate(self):
-        assert self.result.effective_rate == D("0.0067")
+        assert self.result.effective_rate == dec("0.0067")
 
 
 # ---------------------------------------------------------------------------
@@ -185,38 +185,38 @@ class TestExample4HighMedicalExpenses:
 class TestExample5HighIncomeNoCreditEligibility:
     def setup_method(self):
         self.result = calculate_ohio_tax(
-            federal_agi=D("110000"),
-            gross_medical_expenses=D("5000"),
-            qualifying_retirement_income=D("90000"),
-            ss_taxable_federal=D("0"),
+            federal_agi=dec("110000"),
+            gross_medical_expenses=dec("5000"),
+            qualifying_retirement_income=dec("90000"),
+            ss_taxable_federal=dec("0"),
             tax_year=2025,
         )
 
     def test_ohio_agi(self):
-        assert self.result.ohio_agi == D("110000")
+        assert self.result.ohio_agi == dec("110000")
 
     def test_personal_exemption(self):
-        assert self.result.personal_exemption == D("1900")
+        assert self.result.personal_exemption == dec("1900")
 
     def test_medical_deduction(self):
         # Medical floor ($8,250) exceeds gross medical ($5,000)
-        assert self.result.medical_deduction == D("0")
+        assert self.result.medical_deduction == dec("0")
 
     def test_ohio_tax_base(self):
-        assert self.result.ohio_tax_base == D("108100")
+        assert self.result.ohio_tax_base == dec("108100")
 
     def test_tax_before_credits(self):
-        assert self.result.tax_before_credits == D("2647")
+        assert self.result.tax_before_credits == dec("2647")
 
     def test_retirement_income_credit(self):
         # MAGI ($110,000) less exemption ($1,900) = $108,100 ≥ $100,000 → disqualified
-        assert self.result.retirement_income_credit == D("0")
+        assert self.result.retirement_income_credit == dec("0")
 
     def test_ohio_tax(self):
-        assert self.result.ohio_tax == D("2647")
+        assert self.result.ohio_tax == dec("2647")
 
     def test_effective_rate(self):
-        assert self.result.effective_rate == D("0.0241")
+        assert self.result.effective_rate == dec("0.0241")
 
 
 # ---------------------------------------------------------------------------
@@ -225,59 +225,59 @@ class TestExample5HighIncomeNoCreditEligibility:
 
 class TestEdgeCases:
     def test_zero_agi_all_outputs_zero(self):
-        result = calculate_ohio_tax(D("0"), D("0"), D("0"), D("0"), 2025)
-        assert result.ohio_agi == D("0")
-        assert result.personal_exemption == D("2400")
-        assert result.medical_deduction == D("0")
-        assert result.ohio_tax_base == D("0")
-        assert result.tax_before_credits == D("0")
-        assert result.retirement_income_credit == D("0")
-        assert result.ohio_tax == D("0")
-        assert result.effective_rate == D("0")
+        result = calculate_ohio_tax(dec("0"), dec("0"), dec("0"), dec("0"), 2025)
+        assert result.ohio_agi == dec("0")
+        assert result.personal_exemption == dec("2400")
+        assert result.medical_deduction == dec("0")
+        assert result.ohio_tax_base == dec("0")
+        assert result.tax_before_credits == dec("0")
+        assert result.retirement_income_credit == dec("0")
+        assert result.ohio_tax == dec("0")
+        assert result.effective_rate == dec("0")
 
     def test_zero_medical_expenses_no_deduction(self):
-        result = calculate_ohio_tax(D("50000"), D("0"), D("0"), D("0"), 2025)
-        assert result.medical_deduction == D("0")
+        result = calculate_ohio_tax(dec("50000"), dec("0"), dec("0"), dec("0"), 2025)
+        assert result.medical_deduction == dec("0")
 
     def test_medical_expenses_below_floor_no_deduction(self):
         # Floor = 50000 * 0.075 = 3750; gross = 2000 → deduction = 0
-        result = calculate_ohio_tax(D("50000"), D("2000"), D("0"), D("0"), 2025)
-        assert result.medical_deduction == D("0")
+        result = calculate_ohio_tax(dec("50000"), dec("2000"), dec("0"), dec("0"), 2025)
+        assert result.medical_deduction == dec("0")
 
     def test_ss_reduces_ohio_agi(self):
         # Ohio deducts taxable SS from federal AGI
-        result = calculate_ohio_tax(D("50000"), D("0"), D("0"), D("5000"), 2025)
-        assert result.ohio_agi == D("45000")
+        result = calculate_ohio_tax(dec("50000"), dec("0"), dec("0"), dec("5000"), 2025)
+        assert result.ohio_agi == dec("45000")
 
     def test_qualifying_retirement_income_at_or_below_500_no_credit(self):
         # Tier table: income_up_to "500" → credit $0
-        result = calculate_ohio_tax(D("50000"), D("0"), D("500"), D("0"), 2025)
-        assert result.retirement_income_credit == D("0")
+        result = calculate_ohio_tax(dec("50000"), dec("0"), dec("500"), dec("0"), 2025)
+        assert result.retirement_income_credit == dec("0")
 
     def test_qualifying_retirement_income_501_credit_25(self):
-        result = calculate_ohio_tax(D("50000"), D("0"), D("501"), D("0"), 2025)
-        assert result.retirement_income_credit == D("25")
+        result = calculate_ohio_tax(dec("50000"), dec("0"), dec("501"), dec("0"), 2025)
+        assert result.retirement_income_credit == dec("25")
 
     def test_magi_exactly_at_threshold_is_disqualified(self):
         # Threshold check: (ohio_agi - exemption) < 100000
         # ohio_agi = 102150 → exemption = 1900 → magi - exemption = 100250 ≥ 100000 → disqualified
-        result = calculate_ohio_tax(D("102150"), D("0"), D("50000"), D("0"), 2025)
-        assert result.retirement_income_credit == D("0")
+        result = calculate_ohio_tax(dec("102150"), dec("0"), dec("50000"), dec("0"), 2025)
+        assert result.retirement_income_credit == dec("0")
 
     def test_magi_just_below_threshold_is_eligible(self):
         # ohio_agi = 101900 → exemption = 1900 → 100000 - disqualified? No: 101900-1900=100000
         # 100000 < 100000 is False → disqualified
         # ohio_agi = 101899 → 101899-1900=99999 < 100000 → eligible
-        result = calculate_ohio_tax(D("101899"), D("0"), D("50000"), D("0"), 2025)
-        assert result.retirement_income_credit == D("200")
+        result = calculate_ohio_tax(dec("101899"), dec("0"), dec("50000"), dec("0"), 2025)
+        assert result.retirement_income_credit == dec("200")
 
     def test_nonrefundable_credit_cannot_produce_negative_tax(self):
         # tax_before_credits < credit → ohio_tax must be 0, not negative
         # Example 3 already covers this — verify directly
-        result = calculate_ohio_tax(D("28000"), D("3000"), D("20000"), D("0"), 2025)
-        assert result.tax_before_credits == D("0")
-        assert result.retirement_income_credit == D("200")
-        assert result.ohio_tax == D("0")
+        result = calculate_ohio_tax(dec("28000"), dec("3000"), dec("20000"), dec("0"), 2025)
+        assert result.tax_before_credits == dec("0")
+        assert result.retirement_income_credit == dec("200")
+        assert result.ohio_tax == dec("0")
 
 
 # ---------------------------------------------------------------------------
@@ -293,42 +293,42 @@ class TestEdgeCases:
 class TestOhio2026FlatRate:
     def setup_method(self):
         self.result_50k = calculate_ohio_tax(
-            federal_agi=D("52150"),
-            gross_medical_expenses=D("0"),
-            qualifying_retirement_income=D("0"),
-            ss_taxable_federal=D("0"),
+            federal_agi=dec("52150"),
+            gross_medical_expenses=dec("0"),
+            qualifying_retirement_income=dec("0"),
+            ss_taxable_federal=dec("0"),
             tax_year=2026,
         )
         self.result_150k = calculate_ohio_tax(
-            federal_agi=D("151900"),
-            gross_medical_expenses=D("0"),
-            qualifying_retirement_income=D("0"),
-            ss_taxable_federal=D("0"),
+            federal_agi=dec("151900"),
+            gross_medical_expenses=dec("0"),
+            qualifying_retirement_income=dec("0"),
+            ss_taxable_federal=dec("0"),
             tax_year=2026,
         )
 
     def test_50k_tax_base(self):
-        assert self.result_50k.ohio_tax_base == D("50000")
+        assert self.result_50k.ohio_tax_base == dec("50000")
 
     def test_50k_ohio_tax_uses_2026_base(self):
         # 332 + 2.75% × (50,000 − 26,050) = 332 + 658.625 = 990.625 → $991
-        assert self.result_50k.ohio_tax == D("991")
+        assert self.result_50k.ohio_tax == dec("991")
 
     def test_150k_tax_base(self):
-        assert self.result_150k.ohio_tax_base == D("150000")
+        assert self.result_150k.ohio_tax_base == dec("150000")
 
     def test_150k_still_275_rate_no_upper_bracket(self):
         # 2026 has no 3.125% bracket — 2.75% applies beyond $26,050 without limit
         # 332 + 2.75% × (150,000 − 26,050) = 332 + 3408.625 = 3740.625 → $3,741
-        assert self.result_150k.ohio_tax == D("3741")
+        assert self.result_150k.ohio_tax == dec("3741")
 
     def test_no_bracket_jump_between_50k_and_150k(self):
         # In 2025 a 3.125% upper bracket caused a rate increase above $100,000.
         # In 2026 the incremental rate across the full range should be a flat 2.75%.
         delta_tax = self.result_150k.ohio_tax - self.result_50k.ohio_tax
         delta_base = self.result_150k.ohio_tax_base - self.result_50k.ohio_tax_base
-        assert delta_tax / delta_base == D("0.0275")
+        assert delta_tax / delta_base == dec("0.0275")
 
     def test_unsupported_tax_year_raises_value_error(self):
         with pytest.raises(ValueError, match="Unsupported tax year"):
-            calculate_ohio_tax(D("50000"), D("0"), D("0"), D("0"), 2099)
+            calculate_ohio_tax(dec("50000"), dec("0"), dec("0"), dec("0"), 2099)
