@@ -41,3 +41,7 @@ jobs:
 
       - name: Audit dependencies
         run: pip-audit
+
+      - name: Dead code check (warning only)
+        run: vulture services/ api/ vulture_whitelist.py --min-confidence 80
+        continue-on-error: true
