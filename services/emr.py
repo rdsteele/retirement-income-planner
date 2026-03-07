@@ -603,6 +603,7 @@ def calculate_emr(
     ohio_qualifying_retirement_income: Decimal = _ZERO,
     above_the_line_adjustments: Decimal = _ZERO,
     additional_deductions: Decimal = _ZERO,
+    extra_boundary_points: list[Decimal] | None = None,
 ) -> EMRResult:
     if filing_status not in ("single", "mfj"):
         raise ValueError(f"Unsupported filing status: {filing_status!r}")
@@ -642,6 +643,9 @@ def calculate_emr(
             above_the_line_adjustments=above_the_line_adjustments,
             additional_deductions=additional_deductions,
         )
+
+    if extra_boundary_points:
+        boundaries.extend(extra_boundary_points)
 
     sweep_array = _build_sweep_array(
         sweep_floor, sweep_ceiling, sweep_step, boundaries)
