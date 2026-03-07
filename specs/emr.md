@@ -273,6 +273,82 @@ current planning year. They are not included in any tax calculation.
 
 ---
 
+### Net Investment Income Tax (NIIT)
+
+#### Statutory Basis
+
+A flat 3.8% surtax on net investment income (NII) when MAGI exceeds a filing-status
+threshold. This is not a bracket — once the threshold is crossed, the surtax applies
+to the entire applicable NII amount (not just the excess over the threshold).
+
+#### Thresholds
+
+| Filing Status | Threshold |
+|---|---|
+| Single / MFS | $200,000 |
+| MFJ | $250,000 |
+
+These thresholds have not been inflation-adjusted since NIIT was enacted in 2013.
+
+#### NIIT Base — Net Investment Income
+
+```
+niit_base = interest + ordinary_dividends + qualified_dividends + fixed_ltcg + sweep_variable
+```
+
+Where `sweep_variable` is:
+- In **ORDINARY mode**: the variable ordinary income being swept (IRA/RMD withdrawals
+  are ordinary income, not NII — but they increase MAGI, pushing fixed NII into NIIT range)
+- In **PREFERENTIAL mode**: the variable preferential income being swept (each additional
+  dollar of LTCG is simultaneously NII and MAGI)
+
+**Important:** IRA and RMD withdrawals are ordinary income and do **not** count toward NII.
+Only passive investment income (interest, dividends, LTCG) counts. This distinction matters
+for the EMR calculation — see interaction with sweep mode below.
+
+#### NIIT Calculation
+
+```
+niit = max(0, min(nii, magi - niit_threshold) × 0.038)
+```
+
+NIIT applies to the **lesser** of:
+- Total net investment income, or
+- The amount by which MAGI exceeds the threshold
+
+NIIT is nonzero only when **both** conditions hold: MAGI > threshold AND NII > 0.
+
+#### EMR Impact by Zone
+
+| Zone | `emr_niit` |
+|---|---|
+| MAGI ≤ threshold | 0 |
+| MAGI > threshold, NII fully in NIIT range | 0.038 |
+| MAGI crossing threshold | between 0 and 0.038 (transition) |
+
+**ORDINARY sweep mode:** IRA withdrawals increase MAGI but are not NII. Once MAGI
+exceeds the threshold, each additional dollar of withdrawal causes more of the fixed NII
+(interest, dividends, LTCG) to fall into NIIT range, so `emr_niit` becomes active even
+though the variable income itself is not investment income.
+
+**PREFERENTIAL sweep mode:** Each additional dollar of LTCG is both MAGI and NII. Once the
+threshold is crossed, `emr_niit = 0.038` stacks on top of the 15%/20% preferential rate,
+making the effective rate 18.8% or 23.8% on harvested gains.
+
+#### Interaction with Preferential Stacking
+
+When MAGI crosses $200,000/$250,000 while harvesting LTCG, the EMR jumps by 3.8%. This
+is why income ranges that appear to be in the "0% LTCG bracket" are actually subject to
+3.8% once total income is high enough to trigger NIIT.
+
+#### Implementation Note
+
+NIIT logic is implemented directly in `services/emr.py` (`_compute_niit_at_point`).
+There is no separate `niit.py` service because NIIT has no independent use case outside
+the EMR calculation — it is always computed as part of the total tax snapshot.
+
+---
+
 ## Worked Examples
 
 ---
