@@ -109,7 +109,7 @@ Returns an `EMRResult` dataclass:
 | `income`               | `Decimal` | Variable income level at this point                      |
 | `total_tax`            | `Decimal` | Total tax at this income level (federal + Ohio if included) |
 | `emr`                  | `Decimal` | EMR on next dollar (4 decimal places)                    |
-| `emr_ordinary`         | `Decimal` | EMR component: ordinary bracket rate                     |
+| `emr_ordinary`         | `Decimal` | EMR component: actual marginal ordinary rate (0 below standard deduction) |
 | `emr_ss_torpedo`       | `Decimal` | EMR component: additional rate from SS becoming taxable  |
 | `emr_pref_stacking`    | `Decimal` | EMR component: additional rate from preferential stacking|
 | `emr_niit`             | `Decimal` | EMR component: NIIT rate on preferential income          |
@@ -212,7 +212,7 @@ twice — once at `sweep_value`, once at `sweep_value + sweep_step`.
 ### 11. EMR Component Attribution
 Components must sum to `emr` (within rounding tolerance):
 
-**`emr_ordinary`** — statutory bracket rate at the top dollar of `taxable_ordinary`.
+**`emr_ordinary`** — actual marginal federal ordinary tax rate at this sweep point. Below the standard deduction (where `taxable_ordinary = 0`), `emr_ordinary = 0` because no federal ordinary tax is owed on the next dollar. At and above the standard deduction, `emr_ordinary` equals the statutory bracket rate at the top dollar of `taxable_ordinary`. This ensures all components reflect actual marginal cost and sum correctly to `emr`.
 
 **`emr_ss_torpedo`** — additional EMR from SS becoming taxable. Non-zero only when
 `ss_benefit > 0` and provisional income is in an active torpedo range:
@@ -245,21 +245,14 @@ Approximately 2.75% on most ordinary income after exemption. Steps to 3.125% abo
 $100,000 Ohio tax base. Zero in the zero-rate bracket (Ohio tax base ≤ $26,050).
 
 ### 12. Boundary Point Insertion
-In addition to regular `sweep_step` points, the service inserts boundary points
-at known thresholds to ensure sharp transitions in the visualization:
+In addition to regular `sweep_step` points, the service inserts exact boundary
+points at known thresholds to ensure sharp transitions in the visualization:
 - Ordinary bracket boundaries (from bracket data)
 - Preferential bracket boundaries (from bracket data)
 - SS torpedo boundaries (Tier 1 and Tier 2 thresholds)
 - SS maximum taxability point (where 85% cap is reached)
 - NIIT threshold
 - Standard deduction exhaustion point
-
-When `ss_benefit = 0`, boundary points are exact. When the SS torpedo is active,
-ordinary bracket, preferential stacking, and NIIT boundaries are approximate —
-off by `ss_taxable` at that point — because `ss_taxable` varies with the sweep
-value, making exact placement circular. SS torpedo boundaries themselves (tier
-thresholds and max taxability point) are always exact because provisional income
-has no circular dependency.
 
 Boundary points are deduplicated and sorted. The final array is ordered ascending
 by `income`.

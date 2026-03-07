@@ -324,7 +324,8 @@ class TestExampleBSSTorpedo:
     def test_emr_torpedo_at_start(self):
         pt = _find_point(self.result, D("0"))
         assert pt is not None
-        assert pt.emr == D("0.2200")
+        # 0.2220: $1000 × 12% + $1000 × 85% × 12% = $120 + $102 = $222 → 22.2%
+        assert pt.emr == D("0.2220")
         assert pt.total_tax == D("2180")
         assert pt.ss_taxable == D("12150")
         assert pt.taxable_ordinary == D("20150")
@@ -332,7 +333,7 @@ class TestExampleBSSTorpedo:
     def test_emr_torpedo_at_5000(self):
         pt = _find_point(self.result, D("5000"))
         assert pt is not None
-        assert pt.emr == D("0.2200")
+        assert pt.emr == D("0.2220")
         assert pt.total_tax == D("3290")
         assert pt.ss_taxable == D("16400")
 

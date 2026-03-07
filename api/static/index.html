@@ -315,6 +315,11 @@
 </div>
 
 <script>
+  // ── Config ───────────────────────────────────────────────────────────────
+  const CONFIG = {
+    yAxisMaxEMR: 0.50  // cap y-axis at 50% — adjust if needed
+  };
+
   // ── State ────────────────────────────────────────────────────────────────
   let lastResult = null;    // raw API response
   let chartMode  = 'stacked'; // 'stacked' | 'lines'
@@ -520,7 +525,9 @@
       },
       yaxis: {
         title: { text: 'Effective Marginal Rate' },
-        tickformat: '.0%',
+        tickformat: '.1%',
+        range: [0, CONFIG.yAxisMaxEMR],
+        autorange: false,
       },
       legend: { orientation: 'h', y: -0.25 },
       margin: { t: 20, b: 80, l: 60, r: 20 },
@@ -546,7 +553,7 @@
         stackgroup: 'emr',
         line: { color: comp.color, width: 0 },
         fillcolor: comp.color,
-        hovertemplate: comp.label + ': %{y:.2%}<extra></extra>',
+        hovertemplate: comp.label + ': %{y:.1%}<extra></extra>',
       });
       first = false;
     }
@@ -568,7 +575,7 @@
         name: comp.label,
         mode: 'lines',
         line: { color: comp.color, width: 2 },
-        hovertemplate: comp.label + ': %{y:.2%}<extra></extra>',
+        hovertemplate: comp.label + ': %{y:.1%}<extra></extra>',
       });
     }
 
@@ -580,7 +587,7 @@
       name: 'Total EMR',
       mode: 'lines',
       line: { color: '#212529', width: 3 },
-      hovertemplate: 'Total EMR: %{y:.2%}<extra></extra>',
+      hovertemplate: 'Total EMR: %{y:.1%}<extra></extra>',
     });
 
     return traces;

@@ -40,16 +40,16 @@ def _build_points(result: EMRResult) -> EMRPoints:
     return EMRPoints(
         income=[float(p.income) for p in pts],
         total_tax=[float(p.total_tax) for p in pts],
-        emr=[float(p.emr) for p in pts],
+        emr=[round(float(p.emr), 4) for p in pts],
         components=EMRComponents(
-            ordinary=[float(p.emr_ordinary) for p in pts],
-            ss_torpedo=[float(p.emr_ss_torpedo) for p in pts],
-            pref_stacking=[float(p.emr_pref_stacking) for p in pts],
-            niit=[float(p.emr_niit) for p in pts],
-            ohio=[float(p.emr_ohio) for p in pts],
+            ordinary=[round(float(p.emr_ordinary), 4) for p in pts],
+            ss_torpedo=[round(float(p.emr_ss_torpedo), 4) for p in pts],
+            pref_stacking=[round(float(p.emr_pref_stacking), 4) for p in pts],
+            niit=[round(float(p.emr_niit), 4) for p in pts],
+            ohio=[round(float(p.emr_ohio), 4) for p in pts],
         ),
         ss_taxable=[float(p.ss_taxable) for p in pts],
-        ss_inclusion_rate=[float(p.ss_inclusion_rate) for p in pts],
+        ss_inclusion_rate=[round(float(p.ss_inclusion_rate), 4) for p in pts],
         taxable_ordinary=[float(p.taxable_ordinary) for p in pts],
         ohio_tax=[float(p.ohio_tax) for p in pts],
     )

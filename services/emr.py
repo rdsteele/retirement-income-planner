@@ -24,6 +24,7 @@ _DATA_DIR = Path(__file__).parent.parent / "data" / "brackets"
 _SS_PATH = Path(__file__).parent.parent / "data" / "ss_thresholds.json"
 _ZERO = Decimal("0")
 _HALF = Decimal("0.50")
+_EMR_COMPUTE_STEP = Decimal("1000")  # larger step reduces whole-dollar rounding noise
 
 
 class SweepMode(Enum):
@@ -327,13 +328,21 @@ def _attribute_emr_components(
 ) -> tuple[Decimal, Decimal, Decimal, Decimal, Decimal]:
     """Return (emr_ordinary, emr_ss_torpedo, emr_pref_stacking, emr_niit, emr_ohio).
 
-    emr_ordinary is the statutory bracket rate (ORDINARY mode) or zero
-    (PREFERENTIAL mode). Components sum to emr within rounding tolerance.
+    emr_ordinary is the actual ordinary tax delta divided by step (ORDINARY mode) or
+    zero (PREFERENTIAL mode). This is 0 below the standard deduction and equals the
+    bracket rate above it, keeping emr_ordinary consistent with total emr.
+    Components sum to emr within rounding tolerance.
     """
     bracket_rate = lo.marginal_bracket_rate
 
     if sweep_mode == SweepMode.ORDINARY:
-        emr_ordinary = bracket_rate
+        # Below the standard deduction both snapshots have ordinary_tax = 0; the
+        # bracket rate is technically correct for the next dollar but no tax
+        # actually changes, so the ordinary component must be 0.
+        if hi.ordinary_tax == lo.ordinary_tax:
+            emr_ordinary = _ZERO
+        else:
+            emr_ordinary = bracket_rate
     else:
         emr_ordinary = _ZERO
 
@@ -634,12 +643,12 @@ def calculate_emr(
     points: list[EMRPoint] = []
     for sweep_value in sweep_array:
         lo = _compute_tax_snapshot(sweep_value, **shared)
-        hi = _compute_tax_snapshot(sweep_value + sweep_step, **shared)
+        hi = _compute_tax_snapshot(sweep_value + _EMR_COMPUTE_STEP, **shared)
 
-        emr = _compute_emr_between_points(lo, hi, sweep_step)
+        emr = _compute_emr_between_points(lo, hi, _EMR_COMPUTE_STEP)
         (emr_ordinary, emr_ss_torpedo, emr_pref_stacking,
          emr_niit, emr_ohio) = _attribute_emr_components(
-            lo, hi, sweep_step, sweep_mode)
+            lo, hi, _EMR_COMPUTE_STEP, sweep_mode)
 
         points.append(EMRPoint(
             income=sweep_value,
