@@ -10,34 +10,55 @@ Tests cover:
 """
 
 from decimal import Decimal
+from typing import TypedDict
 
 from services.emr import SweepMode, calculate_emr
 from services.total_cost import calculate_total_cost
 
 D = Decimal
 
+
+class _BaseKwargs(TypedDict):
+    pension: Decimal
+    interest: Decimal
+    ordinary_dividends: Decimal
+    inherited_ira_rmd: Decimal
+    ss_benefit: Decimal
+    qualified_dividends: Decimal
+    fixed_ltcg: Decimal
+    tax_exempt_interest: Decimal
+    above_the_line_adjustments: Decimal
+    additional_deductions: Decimal
+    sweep_mode: SweepMode
+    filing_status: str
+    tax_year: int
+    sweep_floor: Decimal
+    sweep_ceiling: Decimal
+    sweep_step: Decimal
+
+
 # ---------------------------------------------------------------------------
 # Shared scenario — 2026 single filer matching spec worked example
 # ---------------------------------------------------------------------------
 
-_BASE = dict(
-    pension=D("1596"),
-    interest=D("3353"),
-    ordinary_dividends=D("228"),
-    inherited_ira_rmd=D("0"),
-    ss_benefit=D("0"),
-    qualified_dividends=D("2594"),
-    fixed_ltcg=D("21819"),
-    tax_exempt_interest=D("0"),
-    above_the_line_adjustments=D("5300"),
-    additional_deductions=D("23"),
-    sweep_mode=SweepMode.ORDINARY,
-    filing_status="single",
-    tax_year=2026,
-    sweep_floor=D("0"),
-    sweep_ceiling=D("70000"),
-    sweep_step=D("1000"),
-)
+_BASE: _BaseKwargs = {
+    "pension": D("1596"),
+    "interest": D("3353"),
+    "ordinary_dividends": D("228"),
+    "inherited_ira_rmd": D("0"),
+    "ss_benefit": D("0"),
+    "qualified_dividends": D("2594"),
+    "fixed_ltcg": D("21819"),
+    "tax_exempt_interest": D("0"),
+    "above_the_line_adjustments": D("5300"),
+    "additional_deductions": D("23"),
+    "sweep_mode": SweepMode.ORDINARY,
+    "filing_status": "single",
+    "tax_year": 2026,
+    "sweep_floor": D("0"),
+    "sweep_ceiling": D("70000"),
+    "sweep_step": D("1000"),
+}
 
 _APTC_MONTHLY = D("520")
 _APTC_ANNUAL = _APTC_MONTHLY * 12  # 6240
