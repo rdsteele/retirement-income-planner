@@ -932,3 +932,88 @@ class TestErrorHandling:
                 sweep_mode=SweepMode.ORDINARY,
                 filing_status="single", tax_year=2099,
             )
+
+
+# ---------------------------------------------------------------------------
+# emr_ordinary attribution — zero in sub-deduction zone, bracket rate above
+#
+# emr_ordinary is derived from whether ordinary_tax changes between the lo and
+# hi snapshots (lo and lo + _EMR_COMPUTE_STEP=1000).  It is 0 when both
+# snapshots have the same ordinary tax (fully below the standard deduction),
+# and equals the marginal bracket rate when ordinary tax increases.
+#
+# These tests use fixed_ordinary=0, no SS, no preferential so that the only
+# source of emr_ordinary is the sweep variable itself.
+# ---------------------------------------------------------------------------
+
+class TestEmrOrdinaryAttribution:
+    def setup_method(self):
+        self.fed_patcher = patch(_PATCH_FED, side_effect=_mock_federal_single)
+        self.ss_patcher = patch(_PATCH_SS, side_effect=_mock_ss_single)
+        self.ohio_patcher = patch(_PATCH_OHIO)
+        self.mock_fed = self.fed_patcher.start()
+        self.mock_ss = self.ss_patcher.start()
+        self.mock_ohio = self.ohio_patcher.start()
+
+    def teardown_method(self):
+        self.fed_patcher.stop()
+        self.ss_patcher.stop()
+        self.ohio_patcher.stop()
+
+    def test_emr_ordinary_zero_below_standard_deduction(self):
+        # sweep_ceiling=14000 keeps every point AND its +$1,000 EMR compute step
+        # (up to 15,000) below the $15,750 standard deduction.  ordinary_tax is
+        # $0 at both snapshots for every point, so emr_ordinary must be 0.
+        result = calculate_emr(
+            pension=D("0"), interest=D("0"),
+            ordinary_dividends=D("0"), inherited_ira_rmd=D("0"),
+            ss_benefit=D("0"), qualified_dividends=D("0"),
+            fixed_ltcg=D("0"), tax_exempt_interest=D("0"),
+            sweep_mode=SweepMode.ORDINARY,
+            filing_status="single", tax_year=2025,
+            sweep_floor=D("0"), sweep_ceiling=D("14000"), sweep_step=D("1000"),
+        )
+        for pt in result.points:
+            assert pt.taxable_ordinary == _ZERO, (
+                f"income={pt.income}: taxable_ordinary={pt.taxable_ordinary}, expected 0"
+            )
+            assert pt.emr_ordinary == _ZERO, (
+                f"income={pt.income}: emr_ordinary={pt.emr_ordinary} below std deduction, "
+                f"expected 0"
+            )
+
+    def test_emr_ordinary_equals_bracket_rate_above_standard_deduction(self):
+        # sweep_floor=17000 → taxable_ordinary starts at 1,250 (10% bracket).
+        # Sweep crosses the 10%→12% boundary at total_ordinary=27,675
+        # (taxable=11,925).  For all points strictly above the deduction, emr_ordinary
+        # must match the marginal bracket rate at that sweep point.
+        result = calculate_emr(
+            pension=D("0"), interest=D("0"),
+            ordinary_dividends=D("0"), inherited_ira_rmd=D("0"),
+            ss_benefit=D("0"), qualified_dividends=D("0"),
+            fixed_ltcg=D("0"), tax_exempt_interest=D("0"),
+            sweep_mode=SweepMode.ORDINARY,
+            filing_status="single", tax_year=2025,
+            sweep_floor=D("17000"), sweep_ceiling=D("50000"), sweep_step=D("1000"),
+        )
+        saw_10pct = saw_12pct = False
+        for pt in result.points:
+            assert pt.taxable_ordinary > _ZERO, (
+                f"income={pt.income}: taxable_ordinary should be positive above deduction"
+            )
+            if pt.taxable_ordinary <= D("11925"):
+                # 10% bracket
+                assert pt.emr_ordinary == D("0.10"), (
+                    f"income={pt.income}: emr_ordinary={pt.emr_ordinary} in 10% bracket, "
+                    f"expected 0.10"
+                )
+                saw_10pct = True
+            elif pt.taxable_ordinary <= D("48475"):
+                # 12% bracket
+                assert pt.emr_ordinary == D("0.12"), (
+                    f"income={pt.income}: emr_ordinary={pt.emr_ordinary} in 12% bracket, "
+                    f"expected 0.12"
+                )
+                saw_12pct = True
+        assert saw_10pct, "no points found in 10% bracket — test setup may be wrong"
+        assert saw_12pct, "no points found in 12% bracket — test setup may be wrong"
