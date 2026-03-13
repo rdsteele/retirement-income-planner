@@ -5,12 +5,16 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from api.routers.accounts import router as accounts_router
+from api.routers.config import router as config_router
 from api.routers.emr import router as emr_router
+from api.routers.tax_years import router as tax_years_router
 
 app = FastAPI(title="Retirement Income Planner")
 
 app.include_router(emr_router, prefix="/api")
 app.include_router(accounts_router, prefix="/api")
+app.include_router(tax_years_router, prefix="/api")
+app.include_router(config_router, prefix="/api")
 app.mount("/static", StaticFiles(directory="api/static"), name="static")
 
 

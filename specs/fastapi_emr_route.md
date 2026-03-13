@@ -50,7 +50,7 @@ All monetary fields are `float`, non-negative. The route converts them to
 | `pension`                           | `float` | Fixed pension or annuity income          |
 | `interest`                          | `float` | Taxable interest income                  |
 | `ordinary_dividends`                | `float` | Non-qualified dividends                  |
-| `inherited_ira_rmd`                 | `float` | Inherited IRA required distributions     |
+| `ira_distributions`                 | `float` | Inherited IRA required distributions     |
 | `ss_benefit`                        | `float` | Gross Social Security benefit            |
 | `qualified_dividends`               | `float` | Qualified dividends (preferential rate)  |
 | `fixed_ltcg`                        | `float` | Fixed LTCG already realized              |

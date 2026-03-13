@@ -14,7 +14,7 @@ from unittest.mock import patch
 import pytest
 
 from services.common import round_rate, round_tax
-from services.emr import EMRResult, SweepMode, calculate_emr
+from services.emr import EMRResult, SweepMode, _get_default_sweep_ceiling, calculate_emr
 from services.federal_tax import FederalTaxResult
 from services.ohio_tax import OhioTaxResult
 from services.social_security import SocialSecurityResult
@@ -226,7 +226,7 @@ class TestExampleAOrdinarySweepNoSS:
 
         self.result = calculate_emr(
             pension=dec("20000"), interest=dec("2000"),
-            ordinary_dividends=dec("0"), inherited_ira_rmd=dec("0"),
+            ordinary_dividends=dec("0"), ira_distributions=dec("0"),
             ss_benefit=dec("0"), qualified_dividends=dec("5000"),
             fixed_ltcg=dec("10000"), tax_exempt_interest=dec("0"),
             sweep_mode=SweepMode.ORDINARY,
@@ -308,7 +308,7 @@ class TestExampleBSSTorpedo:
 
         self.result = calculate_emr(
             pension=dec("15000"), interest=dec("0"),
-            ordinary_dividends=dec("0"), inherited_ira_rmd=dec("8000"),
+            ordinary_dividends=dec("0"), ira_distributions=dec("8000"),
             ss_benefit=dec("24000"), qualified_dividends=dec("3000"),
             fixed_ltcg=dec("5000"), tax_exempt_interest=dec("0"),
             sweep_mode=SweepMode.ORDINARY,
@@ -401,7 +401,7 @@ class TestExampleCPreferentialSweep:
 
         self.result = calculate_emr(
             pension=dec("20000"), interest=dec("0"),
-            ordinary_dividends=dec("0"), inherited_ira_rmd=dec("15000"),
+            ordinary_dividends=dec("0"), ira_distributions=dec("15000"),
             ss_benefit=dec("0"), qualified_dividends=dec("2000"),
             fixed_ltcg=dec("0"), tax_exempt_interest=dec("0"),
             variable_ordinary=dec("0"),
@@ -471,7 +471,7 @@ class TestIncludeOhioTrue:
 
         self.result = calculate_emr(
             pension=dec("20000"), interest=dec("2000"),
-            ordinary_dividends=dec("0"), inherited_ira_rmd=dec("0"),
+            ordinary_dividends=dec("0"), ira_distributions=dec("0"),
             ss_benefit=dec("0"), qualified_dividends=dec("0"),
             fixed_ltcg=dec("0"), tax_exempt_interest=dec("0"),
             sweep_mode=SweepMode.ORDINARY,
@@ -524,7 +524,7 @@ class TestIncludeOhioFalse:
 
         self.result = calculate_emr(
             pension=dec("20000"), interest=dec("2000"),
-            ordinary_dividends=dec("0"), inherited_ira_rmd=dec("0"),
+            ordinary_dividends=dec("0"), ira_distributions=dec("0"),
             ss_benefit=dec("0"), qualified_dividends=dec("0"),
             fixed_ltcg=dec("0"), tax_exempt_interest=dec("0"),
             sweep_mode=SweepMode.ORDINARY,
@@ -572,7 +572,7 @@ class TestNIITTrigger:
         # qualified_dividends=10000 provides the NIIT base.
         self.result = calculate_emr(
             pension=dec("50000"), interest=dec("0"),
-            ordinary_dividends=dec("0"), inherited_ira_rmd=dec("0"),
+            ordinary_dividends=dec("0"), ira_distributions=dec("0"),
             ss_benefit=dec("0"), qualified_dividends=dec("10000"),
             fixed_ltcg=dec("0"), tax_exempt_interest=dec("0"),
             sweep_mode=SweepMode.ORDINARY,
@@ -633,7 +633,7 @@ class TestSSTorpedoBoundaryInsertionPreferential:
         # ss_max boundary: 34000 + (17000-4500)/0.85 - 20000 ≈ 28706
         self.result = calculate_emr(
             pension=dec("10000"), interest=dec("0"),
-            ordinary_dividends=dec("0"), inherited_ira_rmd=dec("0"),
+            ordinary_dividends=dec("0"), ira_distributions=dec("0"),
             ss_benefit=dec("20000"), qualified_dividends=dec("0"),
             fixed_ltcg=dec("0"), tax_exempt_interest=dec("0"),
             variable_ordinary=dec("0"),
@@ -688,7 +688,7 @@ class TestIRMAAThresholds:
 
         self.result = calculate_emr(
             pension=dec("0"), interest=dec("0"),
-            ordinary_dividends=dec("0"), inherited_ira_rmd=dec("0"),
+            ordinary_dividends=dec("0"), ira_distributions=dec("0"),
             ss_benefit=dec("0"), qualified_dividends=dec("0"),
             fixed_ltcg=dec("0"), tax_exempt_interest=dec("0"),
             sweep_mode=SweepMode.ORDINARY,
@@ -740,7 +740,7 @@ class TestOhioBoundaryInsertion:
         # sweep_step=10000 ensures neither boundary falls on a regular point.
         self.result = calculate_emr(
             pension=dec("0"), interest=dec("0"),
-            ordinary_dividends=dec("0"), inherited_ira_rmd=dec("0"),
+            ordinary_dividends=dec("0"), ira_distributions=dec("0"),
             ss_benefit=dec("0"), qualified_dividends=dec("0"),
             fixed_ltcg=dec("0"), tax_exempt_interest=dec("0"),
             ohio_qualifying_retirement_income=dec("10000"),
@@ -779,7 +779,7 @@ class TestOhioBoundaryInsertion:
         # (they are unused and would only add sweep overhead).
         result_no_ohio = calculate_emr(
             pension=dec("0"), interest=dec("0"),
-            ordinary_dividends=dec("0"), inherited_ira_rmd=dec("0"),
+            ordinary_dividends=dec("0"), ira_distributions=dec("0"),
             ss_benefit=dec("0"), qualified_dividends=dec("0"),
             fixed_ltcg=dec("0"), tax_exempt_interest=dec("0"),
             sweep_mode=SweepMode.ORDINARY,
@@ -817,7 +817,7 @@ class TestAboveTheLineAdjustments:
         # With adjustment=10000: agi_excl=20000, prov=20000+10000=30000 → 50% tier
         self.result_no_adj = calculate_emr(
             pension=dec("30000"), interest=dec("0"),
-            ordinary_dividends=dec("0"), inherited_ira_rmd=dec("0"),
+            ordinary_dividends=dec("0"), ira_distributions=dec("0"),
             ss_benefit=dec("20000"), qualified_dividends=dec("0"),
             fixed_ltcg=dec("0"), tax_exempt_interest=dec("0"),
             sweep_mode=SweepMode.ORDINARY,
@@ -826,7 +826,7 @@ class TestAboveTheLineAdjustments:
         )
         self.result_with_adj = calculate_emr(
             pension=dec("30000"), interest=dec("0"),
-            ordinary_dividends=dec("0"), inherited_ira_rmd=dec("0"),
+            ordinary_dividends=dec("0"), ira_distributions=dec("0"),
             ss_benefit=dec("20000"), qualified_dividends=dec("0"),
             fixed_ltcg=dec("0"), tax_exempt_interest=dec("0"),
             sweep_mode=SweepMode.ORDINARY,
@@ -870,7 +870,7 @@ class TestAdditionalDeductions:
         # With additional_deductions=4000: taxable_ordinary = 4250-4000=250
         self.result_no_ded = calculate_emr(
             pension=dec("20000"), interest=dec("0"),
-            ordinary_dividends=dec("0"), inherited_ira_rmd=dec("0"),
+            ordinary_dividends=dec("0"), ira_distributions=dec("0"),
             ss_benefit=dec("0"), qualified_dividends=dec("0"),
             fixed_ltcg=dec("0"), tax_exempt_interest=dec("0"),
             sweep_mode=SweepMode.ORDINARY,
@@ -879,7 +879,7 @@ class TestAdditionalDeductions:
         )
         self.result_with_ded = calculate_emr(
             pension=dec("20000"), interest=dec("0"),
-            ordinary_dividends=dec("0"), inherited_ira_rmd=dec("0"),
+            ordinary_dividends=dec("0"), ira_distributions=dec("0"),
             ss_benefit=dec("0"), qualified_dividends=dec("0"),
             fixed_ltcg=dec("0"), tax_exempt_interest=dec("0"),
             sweep_mode=SweepMode.ORDINARY,
@@ -915,7 +915,7 @@ class TestErrorHandling:
         with pytest.raises(ValueError, match="Unsupported filing status"):
             calculate_emr(
                 pension=dec("0"), interest=dec("0"),
-                ordinary_dividends=dec("0"), inherited_ira_rmd=dec("0"),
+                ordinary_dividends=dec("0"), ira_distributions=dec("0"),
                 ss_benefit=dec("0"), qualified_dividends=dec("0"),
                 fixed_ltcg=dec("0"), tax_exempt_interest=dec("0"),
                 sweep_mode=SweepMode.ORDINARY,
@@ -926,7 +926,7 @@ class TestErrorHandling:
         with pytest.raises(ValueError, match="Unsupported tax year"):
             calculate_emr(
                 pension=dec("0"), interest=dec("0"),
-                ordinary_dividends=dec("0"), inherited_ira_rmd=dec("0"),
+                ordinary_dividends=dec("0"), ira_distributions=dec("0"),
                 ss_benefit=dec("0"), qualified_dividends=dec("0"),
                 fixed_ltcg=dec("0"), tax_exempt_interest=dec("0"),
                 sweep_mode=SweepMode.ORDINARY,
@@ -966,7 +966,7 @@ class TestEmrOrdinaryAttribution:
         # $0 at both snapshots for every point, so emr_ordinary must be 0.
         result = calculate_emr(
             pension=dec("0"), interest=dec("0"),
-            ordinary_dividends=dec("0"), inherited_ira_rmd=dec("0"),
+            ordinary_dividends=dec("0"), ira_distributions=dec("0"),
             ss_benefit=dec("0"), qualified_dividends=dec("0"),
             fixed_ltcg=dec("0"), tax_exempt_interest=dec("0"),
             sweep_mode=SweepMode.ORDINARY,
@@ -989,7 +989,7 @@ class TestEmrOrdinaryAttribution:
         # must match the marginal bracket rate at that sweep point.
         result = calculate_emr(
             pension=dec("0"), interest=dec("0"),
-            ordinary_dividends=dec("0"), inherited_ira_rmd=dec("0"),
+            ordinary_dividends=dec("0"), ira_distributions=dec("0"),
             ss_benefit=dec("0"), qualified_dividends=dec("0"),
             fixed_ltcg=dec("0"), tax_exempt_interest=dec("0"),
             sweep_mode=SweepMode.ORDINARY,
@@ -1017,3 +1017,110 @@ class TestEmrOrdinaryAttribution:
                 saw_12pct = True
         assert saw_10pct, "no points found in 10% bracket — test setup may be wrong"
         assert saw_12pct, "no points found in 12% bracket — test setup may be wrong"
+
+
+# ---------------------------------------------------------------------------
+# sweep_ceiling=None — uses _get_default_sweep_ceiling (24% bracket top)
+# Lines 92-95 (_get_default_sweep_ceiling body) and line 608 exercised.
+# ---------------------------------------------------------------------------
+
+class TestSweepCeilingDefault:
+    """When sweep_ceiling=None, calculate_emr resolves it via _get_default_sweep_ceiling."""
+
+    def setup_method(self):
+        self.fed_patcher = patch(_PATCH_FED, side_effect=_mock_federal_single)
+        self.ss_patcher = patch(_PATCH_SS, side_effect=_mock_ss_single)
+        self.ohio_patcher = patch(_PATCH_OHIO)
+        self.mock_fed = self.fed_patcher.start()
+        self.mock_ss = self.ss_patcher.start()
+        self.mock_ohio = self.ohio_patcher.start()
+
+        self.result = calculate_emr(
+            pension=dec("20000"), interest=dec("0"),
+            ordinary_dividends=dec("0"), ira_distributions=dec("0"),
+            ss_benefit=dec("0"), qualified_dividends=dec("0"),
+            fixed_ltcg=dec("0"), tax_exempt_interest=dec("0"),
+            sweep_mode=SweepMode.ORDINARY,
+            filing_status="single", tax_year=2025,
+            sweep_step=dec("10000"),
+            sweep_ceiling=None,
+        )
+
+    def teardown_method(self):
+        self.fed_patcher.stop()
+        self.ss_patcher.stop()
+        self.ohio_patcher.stop()
+
+    def test_has_points(self):
+        assert len(self.result.points) > 0
+
+    def test_ceiling_uses_24pct_bracket_range(self):
+        # 2025 single 24% bracket top = 197,300.  The sweep stops near that ceiling;
+        # the last point is the bracket-top boundary (taxable=197,300 → variable=193,050).
+        incomes = [pt.income for pt in self.result.points]
+        assert max(incomes) > dec("100000")
+        assert max(incomes) <= dec("197300")
+
+
+def test_get_default_sweep_ceiling_missing_bracket():
+    """_get_default_sweep_ceiling raises ValueError when no 24% bracket exists."""
+    fake_data = {
+        "ordinary": {
+            "single": [
+                {"rate": "0.10", "from": "0", "to": "10000", "excess_over": "0", "base": "0"},
+                {"rate": "0.12", "from": "10000", "to": "50000", "excess_over": "10000", "base": "1000"},
+            ]
+        },
+        "preferential": {"single": []},
+        "standard_deduction": {"single": "15000"},
+        "niit_threshold": {"single": "200000"},
+        "niit_rate": "0.038",
+        "irmaa_thresholds": {"single": []},
+    }
+    with patch("services.emr.load_federal_data", return_value=fake_data):
+        with pytest.raises(ValueError, match="No 24% bracket"):
+            _get_default_sweep_ceiling("single", 2025)
+
+
+# ---------------------------------------------------------------------------
+# Preferential sweep with Ohio — exercises _compute_preferential_boundaries
+# Ohio branch (lines 539-542) when sweep_mode=PREFERENTIAL and include_ohio=True.
+# ---------------------------------------------------------------------------
+
+class TestPreferentialSweepWithOhio:
+    """Preferential sweep + include_ohio=True exercises Ohio boundaries in preferential mode."""
+
+    def setup_method(self):
+        self.fed_patcher = patch(_PATCH_FED, side_effect=_mock_federal_single)
+        self.ss_patcher = patch(_PATCH_SS, side_effect=_mock_ss_single)
+        self.ohio_patcher = patch(_PATCH_OHIO, side_effect=_mock_ohio)
+        self.mock_fed = self.fed_patcher.start()
+        self.mock_ss = self.ss_patcher.start()
+        self.mock_ohio = self.ohio_patcher.start()
+
+        self.result = calculate_emr(
+            pension=dec("20000"), interest=dec("0"),
+            ordinary_dividends=dec("0"), ira_distributions=dec("0"),
+            ss_benefit=dec("0"), qualified_dividends=dec("0"),
+            fixed_ltcg=dec("0"), tax_exempt_interest=dec("0"),
+            sweep_mode=SweepMode.PREFERENTIAL,
+            filing_status="single", tax_year=2025,
+            sweep_step=dec("5000"), sweep_ceiling=dec("60000"),
+            include_ohio=True,
+            ohio_qualifying_retirement_income=dec("5000"),
+        )
+
+    def teardown_method(self):
+        self.fed_patcher.stop()
+        self.ss_patcher.stop()
+        self.ohio_patcher.stop()
+
+    def test_has_points(self):
+        assert len(self.result.points) > 0
+
+    def test_ohio_service_called(self):
+        assert self.mock_ohio.call_count > 0
+
+    def test_emr_ohio_positive(self):
+        # Ohio tax is positive for any non-trivial income
+        assert any(pt.emr_ohio > _ZERO for pt in self.result.points)

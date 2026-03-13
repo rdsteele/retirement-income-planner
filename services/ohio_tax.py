@@ -38,7 +38,7 @@ def _lookup_personal_exemption(ohio_agi: Decimal, tiers: list[dict]) -> Decimal:
         agi_up_to = tier["agi_up_to"]
         if agi_up_to is None or ohio_agi <= Decimal(agi_up_to):
             return Decimal(tier["amount"])
-    return Decimal(tiers[-1]["amount"])
+    return Decimal(tiers[-1]["amount"])  # pragma: no cover — null sentinel always matches
 
 
 def _compute_medical_deduction(
@@ -83,7 +83,7 @@ def _lookup_retirement_income_credit(
         income_up_to = tier["income_up_to"]
         if income_up_to is None or qualifying_income <= Decimal(income_up_to):
             return Decimal(tier["credit"])
-    return Decimal(tiers[-1]["credit"])
+    return Decimal(tiers[-1]["credit"])  # pragma: no cover — null sentinel always matches
 
 
 def _compute_effective_rate(ohio_tax: Decimal, ohio_agi: Decimal) -> Decimal:

@@ -12,6 +12,7 @@ from api.models.emr import (
     EMRResponse,
     PlanningSignals,
 )
+from services.data_loader import load_federal_data
 from services.emr import EMRResult, SweepMode, calculate_emr
 
 logger = logging.getLogger(__name__)
@@ -55,16 +56,33 @@ def _build_points(result: EMRResult) -> EMRPoints:
     )
 
 
-def _compute_planning_signals(result: EMRResult) -> PlanningSignals:
+def _get_ltcg_0pct_ceiling(tax_year: int, filing_status: str) -> float:
+    data = load_federal_data(tax_year)
+    return float(data["preferential"][filing_status][0]["to"])
+
+
+def _compute_ltcg_0pct_remaining(
+    result: EMRResult,
+    request: EMRRequest,
+) -> float | None:
+    pts = result.points
+    if not pts:  # pragma: no cover — calculate_emr always produces ≥1 point
+        return None
+    ltcg_already_used = request.fixed_ltcg + request.qualified_dividends
+    # Ordinary sweep with no fixed preferential income — nothing to report
+    if result.sweep_mode == SweepMode.ORDINARY and ltcg_already_used == _ZERO:
+        return None
+    ceiling = _get_ltcg_0pct_ceiling(request.tax_year, request.filing_status)
+    taxable_ordinary_at_floor = float(pts[0].taxable_ordinary)
+    remaining = ceiling - taxable_ordinary_at_floor - ltcg_already_used
+    return remaining if remaining > _ZERO else None
+
+
+def _compute_planning_signals(result: EMRResult, request: EMRRequest) -> PlanningSignals:
     pts = result.points
     floor_income = float(pts[0].income) if pts else _ZERO
 
-    # ltcg_0pct_remaining: first point where emr_pref_stacking > 0
-    ltcg_0pct_remaining = None
-    for p in pts:
-        if float(p.emr_pref_stacking) > _ZERO:
-            ltcg_0pct_remaining = float(p.income) - floor_income
-            break
+    ltcg_0pct_remaining = _compute_ltcg_0pct_remaining(result, request)
 
     # torpedo_active
     torpedo_active = any(float(p.emr_ss_torpedo) > _ZERO for p in pts)
@@ -115,7 +133,7 @@ def post_emr(request: EMRRequest):
             pension=_to_decimal(request.pension),
             interest=_to_decimal(request.interest),
             ordinary_dividends=_to_decimal(request.ordinary_dividends),
-            inherited_ira_rmd=_to_decimal(request.inherited_ira_rmd),
+            ira_distributions=_to_decimal(request.ira_distributions),
             ss_benefit=_to_decimal(request.ss_benefit),
             qualified_dividends=_to_decimal(request.qualified_dividends),
             fixed_ltcg=_to_decimal(request.fixed_ltcg),
@@ -150,5 +168,5 @@ def post_emr(request: EMRRequest):
         tax_year=result.tax_year,
         points=_build_points(result),
         irmaa_thresholds=[float(t) for t in result.irmaa_thresholds],
-        planning_signals=_compute_planning_signals(result),
+        planning_signals=_compute_planning_signals(result, request),
     )

@@ -1,0 +1,5 @@
+{
+  "irmaa_inflation_default": 0.025,
+  "y_axis_max_emr": 0.50,
+  "sweep_step_default": 100
+}

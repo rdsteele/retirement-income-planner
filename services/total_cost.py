@@ -115,7 +115,7 @@ def calculate_total_cost(
     pension: Decimal = _ZERO,
     interest: Decimal = _ZERO,
     ordinary_dividends: Decimal = _ZERO,
-    inherited_ira_rmd: Decimal = _ZERO,
+    ira_distributions: Decimal = _ZERO,
     ss_benefit: Decimal = _ZERO,
     qualified_dividends: Decimal = _ZERO,
     fixed_ltcg: Decimal = _ZERO,
@@ -134,7 +134,7 @@ def calculate_total_cost(
     aptc_monthly: Decimal = _ZERO,
     include_aca: bool = False,
 ) -> TotalCostResult:
-    fixed_ordinary = pension + interest + ordinary_dividends + inherited_ira_rmd
+    fixed_ordinary = pension + interest + ordinary_dividends + ira_distributions
     aptc_annual_known = aptc_monthly * 12
 
     extra_boundary_points: list[Decimal] | None = None
@@ -149,7 +149,7 @@ def calculate_total_cost(
             pension=pension,
             interest=interest,
             ordinary_dividends=ordinary_dividends,
-            inherited_ira_rmd=inherited_ira_rmd,
+            ira_distributions=ira_distributions,
             ss_benefit=ss_benefit,
             qualified_dividends=qualified_dividends,
             fixed_ltcg=fixed_ltcg,
@@ -204,7 +204,7 @@ def calculate_total_cost(
         pension=pension,
         interest=interest,
         ordinary_dividends=ordinary_dividends,
-        inherited_ira_rmd=inherited_ira_rmd,
+        ira_distributions=ira_distributions,
         ss_benefit=ss_benefit,
         qualified_dividends=qualified_dividends,
         fixed_ltcg=fixed_ltcg,

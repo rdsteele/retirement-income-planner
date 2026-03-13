@@ -9,6 +9,8 @@ Filing status: single unless noted.  Tax year: 2026.
 
 from decimal import Decimal
 
+import pytest
+
 from services.aca import calculate_aca_subsidy
 
 
@@ -271,3 +273,27 @@ class TestWorkedExample:
     def test_marginal_subsidy_loss_zero(self):
         # $528 below cliff — no marginal loss yet
         assert self.result.marginal_subsidy_loss == dec("0")
+
+
+# ---------------------------------------------------------------------------
+# Error handling — unsupported tax year and invalid filing status
+# ---------------------------------------------------------------------------
+
+def test_unsupported_tax_year_raises():
+    with pytest.raises(ValueError, match="Unsupported tax year"):
+        calculate_aca_subsidy(
+            magi=dec("50000"),
+            slcsp_annual_premium=dec("10000"),
+            filing_status="single",
+            tax_year=2099,
+        )
+
+
+def test_invalid_filing_status_raises():
+    with pytest.raises(ValueError, match="Unsupported filing status"):
+        calculate_aca_subsidy(
+            magi=dec("50000"),
+            slcsp_annual_premium=dec("10000"),
+            filing_status="mfs",
+            tax_year=TAX_YEAR,
+        )

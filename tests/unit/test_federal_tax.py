@@ -200,16 +200,16 @@ class TestFederal2026Data:
         assert data["standard_deduction"]["single"] == "16100"
 
     def test_first_bracket_top_single(self):
-        # At exactly $12,225 of taxable ordinary income (the 2026 10% ceiling),
+        # At exactly $12,400 of taxable ordinary income (the 2026 10% ceiling),
         # all income falls in the 10% bracket.
-        # Tax = 12,225 × 0.10 = 1222.5 → ROUND_HALF_UP = $1,223
+        # Tax = 12,400 × 0.10 = 1240.00 → $1,240
         result = calculate_federal_tax(
-            ordinary_income=dec("12225"),
+            ordinary_income=dec("12400"),
             preferential_income=dec("0"),
             filing_status="single",
             tax_year=2026,
         )
         assert len(result.bracket_breakdown) == 1
         assert result.bracket_breakdown[0].rate == dec("0.10")
-        assert result.bracket_breakdown[0].income_taxed == dec("12225")
-        assert result.bracket_breakdown[0].tax_amount == dec("1223")
+        assert result.bracket_breakdown[0].income_taxed == dec("12400")
+        assert result.bracket_breakdown[0].tax_amount == dec("1240")

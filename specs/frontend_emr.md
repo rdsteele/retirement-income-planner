@@ -79,7 +79,7 @@ become visible (`style.display = 'block'`) after the first successful API respon
 | Pension / Annuity | `pension` | blank | |
 | Taxable Interest | `interest` | blank | |
 | Ordinary Dividends | `ordinary_dividends` | blank | |
-| RMDs | `inherited_ira_rmd` | blank | |
+| RMDs | `ira_distributions` | blank | |
 | Above-the-Line Adjustments | `above_the_line_adjustments` | blank | Helper: "e.g. HSA contributions, IRA deductions" |
 | Additional Deductions | `additional_deductions` | blank | Helper: "e.g. QBI, excess itemized deductions" |
 

@@ -6,6 +6,7 @@ Uses FastAPI TestClient with real bracket data — no mocks.
 
 import pytest
 from fastapi.testclient import TestClient
+from unittest.mock import patch
 
 from api.main import app
 
@@ -17,7 +18,7 @@ _BASE_ORDINARY = {
     "pension": 20000.0,
     "interest": 2000.0,
     "ordinary_dividends": 0.0,
-    "inherited_ira_rmd": 0.0,
+    "ira_distributions": 0.0,
     "ss_benefit": 0.0,
     "qualified_dividends": 5000.0,
     "fixed_ltcg": 10000.0,
@@ -34,7 +35,7 @@ _BASE_PREFERENTIAL = {
     "pension": 20000.0,
     "interest": 0.0,
     "ordinary_dividends": 0.0,
-    "inherited_ira_rmd": 15000.0,
+    "ira_distributions": 15000.0,
     "ss_benefit": 0.0,
     "qualified_dividends": 2000.0,
     "fixed_ltcg": 0.0,
@@ -243,7 +244,7 @@ class TestPlanningSignals:
         payload = {
             **_BASE_ORDINARY,
             "pension": 15000.0,
-            "inherited_ira_rmd": 8000.0,
+            "ira_distributions": 8000.0,
             "ss_benefit": 24000.0,
             "qualified_dividends": 3000.0,
             "fixed_ltcg": 5000.0,
@@ -362,7 +363,7 @@ _OHIO_BASE = {
     "pension": 20000.0,
     "interest": 2000.0,
     "ordinary_dividends": 0.0,
-    "inherited_ira_rmd": 0.0,
+    "ira_distributions": 0.0,
     "ss_benefit": 0.0,
     "qualified_dividends": 5000.0,
     "fixed_ltcg": 10000.0,
@@ -416,7 +417,7 @@ class TestOhioFunctional:
             "pension": 80000.0,
             "interest": 0.0,
             "ordinary_dividends": 0.0,
-            "inherited_ira_rmd": 0.0,
+            "ira_distributions": 0.0,
             "ss_benefit": 0.0,
             "qualified_dividends": 0.0,
             "fixed_ltcg": 0.0,
@@ -462,3 +463,86 @@ class TestOhioFunctional:
         assert diff == pytest.approx(137.50, abs=50.0), (
             f"expected ~$137.50 reduction in ohio_tax, got {diff}"
         )
+
+
+# ── ltcg_0pct_remaining signal: formula-based fix ────────────────────────
+#
+# 2025 single:  0% LTCG ceiling = 48,350 | std deduction = 15,750
+# Base: pension=20,000 → taxable_ordinary_at_floor = 20,000 − 15,750 = 4,250
+
+_LTCG_BASE = {
+    "pension": 20000.0,
+    "interest": 0.0,
+    "ordinary_dividends": 0.0,
+    "ira_distributions": 0.0,
+    "ss_benefit": 0.0,
+    "qualified_dividends": 0.0,
+    "fixed_ltcg": 0.0,
+    "tax_exempt_interest": 0.0,
+    "sweep_mode": "ordinary",
+    "filing_status": "single",
+    "tax_year": 2025,
+    "sweep_floor": 0.0,
+    "sweep_ceiling": 5000.0,
+    "sweep_step": 1000.0,
+}
+
+
+class TestLtcg0pctRemainingSignal:
+    # 0% LTCG ceiling (2025 single) = 48,350
+    # taxable_ordinary_at_floor     =  4,250  (pension 20k − std_ded 15,750)
+
+    def test_partial_fill_returns_correct_remaining(self):
+        # fixed_ltcg=20,000 partially fills the 0% bracket
+        # remaining = 48,350 − 4,250 − 20,000 = 24,100
+        payload = {**_LTCG_BASE, "fixed_ltcg": 20000.0}
+        resp = client.post("/api/emr", json=payload)
+        assert resp.status_code == 200
+        remaining = resp.json()["planning_signals"]["ltcg_0pct_remaining"]
+        assert remaining == pytest.approx(24100.0)
+
+    def test_exact_fill_returns_null(self):
+        # fixed_ltcg=44,100 exactly fills the 0% bracket (48,350 − 4,250)
+        # remaining = 0 → null
+        payload = {**_LTCG_BASE, "fixed_ltcg": 44100.0}
+        resp = client.post("/api/emr", json=payload)
+        assert resp.status_code == 200
+        assert resp.json()["planning_signals"]["ltcg_0pct_remaining"] is None
+
+    def test_overfill_returns_null(self):
+        # fixed_ltcg=50,000 exceeds 0% bracket ceiling
+        # remaining < 0 → null
+        payload = {**_LTCG_BASE, "fixed_ltcg": 50000.0}
+        resp = client.post("/api/emr", json=payload)
+        assert resp.status_code == 200
+        assert resp.json()["planning_signals"]["ltcg_0pct_remaining"] is None
+
+    def test_no_preferential_income_returns_null(self):
+        # ordinary sweep with no fixed_ltcg and no qualified_dividends
+        # ltcg_already_used == 0 → null
+        payload = {**_LTCG_BASE, "fixed_ltcg": 0.0, "qualified_dividends": 0.0}
+        resp = client.post("/api/emr", json=payload)
+        assert resp.status_code == 200
+        assert resp.json()["planning_signals"]["ltcg_0pct_remaining"] is None
+
+
+# ── sweep_ceiling=null uses service default ───────────────────────────────
+
+class TestSweepCeilingNull:
+    def test_null_sweep_ceiling_accepted(self):
+        # sweep_ceiling=None triggers _to_decimal_or_none None path in router
+        # and _get_default_sweep_ceiling in service
+        payload = {**_BASE_ORDINARY, "sweep_ceiling": None}
+        resp = client.post("/api/emr", json=payload)
+        assert resp.status_code == 200
+        assert len(resp.json()["points"]["income"]) > 0
+
+
+# ── Unexpected exception → 500 ────────────────────────────────────────────
+
+class TestUnexpectedError:
+    def test_returns_500_on_unexpected_exception(self):
+        with patch("api.routers.emr.calculate_emr", side_effect=RuntimeError("boom")):
+            resp = client.post("/api/emr", json=_BASE_ORDINARY)
+        assert resp.status_code == 500
+        assert "unexpected" in resp.json()["detail"].lower()

@@ -22,7 +22,7 @@ class _BaseKwargs(TypedDict):
     pension: Decimal
     interest: Decimal
     ordinary_dividends: Decimal
-    inherited_ira_rmd: Decimal
+    ira_distributions: Decimal
     ss_benefit: Decimal
     qualified_dividends: Decimal
     fixed_ltcg: Decimal
@@ -45,7 +45,7 @@ _BASE: _BaseKwargs = {
     "pension": D("1596"),
     "interest": D("3353"),
     "ordinary_dividends": D("228"),
-    "inherited_ira_rmd": D("0"),
+    "ira_distributions": D("0"),
     "ss_benefit": D("0"),
     "qualified_dividends": D("2594"),
     "fixed_ltcg": D("21819"),
@@ -76,7 +76,7 @@ class TestNoAca:
             pension=_BASE["pension"],
             interest=_BASE["interest"],
             ordinary_dividends=_BASE["ordinary_dividends"],
-            inherited_ira_rmd=_BASE["inherited_ira_rmd"],
+            ira_distributions=_BASE["ira_distributions"],
             ss_benefit=_BASE["ss_benefit"],
             qualified_dividends=_BASE["qualified_dividends"],
             fixed_ltcg=_BASE["fixed_ltcg"],
@@ -133,7 +133,7 @@ class TestAcaMagi:
         self.tc = calculate_total_cost(**_BASE, aptc_monthly=_APTC_MONTHLY, include_aca=True)
         self.fixed_ordinary = (
             _BASE["pension"] + _BASE["interest"]
-            + _BASE["ordinary_dividends"] + _BASE["inherited_ira_rmd"]
+            + _BASE["ordinary_dividends"] + _BASE["ira_distributions"]
         )
 
     def test_aca_magi_formula_ordinary_mode(self):
@@ -250,7 +250,7 @@ class TestPreferentialMode:
             pension=D("30000"),
             interest=D("1000"),
             ordinary_dividends=D("0"),
-            inherited_ira_rmd=D("0"),
+            ira_distributions=D("0"),
             ss_benefit=D("0"),
             qualified_dividends=D("3000"),
             fixed_ltcg=D("10000"),

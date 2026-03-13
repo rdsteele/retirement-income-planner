@@ -14,12 +14,29 @@
       font-size: 14px;
       background: #f8f9fa;
       color: #212529;
-      padding: 16px;
+      padding: 12px 16px;
     }
 
-    .page { max-width: 960px; margin: 0 auto; }
+    .page { width: 100%; }
 
-    h1 { font-size: 22px; font-weight: 600; margin-bottom: 16px; color: #1a1a2e; }
+    h1 { font-size: 22px; font-weight: 600; margin-bottom: 12px; color: #1a1a2e; }
+
+    /* ── Two-column layout ── */
+    .two-col {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+
+    .left-panel {
+      width: 380px;
+      flex-shrink: 0;
+    }
+
+    .right-panel {
+      flex: 1;
+      min-width: 0;
+    }
 
     /* ── Cards ── */
     .card {
@@ -101,7 +118,7 @@
     .hidden { display: none !important; }
 
     /* ── Run button ── */
-    .run-wrap { padding: 12px 14px 14px; }
+    .run-wrap { margin-bottom: 12px; }
     #run-btn {
       width: 100%;
       padding: 10px;
@@ -190,6 +207,20 @@
       cursor: pointer;
     }
 
+    .irmaa-inflation-rate {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .irmaa-inflation-rate input {
+      width: 56px;
+      padding: 3px 6px;
+      border: 1px solid #ced4da;
+      border-radius: 4px;
+      font-size: 13px;
+      color: #212529;
+    }
+
     #chart { width: 100%; height: 500px; }
   </style>
 </head>
@@ -197,136 +228,195 @@
 <div class="page">
   <h1>EMR Analyzer</h1>
 
-  <!-- ── Input form ── -->
-  <div class="card" id="form-card">
+  <div class="two-col">
 
-    <!-- Section 1: Ordinary Income (open) -->
-    <details open>
-      <summary>Ordinary Income</summary>
-      <div class="section-body">
-        <div class="field"><label>Pension / Annuity</label><input type="number" id="pension" min="0" step="1" placeholder="0"></div>
-        <div class="field"><label>Taxable Interest</label><input type="number" id="interest" min="0" step="1" placeholder="0"></div>
-        <div class="field"><label>Ordinary Dividends</label><input type="number" id="ordinary_dividends" min="0" step="1" placeholder="0"></div>
-        <div class="field"><label>RMDs</label><input type="number" id="inherited_ira_rmd" min="0" step="1" placeholder="0"></div>
-        <div class="field"><label>Above-the-Line Adjustments</label><input type="number" id="above_the_line_adjustments" min="0" step="1" placeholder="0"><span class="field-hint">e.g. HSA contributions, IRA deductions</span></div>
-        <div class="field"><label>Additional Deductions</label><input type="number" id="additional_deductions" min="0" step="1" placeholder="0"><span class="field-hint">e.g. QBI, excess itemized deductions</span></div>
+    <!-- ── Left panel: Run button + inputs ── -->
+    <div class="left-panel">
+
+      <!-- Run button (top of left panel) -->
+      <div class="run-wrap">
+        <button id="run-btn" type="button">Run Analysis</button>
+        <div id="error-msg"></div>
       </div>
-    </details>
 
-    <!-- Section 2: Preferential Income -->
-    <details>
-      <summary>Preferential Income</summary>
-      <div class="section-body">
-        <div class="field"><label>Qualified Dividends</label><input type="number" id="qualified_dividends" min="0" step="1" placeholder="0"></div>
-        <div class="field"><label>Fixed LTCG</label><input type="number" id="fixed_ltcg" min="0" step="1" placeholder="0"></div>
+      <!-- Input form -->
+      <div class="card" id="form-card">
+
+        <!-- Section 1: Ordinary Income (open) -->
+        <details open>
+          <summary>Ordinary Income</summary>
+          <div class="section-body">
+            <div class="field"><label>Pension / Annuity</label><input type="number" id="pension" min="0" step="1" placeholder="0"></div>
+            <div class="field"><label>Taxable Interest</label><input type="number" id="interest" min="0" step="1" placeholder="0"></div>
+            <div class="field"><label>Ordinary Dividends</label><input type="number" id="ordinary_dividends" min="0" step="1" placeholder="0"></div>
+            <div class="field"><label>IRA Distributions / RMDs</label><input type="number" id="ira_distributions" min="0" step="1" placeholder="0"></div>
+            <div class="field"><label>Above-the-Line Adjustments</label><input type="number" id="above_the_line_adjustments" min="0" step="1" placeholder="0"><span class="field-hint">e.g. HSA contributions, IRA deductions</span></div>
+            <div class="field"><label>Additional Deductions</label><input type="number" id="additional_deductions" min="0" step="1" placeholder="0"><span class="field-hint">e.g. QBI, excess itemized deductions</span></div>
+          </div>
+        </details>
+
+        <!-- Section 2: Preferential Income -->
+        <details>
+          <summary>Preferential Income</summary>
+          <div class="section-body">
+            <div class="field"><label>Qualified Dividends</label><input type="number" id="qualified_dividends" min="0" step="1" placeholder="0"></div>
+            <div class="field"><label>Fixed LTCG</label><input type="number" id="fixed_ltcg" min="0" step="1" placeholder="0"></div>
+          </div>
+        </details>
+
+        <!-- Section 3: Social Security -->
+        <details>
+          <summary>Social Security</summary>
+          <div class="section-body">
+            <div class="field"><label>SS Annual Benefit</label><input type="number" id="ss_benefit" min="0" step="1" placeholder="0"></div>
+            <div class="field"><label>Tax-Exempt Interest</label><input type="number" id="tax_exempt_interest" min="0" step="1" placeholder="0"></div>
+          </div>
+        </details>
+
+        <!-- Section 4: Sweep Settings -->
+        <details>
+          <summary>Sweep Settings</summary>
+          <div class="section-body">
+            <div class="field">
+              <label>Sweep Mode</label>
+              <select id="sweep_mode">
+                <option value="ordinary">Ordinary</option>
+                <option value="preferential">Preferential</option>
+              </select>
+            </div>
+            <div class="field" id="variable-ordinary-wrap">
+              <label>Variable Ordinary (Preferential mode)</label>
+              <input type="number" id="variable_ordinary" min="0" step="1" placeholder="0">
+            </div>
+            <div class="field">
+              <label>Filing Status</label>
+              <select id="filing_status">
+                <option value="single">Single</option>
+                <option value="mfj">Married Filing Jointly</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Tax Year</label>
+              <select id="tax_year">
+                <!-- populated dynamically by loadTaxYears() on page load -->
+              </select>
+            </div>
+            <div class="field">
+              <label>Sweep Floor</label>
+              <input type="number" id="sweep_floor" min="0" step="1" placeholder="0">
+            </div>
+            <div class="field">
+              <label>Sweep Ceiling (blank = service default)</label>
+              <input type="number" id="sweep_ceiling" min="1" step="1" placeholder="197,300 (default)">
+            </div>
+            <div class="field">
+              <label>Sweep Step</label>
+              <input type="number" id="sweep_step" min="1" step="100">
+            </div>
+
+            <!-- Ohio toggle -->
+            <div class="checkbox-row">
+              <input type="checkbox" id="include_ohio">
+              <label for="include_ohio">Include Ohio State Tax</label>
+            </div>
+
+            <!-- Ohio sub-fields -->
+            <div class="field hidden" id="ohio-medical-wrap">
+              <label>Ohio Medical Deduction</label>
+              <input type="number" id="ohio_medical_deduction" min="0" step="1" placeholder="0">
+            </div>
+            <div class="field hidden" id="ohio-retirement-wrap">
+              <label>Qualifying Retirement Income</label>
+              <input type="number" id="ohio_qualifying_retirement_income" min="0" step="1" placeholder="0">
+            </div>
+          </div>
+        </details>
+
+      </div><!-- /.card#form-card -->
+    </div><!-- /.left-panel -->
+
+    <!-- ── Right panel: signals + chart ── -->
+    <div class="right-panel">
+
+      <!-- Planning signals -->
+      <div class="card" id="signals-wrap" style="display:none;">
+        <div id="signals-bar"></div>
       </div>
-    </details>
 
-    <!-- Section 3: Social Security -->
-    <details>
-      <summary>Social Security</summary>
-      <div class="section-body">
-        <div class="field"><label>SS Annual Benefit</label><input type="number" id="ss_benefit" min="0" step="1" placeholder="0"></div>
-        <div class="field"><label>Tax-Exempt Interest</label><input type="number" id="tax_exempt_interest" min="0" step="1" placeholder="0"></div>
+      <!-- Chart -->
+      <div class="card" id="chart-section" style="width:100%;">
+        <div class="chart-toolbar">
+          <span class="toolbar-label">Chart type:</span>
+          <button class="toggle-btn active" id="btn-stacked">Stacked Area</button>
+          <button class="toggle-btn" id="btn-lines">Lines</button>
+          <label class="irmaa-toggle">
+            <input type="checkbox" id="irmaa-toggle" checked>
+            IRMAA Thresholds
+          </label>
+          <label class="irmaa-toggle">
+            <input type="checkbox" id="irmaa_inflation_adj">
+            Adjust IRMAA for Inflation
+          </label>
+          <div id="irmaa-inflation-rate-wrap" class="hidden irmaa-inflation-rate">
+            <input type="number" id="irmaa_inflation_rate" min="0" max="20" step="0.1">
+            <span class="toolbar-label">% / yr</span>
+          </div>
+        </div>
+        <div id="chart" style="width:100%; height:500px; min-height:500px;"></div>
       </div>
-    </details>
 
-    <!-- Section 4: Sweep Settings -->
-    <details>
-      <summary>Sweep Settings</summary>
-      <div class="section-body">
-        <div class="field">
-          <label>Sweep Mode</label>
-          <select id="sweep_mode">
-            <option value="ordinary">Ordinary</option>
-            <option value="preferential">Preferential</option>
-          </select>
-        </div>
-        <div class="field" id="variable-ordinary-wrap">
-          <label>Variable Ordinary (Preferential mode)</label>
-          <input type="number" id="variable_ordinary" min="0" step="1" placeholder="0">
-        </div>
-        <div class="field">
-          <label>Filing Status</label>
-          <select id="filing_status">
-            <option value="single">Single</option>
-            <option value="mfj">Married Filing Jointly</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>Tax Year</label>
-          <select id="tax_year">
-            <option value="2025">2025</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>Sweep Floor</label>
-          <input type="number" id="sweep_floor" min="0" step="1" placeholder="0">
-        </div>
-        <div class="field">
-          <label>Sweep Ceiling (blank = service default)</label>
-          <input type="number" id="sweep_ceiling" min="1" step="1" placeholder="197,300 (default)">
-        </div>
-        <div class="field">
-          <label>Sweep Step</label>
-          <input type="number" id="sweep_step" min="1" step="100" value="100">
-        </div>
-
-        <!-- Ohio toggle -->
-        <div class="checkbox-row">
-          <input type="checkbox" id="include_ohio">
-          <label for="include_ohio">Include Ohio State Tax</label>
-        </div>
-
-        <!-- Ohio sub-fields -->
-        <div class="field hidden" id="ohio-medical-wrap">
-          <label>Ohio Medical Deduction</label>
-          <input type="number" id="ohio_medical_deduction" min="0" step="1" placeholder="0">
-        </div>
-        <div class="field hidden" id="ohio-retirement-wrap">
-          <label>Qualifying Retirement Income</label>
-          <input type="number" id="ohio_qualifying_retirement_income" min="0" step="1" placeholder="0">
-        </div>
-      </div>
-    </details>
-
-    <!-- Run button -->
-    <div class="run-wrap">
-      <button id="run-btn" type="button">Run Analysis</button>
-      <div id="error-msg"></div>
-    </div>
-  </div>
-
-  <!-- ── Planning signals ── -->
-  <div class="card" id="signals-wrap" style="display:none;">
-    <div id="signals-bar"></div>
-  </div>
-
-  <!-- ── Chart ── -->
-  <div class="card" id="chart-section" style="width:100%;">
-    <div class="chart-toolbar">
-      <span class="toolbar-label">Chart type:</span>
-      <button class="toggle-btn active" id="btn-stacked">Stacked Area</button>
-      <button class="toggle-btn" id="btn-lines">Lines</button>
-      <label class="irmaa-toggle">
-        <input type="checkbox" id="irmaa-toggle" checked>
-        IRMAA Thresholds
-      </label>
-    </div>
-    <div id="chart" style="width:100%; height:500px; min-height:500px;"></div>
-  </div>
-
-</div>
+    </div><!-- /.right-panel -->
+  </div><!-- /.two-col -->
+</div><!-- /.page -->
 
 <script>
-  // ── Config ───────────────────────────────────────────────────────────────
-  const CONFIG = {
-    yAxisMaxEMR: 0.50  // cap y-axis at 50% — adjust if needed
-  };
+  // ── Config — populated from GET /api/config before first run ──────────────
+  const CONFIG = {};
 
   // ── State ────────────────────────────────────────────────────────────────
   let lastResult = null;    // raw API response
   let chartMode  = 'stacked'; // 'stacked' | 'lines'
+
+  // ── App config loader ─────────────────────────────────────────────────────
+  async function loadConfig() {
+    const resp = await fetch('/api/config');
+    const data = await resp.json();
+    CONFIG.yAxisMaxEMR = data.y_axis_max_emr;
+    el('sweep_step').value = data.sweep_step_default;
+    el('irmaa_inflation_rate').value = (data.irmaa_inflation_default * 100).toFixed(1);
+  }
+
+  // ── Tax year dropdown ─────────────────────────────────────────────────────
+  async function loadTaxYears() {
+    const resp = await fetch('/api/tax-years');
+    const data = await resp.json();
+    const sel = el('tax_year');
+    sel.innerHTML = '';
+    for (const year of data.years) {
+      const opt = document.createElement('option');
+      opt.value = year;
+      opt.textContent = year;
+      if (year === data.default_year) opt.selected = true;
+      sel.appendChild(opt);
+    }
+  }
+
+  // ── Sweep ceiling hint ────────────────────────────────────────────────────
+  // After a run, update the sweep_ceiling placeholder with the 24% bracket
+  // top derived from the last API result's points data.
+  function updateSweepCeilingHint() {
+    if (!lastResult) return;
+    const comps   = lastResult.points.components.ordinary;
+    const incomes = lastResult.points.income;
+    let top24 = null;
+    for (let i = 0; i < comps.length; i++) {
+      if (comps[i] >= 0.235 && comps[i] < 0.315) top24 = incomes[i];
+    }
+    if (top24 !== null) {
+      el('sweep_ceiling').placeholder =
+        Math.round(top24).toLocaleString('en-US') + ' (24% bracket top)';
+    }
+  }
 
   // Component metadata: key, label, color
   const COMPONENTS = [
@@ -365,6 +455,11 @@
     el('ohio-retirement-wrap').classList.toggle('hidden', !checked);
   });
 
+  el('tax_year').addEventListener('change', updateSweepCeilingHint);
+  el('filing_status').addEventListener('change', updateSweepCeilingHint);
+
+  Promise.all([loadConfig(), loadTaxYears()]).then(() => runBtn.click());
+
   // ── Build payload ─────────────────────────────────────────────────────────
   function buildPayload() {
     const ceilVal = el('sweep_ceiling').value;
@@ -372,7 +467,7 @@
       pension:                          fnum('pension'),
       interest:                         fnum('interest'),
       ordinary_dividends:               fnum('ordinary_dividends'),
-      inherited_ira_rmd:                fnum('inherited_ira_rmd'),
+      ira_distributions:                fnum('ira_distributions'),
       ss_benefit:                       fnum('ss_benefit'),
       qualified_dividends:              fnum('qualified_dividends'),
       fixed_ltcg:                       fnum('fixed_ltcg'),
@@ -429,6 +524,7 @@
       }
 
       lastResult = await resp.json();
+      updateSweepCeilingHint();
       renderSignals(lastResult.planning_signals);
       chartSection.style.display = 'block';
       signalsWrap.style.display  = 'block';
@@ -497,6 +593,20 @@
 
   function pctFmt(v) { return (v * 100).toFixed(1) + '%'; }
 
+  // ── IRMAA helpers ─────────────────────────────────────────────────────────
+
+  // Returns { thresholds, adjusted } — applies inflation if checkbox is checked.
+  function effectiveIrmaaThresholds() {
+    const raw = lastResult ? lastResult.irmaa_thresholds : [];
+    const adjChecked = el('irmaa_inflation_adj').checked;
+    if (!adjChecked) return { thresholds: raw, adjusted: false };
+    const rate = (parseFloat(el('irmaa_inflation_rate').value) || 0) / 100;
+    return {
+      thresholds: raw.map(t => t * (1 + rate) ** 2),
+      adjusted: true,
+    };
+  }
+
   function buildIrmaaShapes(thresholds, show) {
     if (!show) return [];
     return thresholds.map((t, i) => ({
@@ -508,16 +618,38 @@
     }));
   }
 
-  function buildIrmaaAnnotations(thresholds, show) {
+  // adjusted: when true, appends "(est. YYYY)" to each label.
+  function buildIrmaaAnnotations(thresholds, show, adjusted) {
     if (!show) return [];
+    const estYear = adjusted
+      ? (parseInt(el('tax_year').value) || 2026) + 2
+      : null;
     return thresholds.map((t, i) => ({
       x: t, y: 1, yref: 'paper',
-      text: 'IRMAA ' + (i + 1),
+      text: 'IRMAA ' + (i + 1) + (estYear ? ` (est. ${estYear})` : ''),
       showarrow: false,
       font: { size: 10, color: 'gray' },
       xanchor: 'left',
       yanchor: 'top',
     }));
+  }
+
+  // Re-applies IRMAA shapes/annotations to an already-rendered chart.
+  function rerenderIrmaa() {
+    if (!lastResult) return;
+    const show = irmaaToggle.checked;
+    if (!show) return;
+    const { thresholds, adjusted } = effectiveIrmaaThresholds();
+    const currentRange = document.getElementById('chart').layout?.xaxis?.range;
+    const update = {
+      shapes:      buildIrmaaShapes(thresholds, true),
+      annotations: buildIrmaaAnnotations(thresholds, true, adjusted),
+    };
+    if (currentRange) {
+      update['xaxis.range']     = currentRange;
+      update['xaxis.autorange'] = false;
+    }
+    Plotly.relayout('chart', update);
   }
 
   function buildLayout() {
@@ -611,11 +743,11 @@
       : buildLineTraces(pts);
     await Plotly.newPlot('chart', traces, buildLayout(), { responsive: true });
     if (irmaaToggle.checked) {
-      const thresholds = lastResult.irmaa_thresholds;
+      const { thresholds, adjusted } = effectiveIrmaaThresholds();
       const currentRange = document.getElementById('chart').layout.xaxis.range;
       Plotly.relayout('chart', {
         shapes:            buildIrmaaShapes(thresholds, true),
-        annotations:       buildIrmaaAnnotations(thresholds, true),
+        annotations:       buildIrmaaAnnotations(thresholds, true, adjusted),
         'xaxis.range':     currentRange,
         'xaxis.autorange': false,
       });
@@ -640,13 +772,13 @@
   // ── IRMAA toggle — relayout only, no re-render ────────────────────────────
   irmaaToggle.addEventListener('change', () => {
     if (!lastResult) return;
-    const thresholds = lastResult.irmaa_thresholds;
     const show = irmaaToggle.checked;
     if (show) {
+      const { thresholds, adjusted } = effectiveIrmaaThresholds();
       const currentRange = document.getElementById('chart').layout.xaxis.range;
       Plotly.relayout('chart', {
         shapes:              buildIrmaaShapes(thresholds, true),
-        annotations:         buildIrmaaAnnotations(thresholds, true),
+        annotations:         buildIrmaaAnnotations(thresholds, true, adjusted),
         'xaxis.range':       currentRange,
         'xaxis.autorange':   false,
       });
@@ -658,6 +790,16 @@
       });
     }
   });
+
+  // ── IRMAA inflation adjustment ────────────────────────────────────────────
+  el('irmaa_inflation_adj').addEventListener('change', () => {
+    el('irmaa-inflation-rate-wrap').classList.toggle(
+      'hidden', !el('irmaa_inflation_adj').checked
+    );
+    rerenderIrmaa();
+  });
+
+  el('irmaa_inflation_rate').addEventListener('input', rerenderIrmaa);
 </script>
 <script>
   window.debugPlotly = function() {

@@ -55,7 +55,7 @@ output so the visualization knows what is on the x-axis.
 | `pension`              | Fixed pension or annuity income                          |
 | `interest`             | Taxable interest income                                  |
 | `ordinary_dividends`   | Non-qualified (ordinary) dividends                       |
-| `inherited_ira_rmd`    | Required minimum distributions from inherited IRA       |
+| `ira_distributions`    | Required minimum distributions from inherited IRA       |
 | `ss_benefit`           | Gross Social Security benefit (taxability computed dynamically) |
 | `qualified_dividends`  | Qualified dividends (preferential rate) — fixed in ORDINARY mode, fixed component in PREFERENTIAL mode |
 | `fixed_ltcg`           | Fixed LTCG already realized — fixed in ORDINARY mode     |
@@ -127,7 +127,7 @@ Returns an `EMRResult` dataclass:
 
 ### 1. Fixed Ordinary Income
 ```
-fixed_ordinary = pension + interest + ordinary_dividends + inherited_ira_rmd
+fixed_ordinary = pension + interest + ordinary_dividends + ira_distributions
 ```
 
 ### 2. Total Ordinary Income at Sweep Point
@@ -362,7 +362,7 @@ Preferential income will be pushed into 15% rate once ordinary income is high en
 - `pension`: `20000`
 - `interest`: `2000`
 - `ordinary_dividends`: `0`
-- `inherited_ira_rmd`: `0`
+- `ira_distributions`: `0`
 - `ss_benefit`: `0`
 - `qualified_dividends`: `5000`
 - `fixed_ltcg`: `10000`
@@ -412,7 +412,7 @@ threshold before any variable income is added. SS torpedo is active from the sta
 - `pension`: `15000`
 - `interest`: `0`
 - `ordinary_dividends`: `0`
-- `inherited_ira_rmd`: `8000`
+- `ira_distributions`: `8000`
 - `ss_benefit`: `24000`
 - `qualified_dividends`: `3000`
 - `fixed_ltcg`: `5000`
@@ -463,7 +463,7 @@ capacity before the 15% rate applies.
 - `pension`: `20000`
 - `interest`: `0`
 - `ordinary_dividends`: `0`
-- `inherited_ira_rmd`: `15000`
+- `ira_distributions`: `15000`
 - `ss_benefit`: `0`
 - `qualified_dividends`: `2000`
 - `fixed_ltcg`: `0`

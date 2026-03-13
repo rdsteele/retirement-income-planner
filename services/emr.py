@@ -103,9 +103,9 @@ def _compute_fixed_ordinary(
     pension: Decimal,
     interest: Decimal,
     ordinary_dividends: Decimal,
-    inherited_ira_rmd: Decimal,
+    ira_distributions: Decimal,
 ) -> Decimal:
-    return pension + interest + ordinary_dividends + inherited_ira_rmd
+    return pension + interest + ordinary_dividends + ira_distributions
 
 
 def _compute_incomes_at_point(
@@ -576,7 +576,7 @@ def calculate_emr(
     pension: Decimal,
     interest: Decimal,
     ordinary_dividends: Decimal,
-    inherited_ira_rmd: Decimal,
+    ira_distributions: Decimal,
     ss_benefit: Decimal,
     qualified_dividends: Decimal,
     fixed_ltcg: Decimal,
@@ -608,7 +608,7 @@ def calculate_emr(
         sweep_ceiling = _get_default_sweep_ceiling(filing_status, tax_year)
 
     fixed_ordinary = _compute_fixed_ordinary(
-        pension, interest, ordinary_dividends, inherited_ira_rmd)
+        pension, interest, ordinary_dividends, ira_distributions)
     investment_ordinary = interest + ordinary_dividends
     total_preferential_fixed = qualified_dividends + fixed_ltcg
 

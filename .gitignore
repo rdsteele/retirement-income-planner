@@ -48,4 +48,6 @@ htmlcov/
 data/scenarios/local_*.json
 
 # Claude Code local settings
-.claude/settings.local.json
+.claude/settings.local.json*.xml
+inspection-results/
+*.inspection.xml

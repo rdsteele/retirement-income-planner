@@ -63,7 +63,7 @@ def calculate_total_cost(
     pension: Decimal = Decimal('0'),
     interest: Decimal = Decimal('0'),
     ordinary_dividends: Decimal = Decimal('0'),
-    inherited_ira_rmd: Decimal = Decimal('0'),
+    ira_distributions: Decimal = Decimal('0'),
     ss_benefit: Decimal = Decimal('0'),
     qualified_dividends: Decimal = Decimal('0'),
     fixed_ltcg: Decimal = Decimal('0'),
@@ -115,7 +115,7 @@ aca_magi = (
 )
 ```
 
-Where `fixed_ordinary = pension + interest + ordinary_dividends + inherited_ira_rmd`
+Where `fixed_ordinary = pension + interest + ordinary_dividends + ira_distributions`
 and `total_preferential = qualified_dividends + fixed_ltcg` (ORDINARY mode)
 or `qualified_dividends + fixed_ltcg + sweep_value` (PREFERENTIAL mode).
 
