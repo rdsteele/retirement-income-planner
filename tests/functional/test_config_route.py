@@ -3,9 +3,9 @@
 Uses FastAPI TestClient with real config.json — no mocks.
 """
 
-import api.routers.config as config_mod
 from fastapi.testclient import TestClient
 
+import api.routers.config as config_mod
 from api.main import app
 
 client = TestClient(app)
