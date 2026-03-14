@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧾</text></svg>">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tax Detail — Retirement Income Planner</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      background: #f8f9fa;
+      color: #212529;
+      padding: 12px 16px;
+    }
+
+    /* ── Nav bar ── */
+    .navbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 0 12px;
+      margin-bottom: 14px;
+      border-bottom: 1px solid #dee2e6;
+    }
+    .nav-brand {
+      font-weight: 700;
+      font-size: 16px;
+      color: #1a1a2e;
+    }
+    .nav-links { display: flex; gap: 24px; }
+    .nav-link {
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      color: #6c757d;
+      padding-bottom: 2px;
+    }
+    .nav-link:hover { color: #1a1a2e; }
+    .nav-link.active {
+      color: #1a1a2e;
+      border-bottom: 2px solid #4c6ef5;
+    }
+
+    .page { width: 100%; }
+
+    /* ── Two-column layout ── */
+    .two-col {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+    .left-panel { width: 380px; flex-shrink: 0; }
+    .right-panel { flex: 1; min-width: 0; }
+
+    /* ── Cards ── */
+    .card {
+      background: #fff;
+      border: 1px solid #dee2e6;
+      border-radius: 6px;
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+
+    .card-header {
+      padding: 10px 14px;
+      font-weight: 600;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #495057;
+      border-bottom: 1px solid #dee2e6;
+      background: #f8f9fa;
+    }
+
+    /* ── Collapsible sections ── */
+    details { border-bottom: 1px solid #dee2e6; }
+    details:last-of-type { border-bottom: none; }
+
+    summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 10px 14px;
+      font-weight: 600;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #495057;
+      user-select: none;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    summary::-webkit-details-marker { display: none; }
+    summary::before {
+      content: '▶';
+      font-size: 9px;
+      transition: transform 0.15s;
+      display: inline-block;
+    }
+    details[open] > summary::before { transform: rotate(90deg); }
+    details[open] > summary { color: #1a1a2e; }
+
+    .section-body {
+      padding: 12px 14px 16px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px 20px;
+    }
+
+    /* ── Form fields ── */
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    .field label { font-size: 12px; color: #6c757d; font-weight: 500; }
+    .field input, .field select {
+      width: 100%;
+      padding: 6px 8px;
+      border: 1px solid #ced4da;
+      border-radius: 4px;
+      font-size: 14px;
+      background: #fff;
+      color: #212529;
+    }
+    .field input:focus, .field select:focus {
+      outline: none;
+      border-color: #4c6ef5;
+      box-shadow: 0 0 0 2px rgba(76,110,245,0.15);
+    }
+    .field-wide { grid-column: 1 / -1; }
+
+    /* checkbox row */
+    .checkbox-row {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 0;
+    }
+    .checkbox-row label { font-size: 13px; color: #495057; cursor: pointer; }
+    .checkbox-row input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
+
+    .hidden { display: none !important; }
+
+    /* ── Error ── */
+    #error-msg {
+      margin-top: 8px;
+      padding: 8px 12px;
+      border-radius: 4px;
+      background: #fff5f5;
+      border: 1px solid #f5c6cb;
+      color: #721c24;
+      font-size: 13px;
+      display: none;
+    }
+
+    /* ── Output panel loading state ── */
+    .loading { opacity: 0.5; pointer-events: none; }
+
+    /* ── Inputs summary list ── */
+    .summary-list { padding: 10px 14px; }
+
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 5px 0;
+      border-bottom: 1px solid #f0f0f0;
+      gap: 12px;
+    }
+    .summary-row:last-child { border-bottom: none; }
+
+    .summary-label { color: #6c757d; font-size: 13px; }
+    .summary-value { font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .summary-row.bold .summary-label { font-weight: 600; color: #212529; }
+    .summary-row.bold .summary-value { font-weight: 600; color: #212529; }
+    .summary-row.divider { border-top: 2px solid #dee2e6; margin-top: 4px; }
+
+    .deduction { color: #6c757d; }
+
+    /* ── Bracket tables ── */
+    .bracket-subsection { padding: 0 14px 12px; }
+    .bracket-subsection-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #6c757d;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      padding: 10px 0 6px;
+    }
+
+    .bracket-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .bracket-table th {
+      text-align: right;
+      font-weight: 600;
+      font-size: 11px;
+      text-transform: uppercase;
+      color: #6c757d;
+      padding: 5px 8px;
+      border-bottom: 2px solid #dee2e6;
+    }
+    .bracket-table th:first-child { text-align: left; }
+    .bracket-table td {
+      text-align: right;
+      padding: 5px 8px;
+      font-variant-numeric: tabular-nums;
+    }
+    .bracket-table td:first-child { text-align: left; }
+    .bracket-table tr:nth-child(even) { background: #f8f9fa; }
+    .bracket-table tr.marginal { background: #dbe4ff; }
+    .bracket-table tr.marginal td { color: #1a1a2e; font-weight: 500; }
+
+    .bracket-total {
+      font-size: 13px;
+      font-weight: 600;
+      text-align: right;
+      padding: 6px 8px 0;
+      color: #212529;
+    }
+
+    /* ── Federal summary ── */
+    .fed-summary { padding: 10px 14px 14px; border-top: 1px solid #dee2e6; }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <span class="nav-brand">Retirement Income Planner</span>
+  <div class="nav-links">
+    <a href="/static/index.html" class="nav-link">EMR Analysis</a>
+    <a href="/static/tax.html" class="nav-link active">Tax Detail</a>
+  </div>
+</nav>
+
+<div class="page">
+  <div class="two-col">
+
+    <!-- ── Left panel: inputs ── -->
+    <div class="left-panel">
+      <div class="card" id="form-card">
+
+        <!-- Income -->
+        <details open>
+          <summary>Income</summary>
+          <div class="section-body">
+            <div class="field"><label>Wages</label><input type="number" id="wages" min="0" step="1" placeholder="0"></div>
+            <div class="field"><label>Pension / Annuity</label><input type="number" id="pension" min="0" step="1" placeholder="0"></div>
+            <div class="field"><label>Taxable Interest</label><input type="number" id="interest" min="0" step="1" placeholder="0"></div>
+            <div class="field"><label>Ordinary Dividends</label><input type="number" id="ordinary_dividends" min="0" step="1" placeholder="0"></div>
+            <div class="field"><label>Qualified Dividends</label><input type="number" id="qualified_dividends" min="0" step="1" placeholder="0"></div>
+            <div class="field"><label>IRA Distributions / RMDs</label><input type="number" id="ira_distributions" min="0" step="1" placeholder="0"></div>
+            <div class="field"><label>Social Security Benefit</label><input type="number" id="ss_benefit" min="0" step="1" placeholder="0"></div>
+            <div class="field"><label>Capital Gains (LT)</label><input type="number" id="fixed_ltcg" min="0" step="1" placeholder="0"></div>
+            <div class="field"><label>Tax-Exempt Interest</label><input type="number" id="tax_exempt_interest" min="0" step="1" placeholder="0"></div>
+          </div>
+        </details>
+
+        <!-- Adjustments -->
+        <details>
+          <summary>Adjustments</summary>
+          <div class="section-body">
+            <div class="field field-wide"><label>Above-the-Line Adjustments</label><input type="number" id="above_the_line_adjustments" min="0" step="1" placeholder="0"></div>
+            <div class="field field-wide"><label>Additional Deductions</label><input type="number" id="additional_deductions" min="0" step="1" placeholder="0"></div>
+          </div>
+        </details>
+
+        <!-- Settings -->
+        <details open>
+          <summary>Settings</summary>
+          <div class="section-body">
+            <div class="field">
+              <label>Filing Status</label>
+              <select id="filing_status">
+                <option value="single">Single</option>
+                <option value="mfj">Married Filing Jointly</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Tax Year</label>
+              <select id="tax_year"><!-- populated by loadTaxYears() --></select>
+            </div>
+
+            <div class="checkbox-row">
+              <input type="checkbox" id="include_ohio">
+              <label for="include_ohio">Include Ohio State Tax</label>
+            </div>
+
+            <div class="field hidden" id="ohio-medical-wrap">
+              <label>Gross Medical Expenses</label>
+              <input type="number" id="gross_medical_expenses" min="0" step="1" placeholder="0">
+            </div>
+            <div class="field hidden" id="ohio-retirement-wrap">
+              <label>Qualifying Retirement Income</label>
+              <input type="number" id="ohio_qualifying_retirement_income" min="0" step="1" placeholder="0">
+            </div>
+          </div>
+        </details>
+
+      </div><!-- /.card -->
+
+      <div id="error-msg"></div>
+    </div><!-- /.left-panel -->
+
+    <!-- ── Right panel: outputs ── -->
+    <div class="right-panel" id="output-panel" style="display:none;">
+
+      <!-- Inputs Summary -->
+      <div class="card">
+        <div class="card-header">Income Flow</div>
+        <div class="summary-list" id="income-flow-list"></div>
+      </div>
+
+      <!-- Federal Tax -->
+      <div class="card">
+        <div class="card-header">Federal Income Tax</div>
+        <div id="federal-ordinary-section">
+          <div class="bracket-subsection">
+            <div class="bracket-subsection-label">Ordinary Income Brackets</div>
+            <table class="bracket-table">
+              <thead>
+                <tr><th>Rate</th><th>From</th><th>To</th><th>Income Taxed</th><th>Tax Amount</th></tr>
+              </thead>
+              <tbody id="ordinary-tbody"></tbody>
+            </table>
+            <div class="bracket-total" id="ordinary-total"></div>
+          </div>
+        </div>
+        <div id="federal-pref-section" style="display:none;">
+          <div class="bracket-subsection" style="border-top:1px solid #dee2e6;">
+            <div class="bracket-subsection-label">Capital Gains Brackets</div>
+            <table class="bracket-table">
+              <thead>
+                <tr><th>Rate</th><th>From</th><th>To</th><th>Income Taxed</th><th>Tax Amount</th></tr>
+              </thead>
+              <tbody id="pref-tbody"></tbody>
+            </table>
+            <div class="bracket-total" id="pref-total"></div>
+          </div>
+        </div>
+        <div class="fed-summary summary-list" id="fed-summary-list"></div>
+      </div>
+
+      <!-- Ohio Tax -->
+      <div class="card" id="ohio-card" style="display:none;">
+        <div class="card-header">Ohio State Tax</div>
+        <div class="summary-list" id="ohio-detail-list"></div>
+      </div>
+
+      <!-- Summary -->
+      <div class="card">
+        <div class="card-header">Summary</div>
+        <div class="summary-list" id="tax-summary-list"></div>
+      </div>
+
+    </div><!-- /.right-panel -->
+  </div><!-- /.two-col -->
+</div><!-- /.page -->
+
+<script>
+  // ── Helpers ──────────────────────────────────────────────────────────────
+  const el   = id => document.getElementById(id);
+  const fnum = id => parseFloat(el(id).value) || 0;
+
+  function fmtDollar(v) {
+    const r = Math.round(v);
+    if (r === 0) return '$0';
+    return '$' + r.toLocaleString('en-US');
+  }
+
+  function fmtDeduction(v) {
+    const r = Math.round(v);
+    if (r === 0) return '<span class="deduction">($0)</span>';
+    return `<span class="deduction">($${r.toLocaleString('en-US')})</span>`;
+  }
+
+  function fmtRate(v) {
+    return (v * 100).toFixed(2) + '%';
+  }
+
+  function fmtToCell(v) {
+    return v >= 999999990 ? '—' : fmtDollar(v);
+  }
+
+  // ── Page-load sequence ───────────────────────────────────────────────────
+  async function loadTaxYears() {
+    const resp = await fetch('/api/tax-years');
+    const data = await resp.json();
+    const sel = el('tax_year');
+    sel.innerHTML = '';
+    for (const year of data.years) {
+      const opt = document.createElement('option');
+      opt.value = year;
+      opt.textContent = year;
+      if (year === data.default_year) opt.selected = true;
+      sel.appendChild(opt);
+    }
+  }
+
+  async function loadConfig() {
+    await fetch('/api/config');
+    // No config values currently applied to the tax detail page.
+  }
+
+  // ── Payload builder ──────────────────────────────────────────────────────
+  function buildPayload() {
+    return {
+      wages:                            fnum('wages'),
+      pension:                          fnum('pension'),
+      interest:                         fnum('interest'),
+      ordinary_dividends:               fnum('ordinary_dividends'),
+      qualified_dividends:              fnum('qualified_dividends'),
+      ira_distributions:                fnum('ira_distributions'),
+      ss_benefit:                       fnum('ss_benefit'),
+      fixed_ltcg:                       fnum('fixed_ltcg'),
+      tax_exempt_interest:              fnum('tax_exempt_interest'),
+      above_the_line_adjustments:       fnum('above_the_line_adjustments'),
+      additional_deductions:            fnum('additional_deductions'),
+      filing_status:                    el('filing_status').value,
+      tax_year:                         parseInt(el('tax_year').value),
+      include_ohio:                     el('include_ohio').checked,
+      gross_medical_expenses:           fnum('gross_medical_expenses'),
+      ohio_qualifying_retirement_income: fnum('ohio_qualifying_retirement_income'),
+    };
+  }
+
+  // ── Error handling ───────────────────────────────────────────────────────
+  function showError(msg) {
+    el('error-msg').textContent = msg;
+    el('error-msg').style.display = 'block';
+  }
+  function clearError() {
+    el('error-msg').style.display = 'none';
+    el('error-msg').textContent = '';
+  }
+
+  // ── Bracket table rendering ──────────────────────────────────────────────
+  function renderBracketRows(tbodyId, rows, marginalIdx) {
+    const tbody = el(tbodyId);
+    tbody.innerHTML = rows.map((row, i) => {
+      const cls = i === marginalIdx ? ' class="marginal"' : '';
+      return `<tr${cls}>
+        <td>${fmtRate(row.rate)}</td>
+        <td>${fmtDollar(row.from)}</td>
+        <td>${fmtToCell(row.to)}</td>
+        <td>${fmtDollar(row.income_taxed)}</td>
+        <td>${fmtDollar(row.tax_amount)}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  function marginalIndex(rows) {
+    // Last row where income_taxed > 0
+    for (let i = rows.length - 1; i >= 0; i--) {
+      if (rows[i].income_taxed > 0) return i;
+    }
+    return -1;
+  }
+
+  // ── Summary row builder ──────────────────────────────────────────────────
+  function summaryRow(label, valueHtml, { bold = false, divider = false, hidden = false } = {}) {
+    if (hidden) return '';
+    const cls = ['summary-row', bold ? 'bold' : '', divider ? 'divider' : ''].filter(Boolean).join(' ');
+    return `<div class="${cls}">
+      <span class="summary-label">${label}</span>
+      <span class="summary-value">${valueHtml}</span>
+    </div>`;
+  }
+
+  // ── Main render ──────────────────────────────────────────────────────────
+  function renderOutput(data) {
+    const s = data.inputs_summary;
+    const fed = data.federal;
+    const ohio = data.ohio;
+    const sum = data.summary;
+    const includeOhio = el('include_ohio').checked;
+
+    // ── Income Flow ──
+    const addlDedZero = s.additional_deductions === 0;
+    el('income-flow-list').innerHTML =
+      summaryRow('Gross Ordinary Income',       fmtDollar(s.gross_ordinary_income)) +
+      summaryRow('Social Security Taxable',     fmtDollar(s.ss_taxable)) +
+      summaryRow('Above-the-Line Adjustments',  fmtDeduction(s.above_the_line_adjustments)) +
+      summaryRow('AGI',                         fmtDollar(s.agi),                   { bold: true, divider: true }) +
+      summaryRow('Standard Deduction',          fmtDeduction(s.standard_deduction)) +
+      summaryRow('Additional Deductions',       fmtDeduction(s.additional_deductions), { hidden: addlDedZero }) +
+      summaryRow('Taxable Income (Ordinary)',   fmtDollar(s.taxable_ordinary),      { bold: true, divider: true }) +
+      summaryRow('Taxable Income (Preferential)', fmtDollar(s.taxable_preferential), { bold: true });
+
+    // ── Ordinary brackets ──
+    const ordRows = fed.bracket_breakdown;
+    renderBracketRows('ordinary-tbody', ordRows, marginalIndex(ordRows));
+    el('ordinary-total').textContent = 'Ordinary Tax Total: ' + fmtDollar(fed.ordinary_income_tax);
+
+    // ── Preferential brackets ──
+    const showPref = s.taxable_preferential > 0;
+    el('federal-pref-section').style.display = showPref ? '' : 'none';
+    if (showPref) {
+      const prefRows = fed.preferential_breakdown;
+      renderBracketRows('pref-tbody', prefRows, marginalIndex(prefRows));
+      el('pref-total').textContent = 'Preferential Tax Total: ' + fmtDollar(fed.preferential_income_tax);
+    }
+
+    // ── Federal summary ──
+    el('fed-summary-list').innerHTML =
+      summaryRow('Ordinary Tax',       fmtDollar(fed.ordinary_income_tax)) +
+      summaryRow('Preferential Tax',   fmtDollar(fed.preferential_income_tax)) +
+      summaryRow('Total Federal Tax',  fmtDollar(fed.total_tax),             { bold: true, divider: true }) +
+      summaryRow('Effective Rate',     fmtRate(fed.effective_rate)) +
+      summaryRow('Marginal Bracket Rate', fmtRate(fed.marginal_bracket_rate));
+
+    // ── Ohio ──
+    const showOhio = includeOhio && ohio.included;
+    el('ohio-card').style.display = showOhio ? '' : 'none';
+    if (showOhio) {
+      const medZero  = ohio.medical_deduction === 0;
+      const credZero = ohio.retirement_income_credit === 0;
+      el('ohio-detail-list').innerHTML =
+        summaryRow('Ohio AGI',                 fmtDollar(ohio.ohio_agi)) +
+        summaryRow('Personal Exemption',       fmtDeduction(ohio.personal_exemption)) +
+        summaryRow('Medical Deduction',        fmtDeduction(ohio.medical_deduction), { hidden: medZero }) +
+        summaryRow('Ohio Tax Base',            fmtDollar(ohio.ohio_tax_base),         { bold: true, divider: true }) +
+        summaryRow('Tax Before Credits',       fmtDollar(ohio.tax_before_credits)) +
+        summaryRow('Retirement Income Credit', fmtDeduction(ohio.retirement_income_credit), { hidden: credZero }) +
+        summaryRow('Ohio Tax',                 fmtDollar(ohio.ohio_tax),              { bold: true, divider: true }) +
+        summaryRow('Effective Rate',           fmtRate(ohio.effective_rate));
+    }
+
+    // ── Summary ──
+    el('tax-summary-list').innerHTML =
+      summaryRow('Total Federal Tax',     fmtDollar(sum.total_federal_tax)) +
+      (includeOhio ? summaryRow('Total Ohio Tax', fmtDollar(sum.total_ohio_tax)) : '') +
+      summaryRow('Grand Total Tax',       fmtDollar(sum.total_tax),             { bold: true, divider: true }) +
+      summaryRow('Overall Effective Rate', fmtRate(sum.overall_effective_rate), { bold: true });
+  }
+
+  // ── Calculate ─────────────────────────────────────────────────────────────
+  let firstSuccess = false;
+
+  async function calculate() {
+    clearError();
+    const panel = el('output-panel');
+    if (firstSuccess) panel.classList.add('loading');
+
+    try {
+      const resp = await fetch('/api/tax', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildPayload()),
+      });
+
+      const body = await resp.json().catch(() => ({}));
+
+      if (!resp.ok) {
+        if (resp.status === 422) {
+          const detail = body.detail;
+          showError(typeof detail === 'string' ? detail : JSON.stringify(detail));
+        } else {
+          showError('An unexpected error occurred. Please try again.');
+        }
+        panel.classList.remove('loading');
+        return;
+      }
+
+      renderOutput(body);
+      panel.style.display = '';
+      panel.classList.remove('loading');
+      firstSuccess = true;
+
+    } catch (_) {
+      showError('Could not reach the server. Is the API running?');
+      panel.classList.remove('loading');
+    }
+  }
+
+  // ── Conditional field visibility ──────────────────────────────────────────
+  el('include_ohio').addEventListener('change', () => {
+    const checked = el('include_ohio').checked;
+    el('ohio-medical-wrap').classList.toggle('hidden', !checked);
+    el('ohio-retirement-wrap').classList.toggle('hidden', !checked);
+    calculate();
+  });
+
+  // ── Blur triggers on all inputs ───────────────────────────────────────────
+  document.querySelectorAll('input[type="number"], select').forEach(input => {
+    input.addEventListener('blur', calculate);
+    if (input.tagName === 'SELECT') {
+      input.addEventListener('change', calculate);
+    }
+  });
+
+  // ── Page load ─────────────────────────────────────────────────────────────
+  Promise.all([loadConfig(), loadTaxYears()]).then(calculate);
+</script>
+</body>
+</html>
