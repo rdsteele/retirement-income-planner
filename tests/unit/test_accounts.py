@@ -1,6 +1,6 @@
 """Unit tests for services/accounts.py.
 
-Tests use tmp_path to avoid touching data/accounts.json.
+Tests use tmp_path to avoid touching profile/accounts.json.
 All monetary comparisons use Decimal.
 """
 

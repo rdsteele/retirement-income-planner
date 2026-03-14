@@ -1,7 +1,7 @@
 """Functional tests for the accounts API routes.
 
 Uses FastAPI TestClient. All file I/O is redirected to a tmp_path-isolated
-accounts.json — no test touches data/accounts.json.
+accounts.json — no test touches profile/accounts.json.
 """
 
 import pytest

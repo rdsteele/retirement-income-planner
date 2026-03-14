@@ -1,7 +1,7 @@
 """Account inventory service.
 
 Manages retirement accounts (taxable, traditional, roth, hsa) and their holdings.
-Reads from and writes to data/accounts.json.
+Reads from and writes to profile/accounts.json.
 
 Decimal throughout; float only at the JSON boundary.
 """
@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Literal
 from uuid import uuid4
 
-_DATA_PATH = Path(__file__).parent.parent / "data" / "accounts.json"
+_DATA_PATH = Path(__file__).parent.parent / "profile" / "accounts.json"
 _ZERO = Decimal("0")
 
 AccountType = Literal["taxable", "traditional", "roth", "hsa"]

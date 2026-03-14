@@ -67,6 +67,28 @@ Open your browser to [http://localhost:8000](http://localhost:8000).
 
 ---
 
+## Personal Data
+
+Account balances and holdings live in `profile/accounts.json`. This file is
+excluded from version control so your financial data stays private.
+
+To get started:
+
+1. Create `profile/accounts.json` (the app treats a missing file as an empty
+   account list)
+2. See `profile/README.md` for the full format and a minimal example with one
+   account of each type (taxable, traditional, Roth, HSA)
+
+```jsonc
+// profile/accounts.json — minimal example
+[
+  { "id": "trad-ira", "name": "Traditional IRA",
+    "account_type": "traditional", "balance": 320000.0, ... }
+]
+```
+
+---
+
 ## Project Structure
 
 ```
@@ -77,6 +99,9 @@ api/              # FastAPI application
 data/             # Tax bracket and threshold data (JSON)
   brackets/       # Federal and Ohio bracket files by year
   aca/            # ACA cliff data by year
+profile/          # Personal financial data (not in version control)
+  accounts.json   # Your account balances and holdings
+  README.md       # Format guide and example
 services/         # Tax calculation services
 specs/            # Design specifications
 tests/            # Unit and functional tests

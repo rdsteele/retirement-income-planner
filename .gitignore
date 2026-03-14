@@ -47,6 +47,10 @@ htmlcov/
 # Local scenario overrides / personal data
 data/scenarios/local_*.json
 
+# Personal profile data
+profile/accounts.json
+profile/scenarios/
+
 # Claude Code local settings
 .claude/settings.local.json*.xml
 inspection-results/

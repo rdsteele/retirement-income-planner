@@ -123,6 +123,7 @@ def calculate_total_cost(
     above_the_line_adjustments: Decimal = _ZERO,
     additional_deductions: Decimal = _ZERO,
     sweep_mode: SweepMode = SweepMode.ORDINARY,
+    variable_ordinary: Decimal = _ZERO,
     filing_status: str = "single",
     tax_year: int = 2026,
     sweep_floor: Decimal = _ZERO,
@@ -135,6 +136,8 @@ def calculate_total_cost(
     include_aca: bool = False,
 ) -> TotalCostResult:
     fixed_ordinary = pension + interest + ordinary_dividends + ira_distributions
+    if sweep_mode == SweepMode.PREFERENTIAL:
+        fixed_ordinary = fixed_ordinary + variable_ordinary
     aptc_annual_known = aptc_monthly * 12
 
     extra_boundary_points: list[Decimal] | None = None
@@ -155,6 +158,7 @@ def calculate_total_cost(
             fixed_ltcg=fixed_ltcg,
             tax_exempt_interest=tax_exempt_interest,
             sweep_mode=sweep_mode,
+            variable_ordinary=variable_ordinary,
             filing_status=filing_status,
             tax_year=tax_year,
             sweep_floor=sweep_floor,
@@ -210,6 +214,7 @@ def calculate_total_cost(
         fixed_ltcg=fixed_ltcg,
         tax_exempt_interest=tax_exempt_interest,
         sweep_mode=sweep_mode,
+        variable_ordinary=variable_ordinary,
         filing_status=filing_status,
         tax_year=tax_year,
         sweep_floor=sweep_floor,
