@@ -61,6 +61,11 @@ def _get_ltcg_0pct_ceiling(tax_year: int, filing_status: str) -> float:
     return float(data["preferential"][filing_status][0]["to"])
 
 
+def _get_standard_deduction(tax_year: int, filing_status: str) -> float:
+    data = load_federal_data(tax_year)
+    return float(data["standard_deduction"][filing_status])
+
+
 def _compute_ltcg_0pct_remaining(
     result: EMRResult,
     request: EMRRequest,
@@ -108,7 +113,31 @@ def _compute_planning_signals(result: EMRResult, request: EMRRequest) -> Plannin
                     distance_to_24pct = float(p.income) - floor_income
                     break
 
+    # zero_ordinary_space: direct formula — no finite-difference artifact.
+    # Mirrors the taxable_ordinary formula: max(0, std_ded + atl + add_ded − fixed_ord − ss).
+    std_ded = _get_standard_deduction(request.tax_year, request.filing_status)
+    fixed_ordinary = (
+        request.pension + request.interest
+        + request.ordinary_dividends + request.ira_distributions
+    )
+    if result.sweep_mode == SweepMode.PREFERENTIAL:
+        fixed_ordinary += request.variable_ordinary
+    ss_taxable_at_floor = float(pts[0].ss_taxable) if pts else _ZERO
+    zero_ordinary_space: float | None = (
+        max(
+            _ZERO,
+            std_ded
+            + request.above_the_line_adjustments
+            + request.additional_deductions
+            - fixed_ordinary
+            - ss_taxable_at_floor,
+        )
+        if pts is not None
+        else None
+    )
+
     return PlanningSignals(
+        zero_ordinary_space=zero_ordinary_space,
         ltcg_0pct_remaining=ltcg_0pct_remaining,
         torpedo_active=torpedo_active,
         ss_fully_taxable=ss_fully_taxable,

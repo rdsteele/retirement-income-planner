@@ -97,6 +97,7 @@ class TestOrdinarySweep:
 
     def test_planning_signals_present(self):
         signals = self.body["planning_signals"]
+        assert "zero_ordinary_space" in signals
         assert "torpedo_active" in signals
         assert "ss_fully_taxable" in signals
         assert "ltcg_0pct_remaining" in signals
@@ -464,6 +465,83 @@ class TestOhioFunctional:
         assert diff == pytest.approx(137.50, abs=50.0), (
             f"expected ~$137.50 reduction in ohio_tax, got {diff}"
         )
+
+
+# ── zero_ordinary_space signal ───────────────────────────────────────────
+#
+# Direct formula (no finite-difference artifact):
+#   zero_ordinary_space = max(0,
+#     std_deduction + above_the_line + additional_deductions
+#     − fixed_ordinary − ss_taxable_at_floor)
+#
+# 2025 single standard deduction = 15,750.
+#
+# Test 1: pension=10,000, no SS, no adjustments.
+#   space = max(0, 15750 − 10000 − 0) = 5,750.
+#
+# Test 2: pension=30,000. space = max(0, 15750 − 30000) = 0.
+#
+# Test 3: above_the_line=6,000, pension=10,000.
+#   space = max(0, 15750 + 6000 − 10000) = 11,750 > 5,750.
+
+class TestZeroOrdinarySpaceSignal:
+    def test_space_available_when_sweep_floor_below_standard_deduction(self):
+        # pension=10,000 → zero_ordinary_space = 15,750 − 10,000 = 5,750.
+        payload = {
+            **_BASE_ORDINARY,
+            "pension": 10000.0,
+            "interest": 0.0,
+            "qualified_dividends": 0.0,
+            "fixed_ltcg": 0.0,
+            "sweep_floor": 0.0,
+            "sweep_ceiling": 20000.0,
+            "sweep_step": 1000.0,
+        }
+        resp = client.post("/api/emr", json=payload)
+        assert resp.status_code == 200
+        space = resp.json()["planning_signals"]["zero_ordinary_space"]
+        assert space is not None
+        assert space == pytest.approx(5750.0)
+
+    def test_space_zero_when_already_past_standard_deduction(self):
+        # pension=30,000 → 30,000 > 15,750 → space = 0.
+        payload = {
+            **_BASE_ORDINARY,
+            "pension": 30000.0,
+            "interest": 0.0,
+            "qualified_dividends": 0.0,
+            "fixed_ltcg": 0.0,
+            "sweep_floor": 0.0,
+            "sweep_ceiling": 5000.0,
+            "sweep_step": 1000.0,
+        }
+        resp = client.post("/api/emr", json=payload)
+        assert resp.status_code == 200
+        space = resp.json()["planning_signals"]["zero_ordinary_space"]
+        assert space == 0.0
+
+    def test_above_the_line_adjustments_expand_space(self):
+        # pension=10,000:
+        #   no adj  → space = 15,750 − 10,000       = 5,750
+        #   adj=6k  → space = 15,750 + 6,000 − 10,000 = 11,750
+        base = {
+            **_BASE_ORDINARY,
+            "pension": 10000.0,
+            "interest": 0.0,
+            "qualified_dividends": 0.0,
+            "fixed_ltcg": 0.0,
+            "sweep_floor": 0.0,
+            "sweep_ceiling": 20000.0,
+            "sweep_step": 1000.0,
+        }
+        resp_no_adj = client.post("/api/emr", json=base)
+        resp_with_adj = client.post("/api/emr", json={**base, "above_the_line_adjustments": 6000.0})
+        assert resp_no_adj.status_code == 200
+        assert resp_with_adj.status_code == 200
+        space_no = resp_no_adj.json()["planning_signals"]["zero_ordinary_space"]
+        space_adj = resp_with_adj.json()["planning_signals"]["zero_ordinary_space"]
+        assert space_no == pytest.approx(5750.0)
+        assert space_adj == pytest.approx(11750.0)
 
 
 # ── ltcg_0pct_remaining signal: formula-based fix ────────────────────────

@@ -577,6 +577,13 @@
   function renderSignals(s) {
     const badges = [];
 
+    // 0% Ordinary Space (most actionable — first)
+    if (s.zero_ordinary_space !== null && s.zero_ordinary_space > 0) {
+      badges.push({ cls: 'badge-green', text: '0% Ordinary Space: ' + fmt$(s.zero_ordinary_space) });
+    } else {
+      badges.push({ cls: 'badge-gray', text: '0% Ordinary Space: None' });
+    }
+
     // Torpedo
     if (s.torpedo_active) {
       badges.push({ cls: 'badge-amber', text: '⚡ SS Torpedo Active' });
