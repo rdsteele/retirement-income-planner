@@ -137,10 +137,12 @@ class TestAcaMagi:
         )
 
     def test_aca_magi_formula_ordinary_mode(self):
-        """aca_magi = fixed_ordinary + sweep_value + ss_taxable - atl_adj + tei"""
+        """aca_magi = fixed_ordinary + qd + ltcg + sweep_value + ss_taxable - atl_adj + tei"""
         for p in self.tc.points:
             expected = (
                 self.fixed_ordinary
+                + _BASE["qualified_dividends"]
+                + _BASE["fixed_ltcg"]
                 + p.income
                 + p.ss_taxable
                 - _BASE["above_the_line_adjustments"]
@@ -163,10 +165,12 @@ class TestEmrAca:
         self.tc = calculate_total_cost(**_BASE, aptc_monthly=_APTC_MONTHLY, include_aca=True)
         self.cliff_magi = self.tc.aca_cliff_magi
 
-    def test_emr_aca_zero_below_cliff(self):
+    def test_emr_aca_nonneg_below_cliff(self):
+        # With schedule-based ACA, gradual slope contributes a positive emr_aca
+        # below the cliff; it is never negative.
         for p in self.tc.points:
             if p.aca_magi < self.cliff_magi:
-                assert p.emr_aca == D("0"), f"Expected 0 below cliff at income={p.income}, magi={p.aca_magi}"
+                assert p.emr_aca >= D("0"), f"Negative emr_aca at income={p.income}, magi={p.aca_magi}"
 
     def test_emr_aca_spike_at_cliff(self):
         cliff_points = [p for p in self.tc.points if p.aca_magi == self.cliff_magi]
@@ -185,10 +189,11 @@ class TestEmrAca:
             if p.aca_magi > self.cliff_magi:
                 assert p.aptc_annual == D("0"), f"Expected aptc=0 above cliff at income={p.income}"
 
-    def test_aptc_nonzero_below_cliff(self):
+    def test_aptc_zero_at_and_above_cliff(self):
+        # Schedule-based APTC varies by MAGI below cliff; zero at and above cliff.
         for p in self.tc.points:
-            if p.aca_magi < self.cliff_magi:
-                assert p.aptc_annual == _APTC_ANNUAL
+            if p.aca_magi >= self.cliff_magi:
+                assert p.aptc_annual == D("0"), f"Expected 0 at/above cliff, got {p.aptc_annual} at magi={p.aca_magi}"
 
 
 # ---------------------------------------------------------------------------
@@ -237,7 +242,12 @@ class TestCliffBoundaryInsertion:
         assert self.tc.aca_cliff_magi == _CLIFF_MAGI
 
     def test_aptc_annual_max_set(self):
-        assert self.tc.aptc_annual_max == _APTC_ANNUAL
+        # _BASE floor MAGI = fixed_ordinary + qd + ltcg - atl_adj
+        #   = 5177 + 2594 + 21819 - 5300 = 24290
+        # 24290 is between schedule points (22000, 972) and (25000, 941).
+        # fraction = (24290-22000)/(25000-22000) = 2290/3000
+        # monthly = 972 + (2290/3000)*(941-972) = 948.3367 → annual = round(11380.04) = 11380
+        assert self.tc.aptc_annual_max == D("11380")
 
 
 # ---------------------------------------------------------------------------
@@ -294,3 +304,73 @@ class TestPreferentialMode:
     def test_total_cost_emr_equals_emr_plus_emr_aca(self):
         for p in self.tc.points:
             assert p.total_cost_emr == p.emr + p.emr_aca
+
+
+# ---------------------------------------------------------------------------
+# 7. cliff_sweep_value formula — fixed_ltcg and qualified_dividends subtracted
+#    in both ORDINARY and PREFERENTIAL modes
+# ---------------------------------------------------------------------------
+
+class TestCliffSweepValueFormula:
+    """Verify cliff_sweep_value = cliff_magi - fixed_ordinary - qd - ltcg
+    - ss_taxable_floor + atl_adj - tei, regardless of sweep_mode."""
+
+    def test_ordinary_mode_subtracts_fixed_ltcg(self):
+        # Worked example from spec:
+        # cliff=62600, fixed_ordinary=18927, ss_taxable=0, atl=5400, tei=0
+        # ltcg=21819, qd=2693
+        # expected = 62600 - 18927 - 2693 - 21819 + 5400 - 0 = 24561
+        tc = calculate_total_cost(
+            pension=D("18927"),
+            qualified_dividends=D("2693"),
+            fixed_ltcg=D("21819"),
+            above_the_line_adjustments=D("5400"),
+            sweep_mode=SweepMode.ORDINARY,
+            filing_status="single",
+            tax_year=2026,
+            sweep_floor=D("0"),
+            sweep_ceiling=D("50000"),
+            sweep_step=D("1000"),
+            aptc_monthly=D("520"),
+            include_aca=True,
+        )
+        assert tc.cliff_sweep_value == D("24561")
+
+    def test_ordinary_mode_subtracts_qualified_dividends(self):
+        # fixed_ltcg=0, qualified_dividends=5000, pension=30000, atl=5000
+        # expected = 62600 - 30000 - 5000 - 0 + 5000 - 0 = 32600
+        tc = calculate_total_cost(
+            pension=D("30000"),
+            qualified_dividends=D("5000"),
+            above_the_line_adjustments=D("5000"),
+            sweep_mode=SweepMode.ORDINARY,
+            filing_status="single",
+            tax_year=2026,
+            sweep_floor=D("0"),
+            sweep_ceiling=D("50000"),
+            sweep_step=D("1000"),
+            aptc_monthly=D("520"),
+            include_aca=True,
+        )
+        assert tc.cliff_sweep_value == D("32600")
+
+    def test_preferential_mode_same_formula(self):
+        # pension=30000, interest=1000, qd=3000, ltcg=10000, atl=5000
+        # fixed_ordinary = 31000, ss_taxable_floor = 0
+        # expected = 62600 - 31000 - 3000 - 10000 + 5000 - 0 = 23600
+        tc = calculate_total_cost(
+            pension=D("30000"),
+            interest=D("1000"),
+            qualified_dividends=D("3000"),
+            fixed_ltcg=D("10000"),
+            above_the_line_adjustments=D("5000"),
+            sweep_mode=SweepMode.PREFERENTIAL,
+            filing_status="single",
+            tax_year=2026,
+            sweep_floor=D("0"),
+            sweep_ceiling=D("50000"),
+            sweep_step=D("1000"),
+            aptc_monthly=D("520"),
+            include_aca=True,
+        )
+        assert tc.cliff_sweep_value == D("23600")

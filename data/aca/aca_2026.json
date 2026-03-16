@@ -8,5 +8,21 @@
     "single": 15650,
     "mfj": 32150
   },
-  "applicable_percentage_400pct": "0.0996"
+  "applicable_percentage_400pct": "0.0996",
+  "aptc_schedule": {
+    "single": [
+      {"magi": 22000, "monthly_aptc": 972},
+      {"magi": 25000, "monthly_aptc": 941},
+      {"magi": 30000, "monthly_aptc": 883},
+      {"magi": 35000, "monthly_aptc": 820},
+      {"magi": 40000, "monthly_aptc": 751},
+      {"magi": 45000, "monthly_aptc": 679},
+      {"magi": 50000, "monthly_aptc": 623},
+      {"magi": 55000, "monthly_aptc": 582},
+      {"magi": 60000, "monthly_aptc": 540},
+      {"magi": 62500, "monthly_aptc": 520},
+      {"magi": 62600, "monthly_aptc": 0}
+    ],
+    "mfj": []
+  }
 }

@@ -5,7 +5,7 @@
 Calculate ACA premium tax credit (APTC) at any MAGI level for a single tax year,
 returning subsidy amount, subsidy loss, and cliff proximity. Used by the total cost
 EMR calculation to show the true marginal cost of each dollar of income including
-ACA subsidy loss.
+ACA subsidy loss. Also used by the income planning page cost rate curve.
 
 ## Background
 
@@ -16,6 +16,15 @@ households with MAGI between 100% and 400% of the prior year FPL. Crossing
 
 For 2026 coverage, the applicable FPL is the 2025 FPL (one-year lag).
 Single person: 400% FPL = $62,600.
+
+The APTC slides downward as MAGI increases below the cliff — it is not flat.
+The rate of decline is determined by the IRS applicable percentage table
+(Rev. Proc. 2025-25) combined with age-rating factors specific to the enrollee.
+Rather than attempting to replicate the full formula, the service uses an
+enrollee-provided APTC schedule of actual healthcare.gov estimates at known
+MAGI levels. Linear interpolation is used between schedule points.
+
+---
 
 ## Configuration
 
@@ -32,13 +41,40 @@ ACA parameters are stored in `data/aca/aca_{year}.json`:
     "single": 15650,
     "mfj": 32150
   },
-  "applicable_percentage_400pct": "0.0996"
+  "applicable_percentage_400pct": "0.0996",
+  "aptc_schedule": {
+    "single": [
+      {"magi": 22000, "monthly_aptc": 972},
+      {"magi": 25000, "monthly_aptc": 941},
+      {"magi": 30000, "monthly_aptc": 883},
+      {"magi": 35000, "monthly_aptc": 820},
+      {"magi": 40000, "monthly_aptc": 751},
+      {"magi": 45000, "monthly_aptc": 679},
+      {"magi": 50000, "monthly_aptc": 623},
+      {"magi": 55000, "monthly_aptc": 582},
+      {"magi": 60000, "monthly_aptc": 540},
+      {"magi": 62500, "monthly_aptc": 520},
+      {"magi": 62600, "monthly_aptc": 0}
+    ],
+    "mfj": []
+  }
 }
 ```
 
-**Note:** The SLCSP premium and actual APTC are user inputs, not stored in
-config — they vary by age, zip code, and plan. The user knows their exact
-APTC from their marketplace enrollment confirmation.
+**Notes:**
+- Schedule points come from actual healthcare.gov APTC estimates for the
+  enrollee's specific age, zip code, and plan year. More points = more
+  accurate interpolation.
+- The schedule must include a point at or just below the cliff MAGI with
+  the last non-zero APTC, and a point at the cliff MAGI with `monthly_aptc: 0`.
+- Points must be sorted ascending by MAGI.
+- Below the lowest schedule MAGI: ineligible (Medicaid territory).
+- Above the cliff: `aptc = 0`.
+- If `aptc_schedule` is empty for a filing status, the service falls back
+  to the formula-based calculation using `applicable_percentage_400pct`.
+- Schedule is updated annually by the user from healthcare.gov estimates.
+
+---
 
 ## Service Interface
 
@@ -53,21 +89,27 @@ class ACAResult:
     magi: Decimal                    # input MAGI
     aptc_annual: Decimal             # annual subsidy at this MAGI
     aptc_monthly: Decimal            # monthly subsidy at this MAGI
-    subsidy_loss: Decimal            # subsidy lost vs maximum (at MAGI=0)
+    subsidy_loss: Decimal            # subsidy lost vs baseline MAGI
+                                     # (baseline = lowest schedule point)
     cliff_magi: Decimal              # 400% FPL cliff for this filing status
     distance_to_cliff: Decimal       # cliff_magi - magi (negative if over)
-    is_eligible: bool                # True if magi < cliff_magi
+    is_eligible: bool                # True if magi < cliff_magi and above
+                                     # lowest schedule point
     marginal_subsidy_loss: Decimal   # subsidy lost per $1 of additional income
-                                     # (0 below cliff, full APTC/1 at cliff)
+                                     # (slope between adjacent schedule points,
+                                     # or full APTC at cliff crossing)
 
 def calculate_aca_subsidy(
     magi: Decimal,
-    slcsp_annual_premium: Decimal,   # Second Lowest Cost Silver Plan annual premium
     filing_status: str,              # "single" or "mfj"
     tax_year: int,
+    baseline_magi: Decimal | None = None,  # MAGI for subsidy_loss reference
+                                           # defaults to lowest schedule point
 ) -> ACAResult:
     ...
 ```
+
+---
 
 ## Calculation Rules
 
@@ -77,70 +119,88 @@ cliff_magi = fpl_100pct[filing_status] × 4.0
 ```
 For 2026 single: `$15,650 × 4 = $62,600`
 
-### 2. APTC Calculation
+### 2. APTC from Schedule
+
+If `aptc_schedule` is non-empty for the filing status:
+
 ```
 if magi >= cliff_magi:
     aptc_annual = 0
     is_eligible = False
+elif magi < min(schedule.magi):
+    aptc_annual = 0
+    is_eligible = False  # Medicaid territory
 else:
-    required_contribution = min(magi × applicable_percentage_400pct, slcsp_annual_premium)
-    aptc_annual = max(0, slcsp_annual_premium - required_contribution)
+    aptc_monthly = interpolate(schedule, magi)
+    aptc_annual = aptc_monthly * 12
     is_eligible = True
 ```
 
-**Important:** The applicable percentage at 400% FPL is 9.96% for 2026. At lower
-income levels the percentage is lower (sliding scale), meaning the subsidy is
-higher. Since the service is primarily used near the cliff for planning purposes,
-we use the 9.96% cap as the contribution percentage. For precise subsidy at
-lower income levels, use the full sliding scale table from IRS Form 8962.
-
-**Simplification for planning use:** The user's actual APTC from their marketplace
-enrollment is more accurate than computing from the sliding scale. The service
-supports passing `known_aptc_annual` as an override:
-
-```python
-def calculate_aca_subsidy(
-    magi: Decimal,
-    slcsp_annual_premium: Decimal,
-    filing_status: str,
-    tax_year: int,
-    known_aptc_annual: Decimal | None = None,  # from marketplace enrollment
-) -> ACAResult:
+**Linear interpolation between adjacent schedule points:**
+```
+aptc_monthly = lower.monthly_aptc + (
+    (magi - lower.magi) / (upper.magi - lower.magi)
+    × (upper.monthly_aptc - lower.monthly_aptc)
+)
 ```
 
-When `known_aptc_annual` is provided and `magi < cliff_magi`:
-- Use `known_aptc_annual` directly as `aptc_annual`
-- `subsidy_loss = 0` (at the income level where APTC was calculated)
+If `magi` exactly matches a schedule point, use that point's value directly.
 
-When `magi >= cliff_magi`:
-- `aptc_annual = 0`
-- `subsidy_loss = known_aptc_annual` (full subsidy lost)
+### 3. APTC Formula Fallback
 
-### 3. Subsidy Loss
-```
-subsidy_loss = max_aptc - aptc_annual
-```
-Where `max_aptc` is the APTC at the user's planning income level (not at MAGI=0).
+If `aptc_schedule` is empty for the filing status, fall back to the
+applicable percentage formula:
 
-### 4. Marginal Subsidy Loss
-The ACA cliff is a step function:
 ```
-if magi < cliff_magi:
-    marginal_subsidy_loss = 0      # subsidy unchanged below cliff
-elif magi == cliff_magi:
-    marginal_subsidy_loss = known_aptc_annual  # full loss at cliff crossing
+if magi >= cliff_magi:
+    aptc_annual = 0
 else:
-    marginal_subsidy_loss = 0      # already lost, no further loss
+    applicable_pct = interpolated from applicable percentage table
+    required_contribution = magi × applicable_pct
+    aptc_annual = max(0, slcsp_annual - required_contribution)
 ```
 
-This is what creates the EMR spike at the cliff — the entire annual APTC
-is lost in a single $1 step.
+This fallback requires `slcsp_annual_premium` as an additional parameter.
+It is less accurate than the schedule-based approach for enrollees with
+age-rated premiums.
 
-### 5. Distance to Cliff
+### 4. Subsidy Loss
+
+```
+baseline_aptc = aptc_at(baseline_magi or min(schedule.magi))
+subsidy_loss = max(0, baseline_aptc - aptc_annual)
+```
+
+Subsidy loss is zero at or below the baseline MAGI and increases as MAGI
+rises toward and above the cliff.
+
+### 5. Marginal Subsidy Loss
+
+The marginal subsidy loss at a given MAGI is the rate of subsidy decline:
+
+```
+# Below cliff — slope between adjacent schedule points:
+marginal_subsidy_loss = (
+    (upper.aptc_annual - lower.aptc_annual) / (upper.magi - lower.magi)
+) × (-1)   # negative slope → positive loss rate
+
+# At cliff crossing:
+marginal_subsidy_loss = aptc_annual_just_below_cliff  # full loss
+
+# Above cliff:
+marginal_subsidy_loss = 0  # already lost
+```
+
+This is what creates the EMR component — both the gradual slope below the
+cliff and the spike at the cliff crossing.
+
+### 6. Distance to Cliff
 ```
 distance_to_cliff = cliff_magi - magi
 ```
 Positive = dollars remaining before cliff. Negative = dollars over cliff.
+
+---
 
 ## ACA MAGI Definition
 
@@ -153,84 +213,89 @@ For most retirees this equals federal AGI. Key items:
 - LTCG and qualified dividends: **count** toward ACA MAGI
 - Return of basis from taxable accounts: **does not** count toward ACA MAGI
 
-The `above_the_line_adjustments` field in the EMR service (HSA contributions)
-correctly reduces ACA MAGI — no separate calculation needed.
+---
 
-## Integration with EMR Service
+## Integration with EMR / Total Cost Service
 
-The ACA service is called from the total cost EMR calculation, not directly
-from the standalone EMR service. The total cost layer:
+The ACA service is called from the total cost EMR calculation at each sweep
+point. The total cost layer:
 
 1. Calls `calculate_emr()` for tax EMR at each sweep point
 2. Calls `calculate_aca_subsidy()` at each sweep point to get subsidy loss
 3. Combines: `total_cost_emr = tax_emr + aca_marginal_loss_rate`
 
-The ACA cliff appears as a spike on the total cost EMR chart — potentially
-100%+ EMR at the cliff crossing point (full annual subsidy / $1 step).
+The ACA cliff appears as a spike on the total cost EMR chart. Below the cliff,
+the gradual subsidy slide also contributes a small positive EMR component at
+each point — typically 1-3% per $1,000 of additional income.
 
 ## Boundary Point Insertion
 
-The ACA cliff must be inserted as an exact boundary point in the sweep,
-identical to how Ohio MAGI credit threshold and SS torpedo boundaries
-are handled. The cliff MAGI maps to a sweep_value via:
+The ACA cliff must be inserted as an exact boundary point in the sweep.
+The cliff MAGI maps to a sweep_value via:
 
 ```
-sweep_value_at_cliff = cliff_magi - fixed_ordinary - above_the_line_adjustments
-                       + standard_deduction + additional_deductions
-                       - ss_taxable_at_cliff
+sweep_value_at_cliff = cliff_magi - fixed_ordinary
+                       - ss_taxable_at_floor
+                       + above_the_line_adjustments
+                       - tax_exempt_interest
 ```
 
-This ensures the cliff spike appears at the exact correct x-coordinate
-rather than being smeared across a $1,000 compute window.
+This ensures the cliff spike appears at the exact correct x-coordinate.
+
+All schedule MAGI points that fall within the sweep range should also be
+inserted as boundary points to ensure the gradual slope is accurately
+represented without being smeared across a $1,000 compute window.
+
+---
 
 ## Worked Example — 2026 Single Filer
 
 Inputs:
-- MAGI at planning income: $62,072 (from spreadsheet)
-- SLCSP annual premium: $6,480 ($540/month)
-- Known APTC: $6,240 ($520/month)
-- Cliff MAGI: $62,600
+- MAGI: $35,346 (from income planning)
+- Filing status: single
+- Tax year: 2026
+- Baseline MAGI: $22,000 (lowest schedule point)
 
-Results at $62,072:
-- `aptc_annual`: $6,240
-- `subsidy_loss`: $0 (at planning income)
-- `distance_to_cliff`: $528
-- `is_eligible`: True
-- `marginal_subsidy_loss`: $0
+Results at $35,346 (interpolated between $35,000 and $40,000):
+```
+lower = {magi: 35000, monthly_aptc: 820}
+upper = {magi: 40000, monthly_aptc: 751}
+fraction = (35346 - 35000) / (40000 - 35000) = 0.0692
+monthly_aptc = 820 + 0.0692 × (751 - 820) = 820 - 4.77 = 815.23
+aptc_annual = 815.23 × 12 = $9,783
+baseline_aptc = 972 × 12 = $11,664
+subsidy_loss = $11,664 - $9,783 = $1,881
+distance_to_cliff = $62,600 - $35,346 = $27,254
+is_eligible = True
+```
 
 Results at $62,601 (one dollar over cliff):
-- `aptc_annual`: $0
-- `subsidy_loss`: $6,240
-- `distance_to_cliff`: -$1
-- `is_eligible`: False
-- `marginal_subsidy_loss`: $6,240
+```
+aptc_annual = $0
+subsidy_loss = $11,664 (full baseline lost)
+distance_to_cliff = -$1
+is_eligible = False
+```
 
-**EMR impact at cliff crossing:** $6,240 lost in one step.
-Over a $1,000 compute window straddling the cliff:
-`aca_emr_contribution = $6,240 / $1,000 = 6.24 = 624%`
-
-This will spike above the 50% y-axis cap — the cap should be raised or
-the ACA cliff handled separately as an annotation rather than a stacked
-area component.
-
-## No Standalone Service for SS Subsidy Interaction
-
-SS benefits count toward ACA MAGI (50% of SS benefit regardless of taxability).
-This is already handled correctly in the EMR service provisional income
-calculation — no separate treatment needed in the ACA service.
+---
 
 ## Data File
 
-`data/aca/aca_2026.json` — created as part of this spec.
-`data/aca/aca_2025.json` — not needed (enhanced subsidies, no cliff).
+`data/aca/aca_2026.json` — updated with `aptc_schedule` as shown above.
+`data/aca/aca_2025.json` — not needed (enhanced subsidies, no cliff, no schedule).
+
+---
 
 ## Tests
 
 Unit tests in `tests/unit/test_aca.py`:
-1. Below cliff: returns correct APTC, zero subsidy loss, positive distance
-2. At cliff (exact): returns correct APTC, zero subsidy loss, distance=0
-3. One dollar over cliff: returns zero APTC, full subsidy loss, distance=-1
-4. Known APTC override: uses provided value, not formula calculation
-5. Distance to cliff calculation accuracy
-6. MFJ cliff uses correct threshold
-
+1. Schedule interpolation — MAGI between two points returns correct value
+2. Schedule exact match — MAGI exactly on a schedule point
+3. Below lowest schedule point — returns zero APTC, is_eligible=False
+4. At cliff — returns last non-zero APTC, distance_to_cliff=0
+5. One dollar over cliff — returns zero APTC, full subsidy_loss
+6. Subsidy loss correct vs baseline MAGI
+7. Marginal subsidy loss correct between schedule points (gradual slope)
+8. Marginal subsidy loss spikes at cliff crossing
+9. Empty schedule falls back to formula calculation
+10. MFJ cliff uses correct threshold

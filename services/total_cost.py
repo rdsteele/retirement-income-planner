@@ -7,7 +7,7 @@ EMR curve. Thin orchestration layer over calculate_emr() and calculate_aca_subsi
 from dataclasses import dataclass
 from decimal import Decimal
 
-from services.aca import calculate_aca_subsidy
+from services.aca import calculate_aca_subsidy, get_aptc_schedule_magis
 from services.emr import EMRPoint, EMRResult, SweepMode, calculate_emr
 
 _ZERO = Decimal("0")
@@ -37,7 +37,6 @@ class TotalCostResult:
 
 
 def _compute_aca_magi(
-    sweep_mode: SweepMode,
     sweep_value: Decimal,
     fixed_ordinary: Decimal,
     ss_taxable: Decimal,
@@ -46,28 +45,18 @@ def _compute_aca_magi(
     above_the_line_adjustments: Decimal,
     tax_exempt_interest: Decimal,
 ) -> Decimal:
-    if sweep_mode == SweepMode.ORDINARY:
-        return (
-            fixed_ordinary
-            + sweep_value
-            + ss_taxable
-            - above_the_line_adjustments
-            + tax_exempt_interest
-        )
-    else:  # PREFERENTIAL
-        return (
-            fixed_ordinary
-            + qualified_dividends
-            + fixed_ltcg
-            + sweep_value
-            + ss_taxable
-            - above_the_line_adjustments
-            + tax_exempt_interest
-        )
+    return (
+        fixed_ordinary
+        + qualified_dividends
+        + fixed_ltcg
+        + sweep_value
+        + ss_taxable
+        - above_the_line_adjustments
+        + tax_exempt_interest
+    )
 
 
 def _compute_cliff_sweep_value(
-    sweep_mode: SweepMode,
     cliff_magi: Decimal,
     fixed_ordinary: Decimal,
     ss_taxable_at_floor: Decimal,
@@ -76,16 +65,15 @@ def _compute_cliff_sweep_value(
     above_the_line_adjustments: Decimal,
     tax_exempt_interest: Decimal,
 ) -> Decimal:
-    base = (
+    return (
         cliff_magi
         - fixed_ordinary
+        - qualified_dividends
+        - fixed_ltcg
         - ss_taxable_at_floor
         + above_the_line_adjustments
         - tax_exempt_interest
     )
-    if sweep_mode == SweepMode.PREFERENTIAL:
-        base = base - fixed_ltcg - qualified_dividends
-    return base
 
 
 def _make_zero_aca_point(emr_point: EMRPoint) -> TotalCostPoint:
@@ -138,12 +126,12 @@ def calculate_total_cost(
     fixed_ordinary = pension + interest + ordinary_dividends + ira_distributions
     if sweep_mode == SweepMode.PREFERENTIAL:
         fixed_ordinary = fixed_ordinary + variable_ordinary
-    aptc_annual_known = aptc_monthly * 12
 
     extra_boundary_points: list[Decimal] | None = None
     cliff_sweep_value = _ZERO
     cliff_magi = _ZERO
     aptc_annual_max = _ZERO
+    floor_aca_magi = _ZERO
 
     if include_aca:
         # Approximate ss_taxable at floor using a quick single-point EMR call.
@@ -172,28 +160,27 @@ def calculate_total_cost(
         )
         ss_taxable_at_floor = floor_result.points[0].ss_taxable if floor_result.points else _ZERO
 
-        # ACA cliff MAGI from the floor-point ACA call
+        floor_aca_magi = _compute_aca_magi(
+            sweep_value=sweep_floor,
+            fixed_ordinary=fixed_ordinary,
+            ss_taxable=ss_taxable_at_floor,
+            qualified_dividends=qualified_dividends,
+            fixed_ltcg=fixed_ltcg,
+            above_the_line_adjustments=above_the_line_adjustments,
+            tax_exempt_interest=tax_exempt_interest,
+        )
+
+        # ACA cliff and max APTC from floor-point call
         aca_floor = calculate_aca_subsidy(
-            magi=_compute_aca_magi(
-                sweep_mode=sweep_mode,
-                sweep_value=sweep_floor,
-                fixed_ordinary=fixed_ordinary,
-                ss_taxable=ss_taxable_at_floor,
-                qualified_dividends=qualified_dividends,
-                fixed_ltcg=fixed_ltcg,
-                above_the_line_adjustments=above_the_line_adjustments,
-                tax_exempt_interest=tax_exempt_interest,
-            ),
-            slcsp_annual_premium=_ZERO,
+            magi=floor_aca_magi,
             filing_status=filing_status,
             tax_year=tax_year,
-            known_aptc_annual=aptc_annual_known,
+            baseline_magi=floor_aca_magi,
         )
         cliff_magi = aca_floor.cliff_magi
         aptc_annual_max = aca_floor.aptc_annual
 
         cliff_sweep_value = _compute_cliff_sweep_value(
-            sweep_mode=sweep_mode,
             cliff_magi=cliff_magi,
             fixed_ordinary=fixed_ordinary,
             ss_taxable_at_floor=ss_taxable_at_floor,
@@ -202,7 +189,22 @@ def calculate_total_cost(
             above_the_line_adjustments=above_the_line_adjustments,
             tax_exempt_interest=tax_exempt_interest,
         )
+
+        # Boundary points: cliff + all schedule MAGI points within sweep range
+        effective_ceiling = sweep_ceiling if sweep_ceiling is not None else cliff_magi * 2
         extra_boundary_points = [cliff_sweep_value]
+        for sched_magi in get_aptc_schedule_magis(filing_status, tax_year):
+            sched_sweep = _compute_cliff_sweep_value(
+                cliff_magi=sched_magi,
+                fixed_ordinary=fixed_ordinary,
+                ss_taxable_at_floor=ss_taxable_at_floor,
+                qualified_dividends=qualified_dividends,
+                fixed_ltcg=fixed_ltcg,
+                above_the_line_adjustments=above_the_line_adjustments,
+                tax_exempt_interest=tax_exempt_interest,
+            )
+            if sweep_floor <= sched_sweep <= effective_ceiling:
+                extra_boundary_points.append(sched_sweep)
 
     emr_result: EMRResult = calculate_emr(
         pension=pension,
@@ -244,7 +246,6 @@ def calculate_total_cost(
     tc_points: list[TotalCostPoint] = []
     for p in emr_result.points:
         aca_magi = _compute_aca_magi(
-            sweep_mode=sweep_mode,
             sweep_value=p.income,
             fixed_ordinary=fixed_ordinary,
             ss_taxable=p.ss_taxable,
@@ -255,10 +256,9 @@ def calculate_total_cost(
         )
         aca_result = calculate_aca_subsidy(
             magi=aca_magi,
-            slcsp_annual_premium=_ZERO,
             filing_status=filing_status,
             tax_year=tax_year,
-            known_aptc_annual=aptc_annual_known,
+            baseline_magi=floor_aca_magi,
         )
         emr_aca = aca_result.marginal_subsidy_loss / _EMR_COMPUTE_STEP
         tc_points.append(TotalCostPoint(

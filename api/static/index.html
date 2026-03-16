@@ -9,6 +9,15 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+    /* Remove spinner arrows from number inputs site-wide */
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type=number] { -moz-appearance: textfield; }
+    /* Exception: keep spinners on IRMAA inflation rate (benefits from fine adjustment) */
+    #irmaa_inflation_rate::-webkit-inner-spin-button,
+    #irmaa_inflation_rate::-webkit-outer-spin-button { -webkit-appearance: auto; }
+    #irmaa_inflation_rate { -moz-appearance: auto; }
+
     /* ── Nav bar ── */
     .navbar {
       display: flex;
@@ -633,16 +642,22 @@
 
   // ── IRMAA helpers ─────────────────────────────────────────────────────────
 
-  // Returns { thresholds, adjusted } — applies inflation if checkbox is checked.
+  // Returns { thresholds, adjusted } — applies inflation if checkbox is checked,
+  // then filters to only thresholds within the current sweep range.
   function effectiveIrmaaThresholds() {
     const raw = lastResult ? lastResult.irmaa_thresholds : [];
     const adjChecked = el('irmaa_inflation_adj').checked;
-    if (!adjChecked) return { thresholds: raw, adjusted: false };
-    const rate = (parseFloat(el('irmaa_inflation_rate').value) || 0) / 100;
-    return {
-      thresholds: raw.map(t => t * (1 + rate) ** 2),
-      adjusted: true,
-    };
+    const rate = adjChecked ? (parseFloat(el('irmaa_inflation_rate').value) || 0) / 100 : 0;
+    const scaled = adjChecked ? raw.map(t => t * (1 + rate) ** 2) : raw;
+
+    // Filter to sweep range so out-of-range thresholds don't expand the x-axis.
+    const income = lastResult?.points?.income;
+    if (income?.length) {
+      const sweepMin = income[0];
+      const sweepMax = income[income.length - 1];
+      return { thresholds: scaled.filter(t => t >= sweepMin && t <= sweepMax), adjusted: adjChecked };
+    }
+    return { thresholds: scaled, adjusted: adjChecked };
   }
 
   function buildIrmaaShapes(thresholds, show) {

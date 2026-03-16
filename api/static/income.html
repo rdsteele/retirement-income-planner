@@ -9,6 +9,11 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+    /* Remove spinner arrows from number inputs site-wide */
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type=number] { -moz-appearance: textfield; }
+
     /* ── Nav bar ── */
     .navbar {
       display: flex;
@@ -357,6 +362,61 @@
       border-color: #4c6ef5;
       background: #f0f4ff;
     }
+
+    /* ── Collapsible withdrawal mix card ── */
+    #withdrawal-mix-card > details > summary {
+      list-style: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      user-select: none;
+    }
+    #withdrawal-mix-card > details > summary::-webkit-details-marker { display: none; }
+    #withdrawal-mix-card > details > summary::before {
+      content: '▶';
+      font-size: 9px;
+      transition: transform 0.15s;
+      display: inline-block;
+    }
+    #withdrawal-mix-card > details[open] > summary::before { transform: rotate(90deg); }
+
+    /* ── Collapsible per-account within withdrawal mix ── */
+    .acct-details { margin-bottom: 10px; }
+    .acct-details > summary {
+      list-style: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-weight: 600;
+      font-size: 13px;
+      color: #212529;
+      user-select: none;
+      padding: 2px 0;
+    }
+    .acct-details > summary::-webkit-details-marker { display: none; }
+    .acct-details > summary::before {
+      content: '▶';
+      font-size: 8px;
+      transition: transform 0.15s;
+      display: inline-block;
+      color: #6c757d;
+    }
+    .acct-details[open] > summary::before { transform: rotate(90deg); }
+
+    /* ── Account subtotals row ── */
+    .acct-subtotals {
+      display: flex;
+      gap: 16px;
+      padding: 5px 2px 2px;
+      font-size: 12px;
+      color: #495057;
+      border-top: 1px solid #dee2e6;
+      margin-top: 2px;
+    }
+    .acct-subtotals span { font-variant-numeric: tabular-nums; }
+    .acct-subtotals .sub-label { color: #6c757d; }
   </style>
 </head>
 <body>
@@ -423,19 +483,15 @@
         </details>
 
         <!-- ACA -->
-        <details>
+        <details open>
           <summary>ACA</summary>
           <div class="section-body">
-            <div class="field"><label>Monthly APTC</label><input type="number" id="aptc_monthly" min="0" step="1" placeholder="0"><span class="field-hint">Advance premium tax credit from marketplace enrollment</span></div>
-            <div class="field"><label>Monthly Plan Premium</label><input type="number" id="silver_premium_monthly" min="0" step="1" placeholder="0"><span class="field-hint">Second-lowest-cost silver plan (SLCSP) monthly premium</span></div>
-          </div>
-        </details>
-
-        <!-- Withdrawal Mix -->
-        <details>
-          <summary>Withdrawal Mix</summary>
-          <div id="withdrawal-mix-body" class="mix-body">
-            <p style="color:#6c757d; font-size:13px;">Loading accounts…</p>
+            <div class="field field-wide">
+              <label style="flex-direction:row; align-items:center; gap:8px; cursor:pointer;">
+                <input type="checkbox" id="include_aca" checked>
+                Include ACA subsidy calculation
+              </label>
+            </div>
           </div>
         </details>
 
@@ -453,22 +509,39 @@
             <span class="magi-label">Projected MAGI</span>
             <span class="magi-value" id="magi-value">$0</span>
           </div>
-          <div class="magi-row">
+          <div class="magi-row aca-row">
             <span class="magi-label">ACA Cliff</span>
             <span class="magi-value" id="aca-cliff-display">$62,600</span>
           </div>
-          <div class="magi-row">
+          <div class="magi-row aca-row">
             <span class="magi-label">Distance to Cliff</span>
             <span class="magi-value" id="distance-display">—</span>
           </div>
+          <div class="magi-row aca-row">
+            <span class="magi-label">Estimated APTC</span>
+            <span class="magi-value" id="aptc-estimate-display">Run Calculate to estimate</span>
+          </div>
           <div class="magi-divider"></div>
           <div class="magi-row">
-            <span class="magi-label">Basis Withdrawals (MAGI-neutral)</span>
-            <span class="magi-value" id="basis-withdrawals-display">$0</span>
+            <span class="magi-label">Taxable Withdrawals</span>
+            <span class="magi-value" id="taxable-withdrawals-display">$0</span>
           </div>
           <div class="magi-row">
-            <span class="magi-label">Roth Withdrawals (MAGI-neutral)</span>
+            <span class="magi-label">Tax-Deferred Withdrawals</span>
+            <span class="magi-value" id="trad-withdrawals-display">$0</span>
+          </div>
+          <div class="magi-row">
+            <span class="magi-label">Tax-Free Withdrawals</span>
             <span class="magi-value" id="roth-withdrawals-display">$0</span>
+          </div>
+          <div class="magi-row">
+            <span class="magi-label">Total Withdrawals</span>
+            <span class="magi-value" id="total-withdrawals-display">$0</span>
+          </div>
+          <div class="magi-divider"></div>
+          <div class="magi-row">
+            <span class="magi-label">Total Forced Income</span>
+            <span class="magi-value" id="forced-income-display">$0</span>
           </div>
           <div class="magi-divider"></div>
           <div class="magi-row">
@@ -480,6 +553,16 @@
             <span class="magi-value" id="shortfall-display">—</span>
           </div>
         </div>
+      </div>
+
+      <!-- Withdrawal Mix (collapsed by default) -->
+      <div class="card" id="withdrawal-mix-card">
+        <details>
+          <summary class="card-header">Withdrawal Mix</summary>
+          <div id="withdrawal-mix-body" class="mix-body">
+            <p style="color:#6c757d; font-size:13px;">Loading accounts…</p>
+          </div>
+        </details>
       </div>
 
       <!-- Chart (shown after Calculate) -->
@@ -610,35 +693,40 @@
       container.innerHTML = `<p style="color:#6c757d; font-size:13px;">
         No accounts found. Add accounts to enable withdrawal mix inputs.<br>
         <small style="color:#adb5bd;">Account management is not yet available in the UI;
-        add accounts to <code>data/accounts.json</code> directly.</small>
+        add accounts to <code>profile/accounts.json</code> directly.</small>
       </p>`;
       return;
     }
 
     let html = '';
 
-    // Taxable accounts
+    // Taxable accounts — each account collapsible (open by default), sorted by unrealized gain asc
     if (taxable.length > 0) {
       html += '<div class="mix-section-label">Taxable</div>';
       for (const acct of taxable) {
-        html += `<div class="mix-account"><div class="mix-account-header">${escHtml(acct.name)}</div>`;
-        if (acct.holdings && acct.holdings.length > 0) {
+        const sortedHoldings = acct.holdings
+          ? [...acct.holdings].sort((a, b) => (a.unrealized_gain ?? 0) - (b.unrealized_gain ?? 0))
+          : [];
+        html += `<details class="acct-details" open data-acct-id="${escHtml(acct.id)}">
+          <summary>${escHtml(acct.name)}</summary>
+          <div>`;
+        if (sortedHoldings.length > 0) {
           html += `<table class="holding-table">
             <thead><tr>
-              <th class="th-left">Ticker</th>
-              <th>Basis</th>
+              <th class="th-left">Holding</th>
               <th>Value</th>
+              <th>Basis</th>
               <th>Unrlzd Gain</th>
               <th>Withdraw ($)</th>
               <th>Basis Portion ($)</th>
               <th>Gain ($)</th>
             </tr></thead><tbody>`;
-          for (const h of acct.holdings) {
+          for (const h of sortedHoldings) {
             const unrealGain = (h.value || 0) - (h.basis || 0);
             html += `<tr>
               <td class="td-left">${escHtml(h.ticker)}</td>
-              <td>${fmt$(h.basis)}</td>
               <td>${fmt$(h.value)}</td>
+              <td>${fmt$(h.basis)}</td>
               <td>${fmt$(unrealGain)}</td>
               <td><input type="number" id="withdraw_${escHtml(h.id)}" class="mix-input" min="0" step="1" placeholder="0"
                          data-basis="${h.basis}" data-value="${h.value}"></td>
@@ -647,11 +735,21 @@
               <td class="derived-cell" id="gain_${escHtml(h.id)}">$0</td>
             </tr>`;
           }
-          html += '</tbody></table>';
+          const acctTotalVal   = sortedHoldings.reduce((s, h) => s + (h.value || 0), 0);
+          const acctTotalBasis = sortedHoldings.reduce((s, h) => s + (h.basis || 0), 0);
+          html += `</tbody></table>
+          </div></details>
+          <div class="acct-subtotals" id="subtotals_${escHtml(acct.id)}">
+            <span class="sub-label">Total:</span>
+            <span>Value <span id="sub_val_${escHtml(acct.id)}">${fmt$(acctTotalVal)}</span></span>
+            <span>Basis <span id="sub_basis_${escHtml(acct.id)}">${fmt$(acctTotalBasis)}</span></span>
+            <span>Unrealized Gain <span id="sub_ug_${escHtml(acct.id)}">${fmt$(acctTotalVal - acctTotalBasis)}</span></span>
+            <span>Withdraw <span id="sub_w_${escHtml(acct.id)}">$0</span></span>
+          </div>`;
         } else {
           html += '<p class="mix-note">No holdings</p>';
+          html += `</div></details>`;
         }
-        html += '</div>';
       }
     }
 
@@ -692,7 +790,13 @@
         html += `<div class="mix-account">
           <div class="mix-account-header">${escHtml(acct.name)}</div>
           <div class="mix-account-balance">Balance: ${fmt$(acct.balance ?? 0)}</div>
-          <div class="mix-note">HSA contribution is entered in the Adjustments section.</div>
+          <div class="mix-field-row">
+            <label class="mix-field-label">Medical Withdrawal ($)<br>
+              <span class="mix-note" style="margin-top:0;">Tax-free for qualified medical expenses — MAGI-neutral</span>
+            </label>
+            <input type="number" id="hsa_${escHtml(acct.id)}" class="mix-input-wide" min="0" step="1" placeholder="0">
+          </div>
+          <div class="mix-note" style="margin-top:6px;">HSA contribution is entered in the Adjustments section.</div>
         </div>`;
       }
     }
@@ -708,18 +812,20 @@
         if (!withdrawInput || !basisInput) continue;
         const basisRatio = h.value > 0 ? h.basis / h.value : 0;
 
-        withdrawInput.addEventListener('input', () => {
+        withdrawInput.addEventListener('blur', () => {
           if (basisInput.dataset.manual === 'false') {
             const w = parseFloat(withdrawInput.value) || 0;
             basisInput.value = w > 0 ? Math.round(w * basisRatio) : '';
           }
           updateGainDisplay(h.id);
+          updateAccountSubtotals(acct.id);
           updateMagi();
         });
 
-        basisInput.addEventListener('input', () => {
+        basisInput.addEventListener('blur', () => {
           basisInput.dataset.manual = 'true';
           updateGainDisplay(h.id);
+          updateAccountSubtotals(acct.id);
           updateMagi();
         });
       }
@@ -733,12 +839,24 @@
     if (gainEl) gainEl.textContent = fmt$(Math.max(0, w - b));
   }
 
+  function updateAccountSubtotals(acctId) {
+    const acct = accounts.find(a => a.id === acctId);
+    if (!acct || !acct.holdings) return;
+    let totalW = 0;
+    for (const h of acct.holdings) {
+      totalW += parseFloat(el(`withdraw_${h.id}`)?.value) || 0;
+    }
+    const subW = el(`sub_w_${acctId}`);
+    if (subW) subW.textContent = fmt$(totalW);
+  }
+
   // ── Gather withdrawal totals ───────────────────────────────────────────
   function gatherWithdrawals() {
     let totalGainWithdrawals  = 0;
     let totalBasisWithdrawals = 0;
     let totalTradWithdrawals  = 0;
     let totalRothWithdrawals  = 0;
+    let totalHsaWithdrawals   = 0;
 
     for (const acct of accounts) {
       if (acct.account_type === 'taxable' && acct.holdings) {
@@ -753,10 +871,12 @@
         totalTradWithdrawals += parseFloat(el(`trad_${acct.id}`)?.value) || 0;
       } else if (acct.account_type === 'roth') {
         totalRothWithdrawals += parseFloat(el(`roth_${acct.id}`)?.value) || 0;
+      } else if (acct.account_type === 'hsa') {
+        totalHsaWithdrawals += parseFloat(el(`hsa_${acct.id}`)?.value) || 0;
       }
     }
 
-    return { totalGainWithdrawals, totalBasisWithdrawals, totalTradWithdrawals, totalRothWithdrawals };
+    return { totalGainWithdrawals, totalBasisWithdrawals, totalTradWithdrawals, totalRothWithdrawals, totalHsaWithdrawals };
   }
 
   // ── SS taxability approximation (single filer, for live display only) ─
@@ -782,7 +902,7 @@
     const discretionary      = fnum('discretionary_spending');
     const totalSpending      = essential + discretionary;
 
-    const { totalGainWithdrawals, totalBasisWithdrawals, totalTradWithdrawals, totalRothWithdrawals } =
+    const { totalGainWithdrawals, totalBasisWithdrawals, totalTradWithdrawals, totalRothWithdrawals, totalHsaWithdrawals } =
       gatherWithdrawals();
 
     const provisionalIncome =
@@ -798,14 +918,22 @@
       + ssTaxableApprox - hsaContribution;
 
     const distance = acaCliffMagi - magi;
+    const forcedIncome =
+      pension + interest + ordinaryDividends + rmds
+      + qualifiedDividends + fixedLtcg + ssBenefit;
+    const totalTaxableWithdrawals = totalBasisWithdrawals + totalGainWithdrawals;
+    const totalAllWithdrawals     = totalTaxableWithdrawals + totalTradWithdrawals + totalRothWithdrawals + totalHsaWithdrawals;
 
     // MAGI card values
-    el('magi-value').textContent         = fmt$(magi);
-    el('aca-cliff-display').textContent  = fmt$(acaCliffMagi);
-    el('basis-withdrawals-display').textContent = fmt$(totalBasisWithdrawals);
-    el('roth-withdrawals-display').textContent  = fmt$(totalRothWithdrawals);
-    el('magi-total-spending').textContent = fmt$(totalSpending);
-    el('total-spending-display').textContent    = fmt$(totalSpending);
+    el('magi-value').textContent                  = fmt$(magi);
+    el('aca-cliff-display').textContent           = fmt$(acaCliffMagi);
+    el('taxable-withdrawals-display').textContent = fmt$(totalTaxableWithdrawals);
+    el('trad-withdrawals-display').textContent    = fmt$(totalTradWithdrawals);
+    el('roth-withdrawals-display').textContent    = fmt$(totalRothWithdrawals);
+    el('total-withdrawals-display').textContent   = fmt$(totalAllWithdrawals);
+    el('forced-income-display').textContent       = fmt$(forcedIncome);
+    el('magi-total-spending').textContent         = fmt$(totalSpending);
+    el('total-spending-display').textContent      = fmt$(totalSpending);
 
     // Distance color coding
     const distEl = el('distance-display');
@@ -820,11 +948,8 @@
       distEl.className   = 'magi-value distance-red';
     }
 
-    // Shortfall = total_spending - forced_income - basis_withdrawals
-    const forcedIncome =
-      pension + interest + ordinaryDividends + rmds
-      + qualifiedDividends + fixedLtcg + ssBenefit;
-    const shortfall = totalSpending - forcedIncome - totalBasisWithdrawals;
+    // Shortfall = total_spending - forced_income - basis_withdrawals - hsa_withdrawals
+    const shortfall = totalSpending - forcedIncome - totalBasisWithdrawals - totalHsaWithdrawals;
     const shortfallEl = el('shortfall-display');
     if (totalSpending === 0) {
       shortfallEl.textContent = '—';
@@ -873,9 +998,7 @@
       sweep_ceiling:              150000,
       sweep_step:                 100,
       include_ohio:               true,
-      include_aca:                true,
-      aptc_monthly:               fnum('aptc_monthly'),
-      silver_premium_monthly:     fnum('silver_premium_monthly'),
+      include_aca:                el('include_aca')?.checked ?? true,
     };
 
     try {
@@ -898,9 +1021,15 @@
 
       lastResult = await resp.json();
 
-      // Update ACA cliff from response
+      // Update ACA cliff and APTC estimate from response
       if (lastResult.aca_cliff_magi > 0) {
         acaCliffMagi = lastResult.aca_cliff_magi;
+      }
+      const aptcEl = el('aptc-estimate-display');
+      if (aptcEl) {
+        aptcEl.textContent = lastResult.aptc_annual_max > 0
+          ? fmt$(Math.round(lastResult.aptc_annual_max / 12)) + '/month'
+          : '$0/month';
       }
       updateMagi();
 
@@ -931,17 +1060,23 @@
     const shapes      = [];
     const annotations = [];
 
-    // IRMAA vertical lines
+    // IRMAA vertical lines — only render thresholds within the sweep range
     if (el('irmaa-toggle')?.checked && lastResult?.irmaa_thresholds?.length) {
+      const income  = lastResult.points.income;
+      const sweepMin = income[0];
+      const sweepMax = income[income.length - 1];
+      let irmaaIdx = 0;
       for (let i = 0; i < lastResult.irmaa_thresholds.length; i++) {
         const t = lastResult.irmaa_thresholds[i];
+        if (t < sweepMin || t > sweepMax) continue;
+        irmaaIdx++;
         shapes.push({
           type: 'line', x0: t, x1: t, y0: 0, y1: 1, yref: 'paper',
           line: { color: 'gray', dash: 'dash', width: 1 },
         });
         annotations.push({
           x: t, y: 1, yref: 'paper',
-          text: 'IRMAA ' + (i + 1),
+          text: 'IRMAA ' + irmaaIdx,
           showarrow: false,
           font: { size: 10, color: 'gray' },
           xanchor: 'left', yanchor: 'top',
@@ -1145,12 +1280,22 @@
       </div>`;
   }
 
-  // ── Live update on any input change ───────────────────────────────────
-  document.addEventListener('input', updateMagi);
+  // ── ACA visibility ────────────────────────────────────────────────────
+  function updateAcaVisibility() {
+    const show = el('include_aca')?.checked ?? true;
+    document.querySelectorAll('.aca-row').forEach(row => {
+      row.style.display = show ? '' : 'none';
+    });
+  }
+
+  el('include_aca')?.addEventListener('change', updateAcaVisibility);
+
+  // ── Update MAGI on blur of any input field ────────────────────────────
+  document.addEventListener('focusout', updateMagi);
 
   // ── Page load ─────────────────────────────────────────────────────────
   Promise.all([loadConfig(), loadTaxYears(), loadAccounts(), loadAccountsSummary()])
-    .then(() => updateMagi());
+    .then(() => { updateMagi(); updateAcaVisibility(); });
 </script>
 </body>
 </html>

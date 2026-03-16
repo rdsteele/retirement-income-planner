@@ -122,8 +122,9 @@ class TestHappyPathWithACA:
         assert self.body["aca_cliff_magi"] == pytest.approx(62600.0)
 
     def test_aptc_annual_max_populated(self):
-        # aptc_monthly=500 → 6000/year
-        assert self.body["aptc_annual_max"] == pytest.approx(6000.0)
+        # _BASE_ACA: pension=30000, no adjustments, sweep_floor=0
+        # floor MAGI = 30000; schedule at 30000: monthly=883 → annual=10596
+        assert self.body["aptc_annual_max"] == pytest.approx(10596.0)
 
     def test_cliff_sweep_value_populated(self):
         # pension=30000, cliff_magi=62600 → cliff_sweep=32600
@@ -158,14 +159,10 @@ class TestACACliffConsistency:
         top_level = self.body["cliff_sweep_value"]
         assert signal == pytest.approx(top_level)
 
-    def test_aca_subsidy_loss_zero_below_cliff(self):
+    def test_aca_subsidy_loss_zero_at_sweep_floor(self):
+        # Subsidy loss is zero at the sweep floor (that is the baseline MAGI).
         pts = self.body["points"]
-        cliff = self.body["cliff_sweep_value"]
-        incomes = pts["income"]
-        losses = pts["aca_subsidy_loss"]
-        for income, loss in zip(incomes, losses):
-            if income < cliff:
-                assert loss == 0.0, f"Expected no subsidy loss below cliff at income={income}"
+        assert pts["aca_subsidy_loss"][0] == 0.0
 
 
 # ── Test 4: bracket_boundaries identifies rate transitions ───────────────
