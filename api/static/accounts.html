@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Accounts — Retirement Income Planner</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      background: #f8f9fa;
+      color: #212529;
+      padding: 12px 16px;
+    }
+
+    /* ── Nav bar ── */
+    .navbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 0 12px;
+      margin-bottom: 0;
+      border-bottom: 1px solid #dee2e6;
+    }
+    .nav-brand { font-weight: 700; font-size: 16px; color: #1a1a2e; }
+    .nav-links { display: flex; gap: 24px; }
+    .nav-link {
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      color: #6c757d;
+      padding-bottom: 2px;
+    }
+    .nav-link:hover { color: #1a1a2e; }
+    .nav-link.active { color: #1a1a2e; border-bottom: 2px solid #4c6ef5; }
+
+    /* ── Page ── */
+    .page { max-width: 960px; margin: 20px auto 0; }
+    h1 { font-size: 22px; font-weight: 600; margin-bottom: 20px; color: #1a1a2e; }
+
+    /* ── Section cards ── */
+    .section-card {
+      background: #fff;
+      border: 1px solid #dee2e6;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .section-card h2 {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 14px;
+      color: #1a1a2e;
+    }
+
+    /* ── Action buttons ── */
+    .action-row { display: flex; gap: 6px; align-items: center; }
+    .btn {
+      padding: 4px 12px;
+      font-size: 12px;
+      border: 1px solid #ced4da;
+      border-radius: 4px;
+      background: #fff;
+      cursor: pointer;
+      color: #495057;
+      white-space: nowrap;
+    }
+    .btn:hover { background: #f0f2f5; }
+    .btn-primary { background: #4c6ef5; color: #fff; border-color: #4c6ef5; }
+    .btn-primary:hover { background: #3b5bdb; }
+    .btn-danger { border-color: #dc3545; color: #dc3545; }
+    .btn-danger:hover { background: #fff0f0; }
+
+    /* ── Messages ── */
+    .message { font-size: 13px; padding: 6px 0; }
+    .message.success { color: #16a34a; }
+    .message.error   { color: #dc2626; }
+    .empty-state { color: #6c757d; font-size: 13px; padding: 4px 0; }
+
+    /* ── Type badges ── */
+    .type-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    /* ── Portfolio summary table ── */
+    .summary-table { border-collapse: collapse; font-size: 13px; }
+    .summary-table td { padding: 4px 12px 4px 0; color: #495057; }
+    .summary-table td.num { text-align: right; font-variant-numeric: tabular-nums; color: #212529; padding-right: 0; }
+    .summary-table tr.summary-total td {
+      font-weight: 700;
+      color: #1a1a2e;
+      border-top: 1px solid #dee2e6;
+      padding-top: 8px;
+    }
+
+    /* ── Non-taxable account rows ── */
+    .account-row {
+      display: flex;
+      align-items: center;
+      padding: 10px 12px;
+      border: 1px solid #e9ecef;
+      border-radius: 6px;
+      margin-bottom: 6px;
+      background: #fff;
+    }
+    .account-row.editing { background: #f8f9fa; border-color: #4c6ef5; }
+    .account-row-main {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+      flex-wrap: wrap;
+    }
+    .account-name { font-weight: 600; color: #1a1a2e; }
+    .account-info { color: #6c757d; font-size: 13px; flex: 1; }
+
+    /* ── Inline edit forms (non-taxable) ── */
+    .edit-form { width: 100%; }
+    .edit-fields { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+    .edit-field { display: flex; flex-direction: column; gap: 3px; }
+    .edit-field label { font-size: 11px; color: #6c757d; font-weight: 500; }
+    .edit-field input {
+      padding: 5px 8px;
+      font-size: 13px;
+      border: 1px solid #ced4da;
+      border-radius: 4px;
+      color: #212529;
+      width: 160px;
+    }
+    .edit-field input:focus { outline: none; border-color: #4c6ef5; }
+
+    /* ── Taxable account cards ── */
+    .taxable-card {
+      border: 1px solid #e9ecef;
+      border-radius: 6px;
+      margin-bottom: 10px;
+      overflow: hidden;
+      background: #fff;
+    }
+    .taxable-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 10px 12px;
+      cursor: pointer;
+      user-select: none;
+      background: #fff;
+    }
+    .taxable-header:hover { background: #f8f9fa; }
+    .expand-icon { color: #6c757d; font-size: 12px; margin-top: 3px; flex-shrink: 0; }
+    .taxable-header-main {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+      flex-wrap: wrap;
+    }
+    .account-totals { color: #6c757d; font-size: 12px; flex: 1; }
+
+    /* ── Holdings table ── */
+    .holdings-section { padding: 0 12px 12px; }
+    .holdings-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .holdings-table th {
+      text-align: left;
+      padding: 6px 8px;
+      border-bottom: 2px solid #dee2e6;
+      font-weight: 600;
+      font-size: 12px;
+      color: #495057;
+    }
+    .holdings-table td {
+      padding: 6px 8px;
+      border-bottom: 1px solid #f0f0f0;
+      color: #212529;
+      font-variant-numeric: tabular-nums;
+    }
+    .holdings-table tr:last-child td { border-bottom: none; }
+    .holdings-table tr:hover td { background: #f8f9fa; }
+    .holdings-table tr.editing td { background: #f0f4ff; }
+    .holdings-table input[type="text"],
+    .holdings-table input[type="number"] {
+      padding: 3px 6px;
+      font-size: 12px;
+      border: 1px solid #ced4da;
+      border-radius: 3px;
+      color: #212529;
+    }
+    .holdings-table input[type="text"] { width: 80px; }
+    .holdings-table input[type="number"] { width: 100px; }
+    .holdings-table input:focus { outline: none; border-color: #4c6ef5; }
+
+    /* ── Add Account form ── */
+    .add-account-form { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+    .form-field { display: flex; flex-direction: column; gap: 3px; }
+    .form-field label { font-size: 11px; color: #6c757d; font-weight: 500; }
+    .form-field input, .form-field select {
+      padding: 6px 10px;
+      font-size: 13px;
+      border: 1px solid #ced4da;
+      border-radius: 4px;
+      color: #212529;
+      background: #fff;
+    }
+    .form-field input:focus, .form-field select:focus { outline: none; border-color: #4c6ef5; }
+    .form-field input[type="text"] { width: 200px; }
+    .form-field input[type="number"] { width: 140px; }
+    .form-field select { width: 140px; }
+
+    /* ── Bulk CSV ── */
+    .csv-textarea {
+      width: 100%;
+      font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+      font-size: 12px;
+      padding: 10px;
+      border: 1px solid #ced4da;
+      border-radius: 4px;
+      color: #212529;
+      resize: vertical;
+      margin-bottom: 10px;
+    }
+    .csv-textarea:focus { outline: none; border-color: #4c6ef5; }
+    .csv-preview-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      margin-top: 10px;
+    }
+    .csv-preview-table td {
+      padding: 6px 8px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .csv-preview-table tr:last-child td { border-bottom: none; }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <span class="nav-brand">Retirement Income Planner</span>
+  <div class="nav-links">
+    <a href="/static/income.html" class="nav-link">Income Planning</a>
+    <a href="/static/index.html" class="nav-link">EMR Analysis</a>
+    <a href="/static/tax.html" class="nav-link">Tax Detail</a>
+    <a href="/static/scenarios.html" class="nav-link">Scenarios</a>
+    <a href="/static/accounts.html" class="nav-link active">Accounts</a>
+  </div>
+</nav>
+
+<div class="page">
+  <h1>Accounts</h1>
+
+  <!-- Portfolio Summary -->
+  <div class="section-card">
+    <h2>Portfolio Summary</h2>
+    <div id="summary-container"><p class="empty-state">Loading…</p></div>
+  </div>
+
+  <!-- Accounts List -->
+  <div class="section-card">
+    <h2>Accounts</h2>
+    <div id="accounts-container"><p class="empty-state">Loading…</p></div>
+  </div>
+
+  <!-- Add Account -->
+  <div class="section-card">
+    <h2>Add Account</h2>
+    <div class="add-account-form">
+      <div class="form-field">
+        <label for="new-name">Account Name</label>
+        <input type="text" id="new-name" placeholder="e.g. Fidelity Brokerage">
+      </div>
+      <div class="form-field">
+        <label for="new-type">Account Type</label>
+        <select id="new-type" onchange="onTypeChange()">
+          <option value="taxable">taxable</option>
+          <option value="traditional">traditional</option>
+          <option value="roth">roth</option>
+          <option value="hsa">hsa</option>
+        </select>
+      </div>
+      <div class="form-field" id="new-balance-row" style="display:none;">
+        <label for="new-balance">Balance</label>
+        <input type="number" id="new-balance" min="0" step="any" placeholder="0">
+      </div>
+      <div class="form-field" id="new-contrib-row" style="display:none;">
+        <label for="new-contrib">Annual Contribution</label>
+        <input type="number" id="new-contrib" min="0" step="any" placeholder="0">
+      </div>
+      <div class="form-field" style="justify-content:flex-end;">
+        <button class="btn btn-primary" onclick="submitAddAccount()">Add Account</button>
+      </div>
+    </div>
+    <div id="add-account-message" class="message"></div>
+  </div>
+
+  <!-- Bulk Update (CSV) -->
+  <div class="section-card">
+    <h2>Bulk Update (CSV)</h2>
+    <textarea id="csv-textarea" class="csv-textarea" rows="10"
+      placeholder="account,type,holding,value,basis
+Fidelity Brokerage,taxable,FXAIX,63098.39,20350
+Fidelity Brokerage,taxable,FSKAX,83514.36,40596
+Rollover IRA,traditional,,1000000,
+Roth IRA,roth,,900000,
+HSA,hsa,,100000,5400"></textarea>
+    <div class="action-row">
+      <button class="btn" onclick="previewCSV()">Preview</button>
+      <button class="btn btn-primary" onclick="applyCSV()">Apply</button>
+    </div>
+    <div id="csv-preview"></div>
+    <div id="csv-result"></div>
+  </div>
+</div>
+
+<script>
+  // ── Global state ─────────────────────────────────────────────────────────────
+  let accounts = [];
+  let expandedAccounts = new Set();
+  let editingAccount = null;   // account id being edited
+  let editingHolding = null;   // { accountId, holdingId }
+  let addingHoldingTo = null;  // account id with open "add holding" form
+
+  // ── Utilities ─────────────────────────────────────────────────────────────────
+  function fmt(n) {
+    return '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  }
+
+  function escHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function badge(type) {
+    const styles = {
+      taxable:     'background:#0d6efd;color:#fff',
+      traditional: 'background:#fd7e14;color:#fff',
+      roth:        'background:#198754;color:#fff',
+      hsa:         'background:#0dcaf0;color:#212529',
+    };
+    return `<span class="type-badge" style="${styles[type] || ''}">${escHtml(type)}</span>`;
+  }
+
+  // ── Data loading ──────────────────────────────────────────────────────────────
+  async function loadSummary() {
+    const container = document.getElementById('summary-container');
+    try {
+      const resp = await fetch('/api/accounts/summary');
+      if (!resp.ok) {
+        container.innerHTML = '<p class="empty-state" style="color:#dc2626;">Failed to load summary.</p>';
+        return;
+      }
+      const s = await resp.json();
+      container.innerHTML = `
+        <table class="summary-table">
+          <tr><td>Taxable Value</td><td class="num">${fmt(s.taxable_value)}</td></tr>
+          <tr><td>Taxable Basis</td><td class="num">${fmt(s.taxable_basis)}</td></tr>
+          <tr><td>Taxable Unrealized Gain</td><td class="num">${fmt(s.taxable_unrealized_gain)}</td></tr>
+          <tr><td>Tax-Deferred Balance</td><td class="num">${fmt(s.traditional_balance)}</td></tr>
+          <tr><td>Roth Balance</td><td class="num">${fmt(s.roth_balance)}</td></tr>
+          <tr><td>HSA Balance</td><td class="num">${fmt(s.hsa_balance)}</td></tr>
+          <tr><td>HSA Annual Contribution</td><td class="num">${fmt(s.hsa_annual_contribution)}</td></tr>
+          <tr class="summary-total"><td>Total Portfolio</td><td class="num">${fmt(s.total_portfolio_value)}</td></tr>
+        </table>`;
+    } catch (e) {
+      container.innerHTML = '<p class="empty-state" style="color:#dc2626;">Failed to load summary.</p>';
+    }
+  }
+
+  async function loadAccounts() {
+    const container = document.getElementById('accounts-container');
+    try {
+      const resp = await fetch('/api/accounts');
+      if (!resp.ok) {
+        container.innerHTML = '<p class="empty-state" style="color:#dc2626;">Failed to load accounts.</p>';
+        return;
+      }
+      accounts = await resp.json();
+      // Expand new taxable accounts by default
+      accounts.filter(a => a.account_type === 'taxable' && !expandedAccounts.has(a.id))
+              .forEach(a => expandedAccounts.add(a.id));
+      renderAccounts();
+    } catch (e) {
+      container.innerHTML = '<p class="empty-state" style="color:#dc2626;">Failed to load accounts.</p>';
+    }
+  }
+
+  async function refreshAll() {
+    await Promise.all([loadSummary(), loadAccounts()]);
+  }
+
+  // ── Rendering ─────────────────────────────────────────────────────────────────
+  function renderAccounts() {
+    const container = document.getElementById('accounts-container');
+    if (!accounts.length) {
+      container.innerHTML = '<p class="empty-state">No accounts yet. Add one below.</p>';
+      return;
+    }
+    const typeOrder = ['taxable', 'traditional', 'roth', 'hsa'];
+    const sorted = [...accounts].sort((a, b) => {
+      const ta = typeOrder.indexOf(a.account_type);
+      const tb = typeOrder.indexOf(b.account_type);
+      if (ta !== tb) return ta - tb;
+      return a.name.localeCompare(b.name);
+    });
+    container.innerHTML = sorted.map(a =>
+      a.account_type === 'taxable' ? renderTaxableCard(a) : renderNonTaxableRow(a)
+    ).join('');
+  }
+
+  function renderNonTaxableRow(a) {
+    const id = a.id;
+    if (editingAccount === id) {
+      const hsaField = a.account_type === 'hsa' ? `
+        <div class="edit-field">
+          <label>Annual Contribution</label>
+          <input type="number" id="edit-contrib-${id}" value="${a.annual_contribution ?? ''}" min="0" step="any">
+        </div>` : '';
+      return `
+        <div class="account-row editing" id="account-row-${id}">
+          <div class="edit-form">
+            <div class="edit-fields">
+              <div class="edit-field">
+                <label>Name</label>
+                <input type="text" id="edit-name-${id}" value="${escHtml(a.name)}">
+              </div>
+              <div class="edit-field">
+                <label>Balance</label>
+                <input type="number" id="edit-balance-${id}" value="${a.balance ?? ''}" min="0" step="any">
+              </div>
+              ${hsaField}
+            </div>
+            <div class="action-row" style="margin-top:8px;">
+              <button class="btn btn-primary" onclick="saveAccount('${id}', '${a.account_type}')">Save</button>
+              <button class="btn" onclick="cancelEditAccount()">Cancel</button>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    let info = `Balance: <strong>${fmt(a.balance ?? 0)}</strong>`;
+    if (a.account_type === 'hsa' && a.annual_contribution != null) {
+      info += `&nbsp;&nbsp; Annual Contribution: <strong>${fmt(a.annual_contribution)}</strong>`;
+    }
+    return `
+      <div class="account-row" id="account-row-${id}">
+        <div class="account-row-main">
+          <span class="account-name">${escHtml(a.name)}</span>
+          ${badge(a.account_type)}
+          <span class="account-info">${info}</span>
+          <div class="action-row">
+            <button class="btn" onclick="editAccount('${id}')">Edit</button>
+            <button class="btn btn-danger" onclick="deleteAccount('${id}')">Delete</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function renderTaxableCard(a) {
+    const id = a.id;
+    const expanded = expandedAccounts.has(id);
+    const isEditingName = editingAccount === id;
+
+    const nameSection = isEditingName
+      ? `<span style="display:inline-flex;gap:6px;align-items:center;">
+           <input type="text" id="edit-name-${id}" value="${escHtml(a.name)}"
+             style="padding:4px 8px;font-size:13px;border:1px solid #ced4da;border-radius:4px;width:200px;">
+           <button class="btn btn-primary" onclick="saveAccountName('${id}')">Save</button>
+           <button class="btn" onclick="cancelEditAccountName()">Cancel</button>
+         </span>`
+      : `<span class="account-name">${escHtml(a.name)}</span> ${badge(a.account_type)}`;
+
+    const totals = `Value ${fmt(a.total_value ?? 0)} | Basis ${fmt(a.total_basis ?? 0)} | Gain ${fmt(a.total_unrealized_gain ?? 0)}`;
+
+    const editNameBtn  = isEditingName       ? '' : `<button class="btn" onclick="editAccountName('${id}')">Edit Name</button>`;
+    const addHoldingBtn = addingHoldingTo === id ? '' : `<button class="btn" onclick="showAddHolding('${id}')">Add Holding</button>`;
+
+    let holdingsHtml = '';
+    if (expanded) {
+      const holdings = a.holdings || [];
+      const holdingRows = holdings.map(h => renderHoldingRow(id, h)).join('');
+      const addRow = addingHoldingTo === id ? `
+        <tr>
+          <td><input type="text" id="add-ticker-${id}" placeholder="TICKER"
+            oninput="this.value=this.value.toUpperCase()" style="text-transform:uppercase;"></td>
+          <td><input type="number" id="add-value-${id}" placeholder="Value" min="0" step="any"></td>
+          <td><input type="number" id="add-basis-${id}" placeholder="Basis" min="0" step="any"></td>
+          <td></td>
+          <td>
+            <div class="action-row">
+              <button class="btn btn-primary" onclick="submitAddHolding('${id}')">Add</button>
+              <button class="btn" onclick="cancelAddHolding()">Cancel</button>
+            </div>
+          </td>
+        </tr>` : '';
+
+      holdingsHtml = `
+        <div class="holdings-section">
+          <table class="holdings-table">
+            <thead><tr>
+              <th>Holding</th><th>Value</th><th>Basis</th><th>Unrealized Gain</th><th>Actions</th>
+            </tr></thead>
+            <tbody>${holdingRows}${addRow}</tbody>
+          </table>
+        </div>`;
+    }
+
+    return `
+      <div class="taxable-card" id="account-row-${id}">
+        <div class="taxable-header" onclick="toggleTaxable('${id}')">
+          <span class="expand-icon">${expanded ? '▼' : '▶'}</span>
+          <div class="taxable-header-main" onclick="event.stopPropagation()">
+            ${nameSection}
+            <span class="account-totals">${totals}</span>
+            <div class="action-row">
+              ${editNameBtn}
+              <button class="btn btn-danger" onclick="deleteAccount('${id}')">Delete Account</button>
+              ${addHoldingBtn}
+            </div>
+          </div>
+        </div>
+        ${holdingsHtml}
+      </div>`;
+  }
+
+  function renderHoldingRow(accountId, h) {
+    const hid = h.id;
+    if (editingHolding && editingHolding.accountId === accountId && editingHolding.holdingId === hid) {
+      return `
+        <tr class="editing">
+          <td><input type="text" id="edit-hticker-${hid}" value="${escHtml(h.ticker)}"
+            oninput="this.value=this.value.toUpperCase()" style="text-transform:uppercase;"></td>
+          <td><input type="number" id="edit-hvalue-${hid}" value="${h.value}" min="0" step="any"></td>
+          <td><input type="number" id="edit-hbasis-${hid}" value="${h.basis}" min="0" step="any"></td>
+          <td>${fmt(h.unrealized_gain)}</td>
+          <td>
+            <div class="action-row">
+              <button class="btn btn-primary" onclick="saveHolding('${accountId}', '${hid}')">Save</button>
+              <button class="btn" onclick="cancelEditHolding()">Cancel</button>
+            </div>
+          </td>
+        </tr>`;
+    }
+    return `
+      <tr>
+        <td>${escHtml(h.ticker)}</td>
+        <td>${fmt(h.value)}</td>
+        <td>${fmt(h.basis)}</td>
+        <td>${fmt(h.unrealized_gain)}</td>
+        <td>
+          <div class="action-row">
+            <button class="btn" onclick="editHolding('${accountId}', '${hid}')">Edit</button>
+            <button class="btn btn-danger" onclick="deleteHolding('${accountId}', '${hid}')">Delete</button>
+          </div>
+        </td>
+      </tr>`;
+  }
+
+  // ── Non-taxable account actions ───────────────────────────────────────────────
+  function editAccount(id) {
+    editingAccount = id;
+    editingHolding = null;
+    addingHoldingTo = null;
+    renderAccounts();
+  }
+
+  function cancelEditAccount() {
+    editingAccount = null;
+    renderAccounts();
+  }
+
+  async function saveAccount(id, type) {
+    const name    = document.getElementById(`edit-name-${id}`).value.trim();
+    const balance = parseFloat(document.getElementById(`edit-balance-${id}`).value) || 0;
+    let annual_contribution = null;
+    if (type === 'hsa') {
+      const el = document.getElementById(`edit-contrib-${id}`);
+      if (el) annual_contribution = parseFloat(el.value) || 0;
+    }
+    try {
+      const resp = await fetch(`/api/accounts/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, account_type: type, balance, annual_contribution }),
+      });
+      if (!resp.ok) return;
+      editingAccount = null;
+      await refreshAll();
+    } catch (e) {
+      console.error('saveAccount error:', e);
+    }
+  }
+
+  async function deleteAccount(id) {
+    try {
+      await fetch(`/api/accounts/${id}`, { method: 'DELETE' });
+      expandedAccounts.delete(id);
+      if (editingAccount === id) editingAccount = null;
+      await refreshAll();
+    } catch (e) {
+      console.error('deleteAccount error:', e);
+    }
+  }
+
+  // ── Taxable account actions ───────────────────────────────────────────────────
+  function toggleTaxable(id) {
+    if (expandedAccounts.has(id)) expandedAccounts.delete(id);
+    else expandedAccounts.add(id);
+    renderAccounts();
+  }
+
+  function editAccountName(id) {
+    editingAccount = id;
+    editingHolding = null;
+    renderAccounts();
+  }
+
+  function cancelEditAccountName() {
+    editingAccount = null;
+    renderAccounts();
+  }
+
+  async function saveAccountName(id) {
+    const account = accounts.find(a => a.id === id);
+    if (!account) return;
+    const name = document.getElementById(`edit-name-${id}`).value.trim();
+    try {
+      const resp = await fetch(`/api/accounts/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          account_type: account.account_type,
+          balance: account.balance,
+          annual_contribution: account.annual_contribution,
+        }),
+      });
+      if (!resp.ok) return;
+      editingAccount = null;
+      await refreshAll();
+    } catch (e) {
+      console.error('saveAccountName error:', e);
+    }
+  }
+
+  function showAddHolding(id) {
+    addingHoldingTo = id;
+    editingHolding = null;
+    renderAccounts();
+  }
+
+  function cancelAddHolding() {
+    addingHoldingTo = null;
+    renderAccounts();
+  }
+
+  async function submitAddHolding(id) {
+    const ticker = (document.getElementById(`add-ticker-${id}`).value || '').trim().toUpperCase();
+    const value  = parseFloat(document.getElementById(`add-value-${id}`).value) || 0;
+    const basis  = parseFloat(document.getElementById(`add-basis-${id}`).value) || 0;
+    if (!ticker) return;
+    try {
+      const resp = await fetch(`/api/accounts/${id}/holdings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticker, value, basis }),
+      });
+      if (!resp.ok) return;
+      addingHoldingTo = null;
+      await refreshAll();
+    } catch (e) {
+      console.error('submitAddHolding error:', e);
+    }
+  }
+
+  function editHolding(accountId, holdingId) {
+    editingHolding = { accountId, holdingId };
+    editingAccount = null;
+    renderAccounts();
+  }
+
+  function cancelEditHolding() {
+    editingHolding = null;
+    renderAccounts();
+  }
+
+  async function saveHolding(accountId, holdingId) {
+    const ticker = (document.getElementById(`edit-hticker-${holdingId}`).value || '').trim().toUpperCase();
+    const value  = parseFloat(document.getElementById(`edit-hvalue-${holdingId}`).value) || 0;
+    const basis  = parseFloat(document.getElementById(`edit-hbasis-${holdingId}`).value) || 0;
+    try {
+      const resp = await fetch(`/api/accounts/${accountId}/holdings/${holdingId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticker, value, basis }),
+      });
+      if (!resp.ok) return;
+      editingHolding = null;
+      await refreshAll();
+    } catch (e) {
+      console.error('saveHolding error:', e);
+    }
+  }
+
+  async function deleteHolding(accountId, holdingId) {
+    try {
+      await fetch(`/api/accounts/${accountId}/holdings/${holdingId}`, { method: 'DELETE' });
+      await refreshAll();
+    } catch (e) {
+      console.error('deleteHolding error:', e);
+    }
+  }
+
+  // ── Add Account form ──────────────────────────────────────────────────────────
+  function onTypeChange() {
+    const type = document.getElementById('new-type').value;
+    document.getElementById('new-balance-row').style.display = type === 'taxable' ? 'none' : '';
+    document.getElementById('new-contrib-row').style.display = type === 'hsa'     ? ''     : 'none';
+  }
+
+  async function submitAddAccount() {
+    const name  = document.getElementById('new-name').value.trim();
+    const type  = document.getElementById('new-type').value;
+    const msgEl = document.getElementById('add-account-message');
+    msgEl.textContent = '';
+    msgEl.className = 'message';
+
+    if (!name) {
+      msgEl.textContent = 'Account name is required.';
+      msgEl.className = 'message error';
+      return;
+    }
+
+    const body = { name, account_type: type };
+    if (type !== 'taxable') {
+      body.balance = parseFloat(document.getElementById('new-balance').value) || 0;
+    }
+    if (type === 'hsa') {
+      body.annual_contribution = parseFloat(document.getElementById('new-contrib').value) || 0;
+    }
+
+    try {
+      const resp = await fetch('/api/accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!resp.ok) {
+        msgEl.textContent = 'Failed to create account.';
+        msgEl.className = 'message error';
+        return;
+      }
+      document.getElementById('new-name').value    = '';
+      document.getElementById('new-balance').value = '';
+      document.getElementById('new-contrib').value = '';
+      await refreshAll();
+    } catch (e) {
+      msgEl.textContent = 'Failed to create account.';
+      msgEl.className = 'message error';
+    }
+  }
+
+  // ── Bulk CSV ──────────────────────────────────────────────────────────────────
+  function parseCSV(text) {
+    const lines = text.trim().split('\n').map(l => l.trim()).filter(l => l);
+    if (!lines.length) return { error: 'No data provided.' };
+
+    const header = lines[0].toLowerCase().replace(/\s/g, '');
+    if (header !== 'account,type,holding,value,basis') {
+      return { error: 'First row must be: account,type,holding,value,basis' };
+    }
+
+    const rows = [];
+    const errors = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const parts = lines[i].split(',');
+      if (parts.length < 4) {
+        errors.push(`Row ${i + 1}: not enough columns`);
+        continue;
+      }
+      const account  = parts[0].trim();
+      const type     = parts[1].trim().toLowerCase();
+      const holding  = parts[2].trim();
+      const valueStr = parts[3].trim();
+      const basisStr = (parts[4] || '').trim();
+
+      if (!account) { errors.push(`Row ${i + 1}: account name is required`); continue; }
+      if (!['taxable', 'traditional', 'roth', 'hsa'].includes(type)) {
+        errors.push(`Row ${i + 1}: invalid type "${type}"`);
+        continue;
+      }
+      const value = parseFloat(valueStr);
+      if (isNaN(value)) { errors.push(`Row ${i + 1}: invalid value "${valueStr}"`); continue; }
+      const basis = basisStr ? (parseFloat(basisStr) || 0) : 0;
+
+      rows.push({ account, type, holding, value, basis });
+    }
+
+    return { rows, errors };
+  }
+
+  function groupCSVRows(rows) {
+    const groups = new Map();
+    for (const row of rows) {
+      const key = `${row.account.toLowerCase()}|${row.type}`;
+      if (!groups.has(key)) groups.set(key, { account: row.account, type: row.type, rows: [] });
+      groups.get(key).rows.push(row);
+    }
+    return Array.from(groups.values()).map(group => {
+      const existing = accounts.find(
+        a => a.name.toLowerCase() === group.account.toLowerCase() && a.account_type === group.type
+      );
+      return { ...group, existing };
+    });
+  }
+
+  function previewCSV() {
+    const text = document.getElementById('csv-textarea').value;
+    const previewContainer = document.getElementById('csv-preview');
+    const { rows, errors, error } = parseCSV(text);
+
+    if (error) {
+      previewContainer.innerHTML = `<p class="message error">${escHtml(error)}</p>`;
+      return;
+    }
+
+    const actions = groupCSVRows(rows);
+    let html = '<table class="csv-preview-table"><tbody>';
+
+    for (const action of actions) {
+      if (action.existing) {
+        if (action.type === 'taxable') {
+          const n = action.rows.length;
+          html += `<tr><td>Will update: <strong>${escHtml(action.account)}</strong> (replace ${n} holding${n !== 1 ? 's' : ''})</td></tr>`;
+        } else {
+          html += `<tr><td>Will update: <strong>${escHtml(action.account)}</strong> (update balance)</td></tr>`;
+        }
+      } else {
+        const n = action.rows.filter(r => r.holding).length;
+        const detail = action.type === 'taxable' ? `, ${n} holding${n !== 1 ? 's' : ''}` : '';
+        html += `<tr><td>Will create: <strong>${escHtml(action.account)}</strong> (${action.type}${detail})</td></tr>`;
+      }
+    }
+    for (const e of errors) {
+      html += `<tr><td style="color:#dc2626;">Error: ${escHtml(e)}</td></tr>`;
+    }
+    html += '</tbody></table>';
+    previewContainer.innerHTML = html;
+  }
+
+  async function applyCSV() {
+    const text = document.getElementById('csv-textarea').value;
+    const resultContainer = document.getElementById('csv-result');
+    const { rows, errors: parseErrors, error } = parseCSV(text);
+
+    if (error) {
+      resultContainer.innerHTML = `<p class="message error">${escHtml(error)}</p>`;
+      return;
+    }
+
+    const actions    = groupCSVRows(rows);
+    const applyErrors = [...parseErrors];
+    let updated = 0, created = 0;
+
+    for (const action of actions) {
+      try {
+        if (action.existing) {
+          const id = action.existing.id;
+          if (action.type === 'taxable') {
+            for (const h of (action.existing.holdings || [])) {
+              await fetch(`/api/accounts/${id}/holdings/${h.id}`, { method: 'DELETE' });
+            }
+            for (const row of action.rows) {
+              if (row.holding) {
+                await fetch(`/api/accounts/${id}/holdings`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ ticker: row.holding, value: row.value, basis: row.basis }),
+                });
+              }
+            }
+          } else {
+            const firstRow = action.rows[0];
+            await fetch(`/api/accounts/${id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                name: action.existing.name,
+                account_type: action.type,
+                balance: firstRow.value,
+                annual_contribution: action.type === 'hsa' ? firstRow.basis : action.existing.annual_contribution,
+              }),
+            });
+          }
+          updated++;
+        } else {
+          const firstRow = action.rows[0];
+          const body = {
+            name: action.account,
+            account_type: action.type,
+            balance: action.type === 'taxable' ? null : firstRow.value,
+            annual_contribution: action.type === 'hsa' ? firstRow.basis : null,
+          };
+          const resp = await fetch('/api/accounts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          });
+          if (resp.ok && action.type === 'taxable') {
+            const newAccount = await resp.json();
+            for (const row of action.rows) {
+              if (row.holding) {
+                await fetch(`/api/accounts/${newAccount.id}/holdings`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ ticker: row.holding, value: row.value, basis: row.basis }),
+                });
+              }
+            }
+          }
+          created++;
+        }
+      } catch (e) {
+        applyErrors.push(`Failed to process "${action.account}": ${e.message}`);
+      }
+    }
+
+    await refreshAll();
+    document.getElementById('csv-preview').innerHTML = '';
+
+    const summary = `Updated ${updated} account${updated !== 1 ? 's' : ''}, created ${created} account${created !== 1 ? 's' : ''}, ${applyErrors.length} error${applyErrors.length !== 1 ? 's' : ''}`;
+    let html = `<p class="message ${applyErrors.length ? 'error' : 'success'}">${escHtml(summary)}</p>`;
+    for (const e of applyErrors) {
+      html += `<p class="message error">${escHtml(e)}</p>`;
+    }
+    resultContainer.innerHTML = html;
+  }
+
+  // ── Init ──────────────────────────────────────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', () => {
+    onTypeChange();
+    refreshAll();
+  });
+</script>
+</body>
+</html>
