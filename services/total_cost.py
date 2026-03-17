@@ -120,7 +120,6 @@ def calculate_total_cost(
     include_ohio: bool = False,
     ohio_medical_deduction: Decimal = _ZERO,
     ohio_qualifying_retirement_income: Decimal = _ZERO,
-    aptc_monthly: Decimal = _ZERO,
     include_aca: bool = False,
 ) -> TotalCostResult:
     fixed_ordinary = pension + interest + ordinary_dividends + ira_distributions

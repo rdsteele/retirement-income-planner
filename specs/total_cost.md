@@ -41,7 +41,7 @@ class TotalCostPoint:
     # ACA additions
     aca_magi: Decimal               # ACA MAGI at this sweep point
     aptc_annual: Decimal            # APTC at this sweep point
-    aca_subsidy_loss: Decimal       # cumulative subsidy lost vs max
+    aca_subsidy_loss: Decimal       # cumulative subsidy lost vs baseline
     emr_aca: Decimal                # ACA marginal cost component
     # Total
     total_cost_emr: Decimal         # emr + emr_aca
@@ -55,7 +55,11 @@ class TotalCostResult:
     filing_status: str
     # ACA summary
     aca_cliff_magi: Decimal
-    aptc_annual_max: Decimal        # APTC at sweep_floor (planning baseline)
+    aptc_annual_max: Decimal        # APTC at floor_aca_magi (the ACA MAGI at sweep_floor).
+                                    # This is the planning baseline — subsidy available
+                                    # at the start of the sweep. If sweep_floor is above
+                                    # the lowest schedule point, some subsidy may already
+                                    # be lost before the sweep begins.
     cliff_sweep_value: Decimal      # sweep_value where ACA cliff occurs
 
 def calculate_total_cost(
@@ -71,6 +75,7 @@ def calculate_total_cost(
     above_the_line_adjustments: Decimal = Decimal('0'),
     additional_deductions: Decimal = Decimal('0'),
     sweep_mode: SweepMode = SweepMode.ORDINARY,
+    variable_ordinary: Decimal = Decimal('0'),
     filing_status: str = 'single',
     tax_year: int = 2026,
     sweep_floor: Decimal = Decimal('0'),
@@ -80,8 +85,10 @@ def calculate_total_cost(
     ohio_medical_deduction: Decimal = Decimal('0'),
     ohio_qualifying_retirement_income: Decimal = Decimal('0'),
     # ACA parameters
-    aptc_monthly: Decimal = Decimal('0'),    # known APTC from marketplace
     include_aca: bool = False,               # False = no ACA overlay
+    # APTC amounts are read directly from the ACA schedule in
+    # data/aca/aca_{year}.json via calculate_aca_subsidy(). No caller-supplied
+    # APTC amount is needed — the schedule provides the full APTC curve.
 ) -> TotalCostResult:
     ...
 ```
@@ -94,51 +101,52 @@ emr_result = calculate_emr(
     pension=pension,
     interest=interest,
     # ... all pass-through params
+    extra_boundary_points=extra_boundary_points,  # ACA cliff + schedule MAGIs
 )
 ```
 
 ### 2. ACA MAGI at Each Sweep Point
-```
-aca_magi = agi + tax_exempt_interest
-```
-Where `agi` is already computed inside the EMR service at each point.
-Since we can't access the internal AGI directly, reconstruct it:
+
+ACA MAGI is reconstructed from the EMR point fields:
 
 ```
 aca_magi = (
-    fixed_ordinary
-    + sweep_value                      # variable ordinary (ORDINARY mode)
-    + ss_taxable                       # from EMRPoint.ss_taxable
-    + total_preferential               # fixed + sweep (PREFERENTIAL mode)
+    fixed_ordinary          # pension + interest + ordinary_dividends + ira_distributions
+    + qualified_dividends   # fixed preferential components only
+    + fixed_ltcg
+    + sweep_value           # variable income being swept
+    + ss_taxable            # from EMRPoint.ss_taxable at this point
     - above_the_line_adjustments
     + tax_exempt_interest
 )
 ```
 
-Where `fixed_ordinary = pension + interest + ordinary_dividends + ira_distributions`
-and `total_preferential = qualified_dividends + fixed_ltcg` (ORDINARY mode)
-or `qualified_dividends + fixed_ltcg + sweep_value` (PREFERENTIAL mode).
+**PREFERENTIAL mode adjustment:** When `sweep_mode = PREFERENTIAL`, `variable_ordinary`
+is added into `fixed_ordinary` before the sweep so the formula remains consistent.
+`sweep_value` in this case represents variable LTCG, not variable ordinary income.
+
+**Note:** `qualified_dividends + fixed_ltcg` represents the *fixed* preferential
+components only. The sweep variable is always captured separately as `sweep_value`,
+regardless of mode.
 
 ### 3. ACA Subsidy at Each Sweep Point
 ```python
 aca_result = calculate_aca_subsidy(
     magi=aca_magi,
-    slcsp_annual_premium=Decimal('0'),   # not needed when known_aptc provided
     filing_status=filing_status,
     tax_year=tax_year,
-    known_aptc_annual=aptc_monthly * 12,
+    baseline_magi=floor_aca_magi,   # ACA MAGI at sweep_floor
 )
 ```
 
 ### 4. ACA EMR Component
-The ACA contribution to EMR is a step function at the cliff:
 ```
 emr_aca = aca_result.marginal_subsidy_loss / _EMR_COMPUTE_STEP
 ```
 
-Where `_EMR_COMPUTE_STEP` matches the value used in `emr.py` (currently $1,000).
-This produces `emr_aca = known_aptc_annual / 1000` at the cliff crossing point
-and `0` everywhere else.
+Where `_EMR_COMPUTE_STEP = 1000` (shared with `emr.py`).
+`marginal_subsidy_loss` is expressed as annual APTC dollars lost per $1,000 of
+MAGI, so dividing by 1000 gives the EMR rate contribution.
 
 **Note on cliff spike magnitude:** For a $6,240 annual APTC over a $1,000
 compute step, `emr_aca = 6.24 = 624%`. This will exceed the y-axis cap.
@@ -159,27 +167,28 @@ when `aca_magi = cliff_magi`. Solve for `sweep_value`:
 cliff_sweep_value = (
     cliff_magi
     - fixed_ordinary
-    - ss_taxable_at_cliff        # approximate: use ss_taxable at sweep_floor
-    + above_the_line_adjustments
-    - tax_exempt_interest
-)
-```
-
-**PREFERENTIAL mode:**
-```
-cliff_sweep_value = (
-    cliff_magi
-    - fixed_ordinary
-    - ss_taxable_at_floor
-    + above_the_line_adjustments
-    - tax_exempt_interest
-    - fixed_ltcg
     - qualified_dividends
+    - fixed_ltcg
+    - ss_taxable_at_floor        # approximate: use ss_taxable at sweep_floor
+    + above_the_line_adjustments
+    - tax_exempt_interest
 )
 ```
 
-Pass `cliff_sweep_value` as an additional boundary point to `calculate_emr()`
-via a new optional parameter `extra_boundary_points: list[Decimal] | None`.
+**PREFERENTIAL mode:** Same formula, but `fixed_ordinary` already includes
+`variable_ordinary` (added at the top of `calculate_total_cost()`), so
+the formula is consistent across both modes.
+
+**Schedule MAGI boundary injection:** In addition to the cliff boundary point,
+all ACA schedule MAGI values (from `get_aptc_schedule_magis()`) that fall within
+the sweep range are converted to sweep values using the same formula and injected
+as extra boundary points. This ensures the gradual subsidy slope between schedule
+points is accurately represented without being smeared across the $1,000 compute
+window. Both the cliff and all in-range schedule points are passed together via
+`extra_boundary_points` to `calculate_emr()`.
+
+Pass all boundary points to `calculate_emr()` via the `extra_boundary_points`
+parameter.
 
 ### 7. When include_aca = False
 All ACA fields are zero. `total_cost_emr = emr`. Behavior identical to
@@ -190,21 +199,30 @@ calling `calculate_emr()` directly.
 ```
 calculate_total_cost()
     │
-    ├── calculate_emr()          → EMRResult (tax sweep with boundaries)
-    │                                        
+    ├── calculate_emr() [floor only, sweep_ceiling=sweep_floor]
+    │       → ss_taxable_at_floor, floor_aca_magi
+    │
+    ├── calculate_aca_subsidy(floor_aca_magi)
+    │       → cliff_magi, aptc_annual_max
+    │
+    ├── compute cliff_sweep_value + schedule boundary points
+    │
+    ├── calculate_emr() [full sweep, extra_boundary_points injected]
+    │       → EMRResult
+    │
     └── for each EMRPoint:
-            calculate_aca_subsidy()  → ACAResult
+            calculate_aca_subsidy(aca_magi, baseline=floor_aca_magi)
             combine → TotalCostPoint
-    
+
     → TotalCostResult
 ```
 
 ## EMR Service Extension
 
-Add `extra_boundary_points: list[Decimal] | None = None` parameter to
-`calculate_emr()`. These are merged with the existing boundary points list
-before deduplication and sorting. This allows the total cost layer to inject
-the ACA cliff boundary without modifying `emr.py`'s internal boundary logic.
+`calculate_emr()` accepts `extra_boundary_points: list[Decimal] | None = None`.
+These are merged with the existing boundary points list before deduplication
+and sorting. This allows the total cost layer to inject the ACA cliff and
+schedule MAGI boundaries without modifying `emr.py`'s internal boundary logic.
 
 ## Worked Example — 2026 Single Filer
 
@@ -213,13 +231,13 @@ Inputs (from spreadsheet):
 - qualified_dividends=$2,594, fixed_ltcg=$21,819
 - above_the_line_adjustments=$5,300, additional_deductions=$23
 - ss_benefit=$0, tax_exempt_interest=$0
-- aptc_monthly=$520, include_aca=True
+- include_aca=True
 - sweep_mode=ORDINARY, filing_status=single, tax_year=2026
 
 At sweep_value=$38,900 (approximate stacking spike from 2025 analysis):
 - aca_magi ≈ $38,900 + $5,177 - $5,323 = $38,754 (well below $62,600 cliff)
-- emr_aca = 0
-- total_cost_emr = emr (tax only)
+- emr_aca = 0 (in gradual slope zone, but small)
+- total_cost_emr ≈ emr (tax only)
 
 At cliff crossing (~sweep_value=$59,046):
 - aca_magi = $62,600
@@ -234,11 +252,13 @@ Above cliff:
 
 `tests/unit/test_total_cost.py`:
 1. `include_aca=False` produces identical results to `calculate_emr()`
-2. ACA MAGI computed correctly at each sweep point
-3. `emr_aca=0` below cliff, spike at cliff, `0` above cliff
-4. `total_cost_emr = emr + emr_aca` at all points
-5. Cliff boundary point inserted at correct sweep_value
-6. ORDINARY and PREFERENTIAL modes both compute cliff correctly
+2. ACA MAGI computed correctly at each sweep point (ORDINARY mode)
+3. ACA MAGI computed correctly at each sweep point (PREFERENTIAL mode)
+4. `emr_aca=0` below cliff (outside gradual slope), spike at cliff, `0` above cliff
+5. `total_cost_emr = emr + emr_aca` at all points
+6. Cliff boundary point inserted at correct sweep_value
+7. Schedule MAGI boundary points injected within sweep range
+8. ORDINARY and PREFERENTIAL modes both compute cliff correctly
 
 `tests/functional/test_total_cost_route.py` — deferred until API route exists.
 
@@ -247,4 +267,3 @@ Above cliff:
 The total cost service is built and tested standalone. The FastAPI route and
 frontend integration come in Phase 3 (income planning page). The service is
 the foundation.
-

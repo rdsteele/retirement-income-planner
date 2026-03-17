@@ -71,7 +71,7 @@ _CLIFF_MAGI = D("62600")
 
 class TestNoAca:
     def setup_method(self):
-        self.tc = calculate_total_cost(**_BASE, aptc_monthly=_APTC_MONTHLY, include_aca=False)
+        self.tc = calculate_total_cost(**_BASE, include_aca=False)
         self.emr = calculate_emr(
             pension=_BASE["pension"],
             interest=_BASE["interest"],
@@ -130,7 +130,7 @@ class TestNoAca:
 
 class TestAcaMagi:
     def setup_method(self):
-        self.tc = calculate_total_cost(**_BASE, aptc_monthly=_APTC_MONTHLY, include_aca=True)
+        self.tc = calculate_total_cost(**_BASE, include_aca=True)
         self.fixed_ordinary = (
             _BASE["pension"] + _BASE["interest"]
             + _BASE["ordinary_dividends"] + _BASE["ira_distributions"]
@@ -162,7 +162,7 @@ class TestAcaMagi:
 
 class TestEmrAca:
     def setup_method(self):
-        self.tc = calculate_total_cost(**_BASE, aptc_monthly=_APTC_MONTHLY, include_aca=True)
+        self.tc = calculate_total_cost(**_BASE, include_aca=True)
         self.cliff_magi = self.tc.aca_cliff_magi
 
     def test_emr_aca_nonneg_below_cliff(self):
@@ -202,7 +202,7 @@ class TestEmrAca:
 
 class TestTotalCostEmr:
     def setup_method(self):
-        self.tc = calculate_total_cost(**_BASE, aptc_monthly=_APTC_MONTHLY, include_aca=True)
+        self.tc = calculate_total_cost(**_BASE, include_aca=True)
 
     def test_total_cost_emr_equals_emr_plus_emr_aca(self):
         for p in self.tc.points:
@@ -217,7 +217,7 @@ class TestTotalCostEmr:
 
 class TestCliffBoundaryInsertion:
     def setup_method(self):
-        self.tc = calculate_total_cost(**_BASE, aptc_monthly=_APTC_MONTHLY, include_aca=True)
+        self.tc = calculate_total_cost(**_BASE, include_aca=True)
 
     def test_cliff_sweep_value_in_result(self):
         assert self.tc.cliff_sweep_value > D("0")
@@ -273,7 +273,6 @@ class TestPreferentialMode:
             sweep_floor=D("0"),
             sweep_ceiling=D("50000"),
             sweep_step=D("1000"),
-            aptc_monthly=_APTC_MONTHLY,
             include_aca=True,
         )
 
@@ -331,7 +330,6 @@ class TestCliffSweepValueFormula:
             sweep_floor=D("0"),
             sweep_ceiling=D("50000"),
             sweep_step=D("1000"),
-            aptc_monthly=D("520"),
             include_aca=True,
         )
         assert tc.cliff_sweep_value == D("24561")
@@ -349,7 +347,6 @@ class TestCliffSweepValueFormula:
             sweep_floor=D("0"),
             sweep_ceiling=D("50000"),
             sweep_step=D("1000"),
-            aptc_monthly=D("520"),
             include_aca=True,
         )
         assert tc.cliff_sweep_value == D("32600")
@@ -370,7 +367,6 @@ class TestCliffSweepValueFormula:
             sweep_floor=D("0"),
             sweep_ceiling=D("50000"),
             sweep_step=D("1000"),
-            aptc_monthly=D("520"),
             include_aca=True,
         )
         assert tc.cliff_sweep_value == D("23600")

@@ -1,8 +1,8 @@
 # Spec: EMR Visualization Frontend
 
-**Version:** 1.0
+**Version:** 1.1
 **Status:** Draft
-**Covers:** `api/static/index.html`
+**Covers:** `api/static/emr.html`
 
 ---
 
@@ -20,14 +20,18 @@ FastAPI serves the file as a static asset. `api/main.py` mounts:
 ```python
 app.mount("/static", StaticFiles(directory="api/static"), name="static")
 ```
-And adds a root redirect:
+And adds route redirects:
 ```python
 @app.get("/")
 async def root():
-    return RedirectResponse(url="/static/index.html")
+    return RedirectResponse(url="/static/income.html")
+
+@app.get("/emr")
+async def emr_page():
+    return RedirectResponse(url="/static/emr.html")
 ```
 
-Accessible at `http://localhost:8000` after `uvicorn api.main:app --reload`.
+Accessible at `http://localhost:8000/emr` after `uvicorn api.main:app --reload`.
 
 A favicon is embedded as an inline SVG data URI in `<head>` — no separate file needed:
 ```html

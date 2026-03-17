@@ -26,4 +26,9 @@ app.mount("/static", StaticFiles(directory="api/static"), name="static")
 
 @app.get("/")
 async def root():
-    return RedirectResponse(url="/static/index.html")
+    return RedirectResponse(url="/static/income.html")
+
+
+@app.get("/emr")
+async def emr():
+    return RedirectResponse(url="/static/emr.html")

@@ -20,8 +20,8 @@ ACA subsidy planning, and annual withdrawal planning. Runs entirely on
 localhost — no cloud, no authentication.
 
 ## Pages
-- Income Planning (income.html) — withdrawal mix, MAGI planning, ACA cliff
-- EMR Analysis (index.html) — effective marginal rate sweep chart
+- Income Planning (income.html) — withdrawal mix, MAGI planning, ACA cliff [default /]
+- EMR Analysis (emr.html) — effective marginal rate sweep chart [/emr]
 - Tax Detail (tax.html) — point-in-time federal + Ohio tax breakdown
 - Scenarios (scenarios.html) — save/load/export/import named plans
 - Accounts (accounts.html) — account inventory CRUD + bulk CSV update
@@ -45,7 +45,7 @@ localhost — no cloud, no authentication.
 - Specs in specs/ directory
 
 ## Current State
-- Tests: 529 passing, 97%+ coverage
+- Tests: 530 passing, 97%+ coverage
 - CI: ruff, mypy, pytest, bandit, pip-audit on every push
 
 I want to design: [FEATURE NAME]
@@ -69,13 +69,13 @@ Tech stack: FastAPI, vanilla JS, Plotly, local JSON file storage, Python 3.12+
 Pages: Income Planning, EMR Analysis, Tax Detail, Scenarios, Accounts
 Services: federal_tax, ohio_tax, social_security, emr, aca, total_cost,
           accounts, scenarios, data_loader
-Tests: 529 passing (update this number before each session)
+Tests: 530 passing (update this number before each session)
 Python 3.12+, single filer only, tax years 2025/2026
 
 Here is the spec for what I want to build today:
 [UPLOAD SPEC FILE]
 
-Current test count: 529. All must still pass.
+Current test count: 530. All must still pass.
 Please read the spec carefully before writing any code.
 ```
 
@@ -95,7 +95,7 @@ Tech stack: FastAPI, vanilla JS, Plotly, local JSON file storage, Python 3.12+
 Pages: Income Planning, EMR Analysis, Tax Detail, Scenarios, Accounts
 Services: federal_tax, ohio_tax, social_security, emr, aca, total_cost,
           accounts, scenarios, data_loader
-Tests: 529 passing
+Tests: 530 passing
 Python 3.12+
 
 I'm seeing this issue: [DESCRIPTION OF PROBLEM]
@@ -111,27 +111,49 @@ any source files directly related to the issue.
 
 ---
 
-## Spec Review / Audit Session
+## Spec Audit Session (chat, not Claude Code)
 
 ```
 I'm working on a Python/FastAPI retirement income planning application.
 
 GitHub: https://github.com/rdsteele/retirement-income-planner
-Tests: 529 passing
+Tests: 530 passing
 
-I want to audit the code against the specs to find any discrepancies,
-missing coverage, or areas where the implementation has drifted from
-the design.
+Fetch the spec at [SPEC_URL] and review it against the code pasted below.
 
-Please review the uploaded spec and identify:
-1. Any spec requirements not reflected in the implementation
-2. Any implementation behavior not covered by the spec
-3. Any inconsistencies between the spec and actual behavior
+Identify and format as a numbered list:
+1. Spec requirements not reflected in the implementation
+2. Implementation behavior not covered by the spec
+3. Inconsistencies between spec and actual behavior
 4. Suggested spec updates to reflect current implementation
+
+For each finding: describe the discrepancy, cite the spec section and
+code location, and recommend whether to update the spec or the code.
+
+[PASTE CODE HERE]
 ```
 
-**Recommended files to upload:** the spec(s) to audit, plus relevant
-source files from services/ and api/
+**Spec raw URLs:**
+```
+https://raw.githubusercontent.com/rdsteele/retirement-income-planner/main/specs/aca.md
+https://raw.githubusercontent.com/rdsteele/retirement-income-planner/main/specs/emr.md
+https://raw.githubusercontent.com/rdsteele/retirement-income-planner/main/specs/fastapi_emr_route.md
+https://raw.githubusercontent.com/rdsteele/retirement-income-planner/main/specs/federal_tax.md
+https://raw.githubusercontent.com/rdsteele/retirement-income-planner/main/specs/frontend_emr.md
+https://raw.githubusercontent.com/rdsteele/retirement-income-planner/main/specs/ohio_tax.md
+https://raw.githubusercontent.com/rdsteele/retirement-income-planner/main/specs/social_security.md
+https://raw.githubusercontent.com/rdsteele/retirement-income-planner/main/specs/total_cost.md
+```
+
+**Service raw URLs:**
+```
+https://raw.githubusercontent.com/rdsteele/retirement-income-planner/main/services/aca.py
+https://raw.githubusercontent.com/rdsteele/retirement-income-planner/main/services/emr.py
+https://raw.githubusercontent.com/rdsteele/retirement-income-planner/main/services/federal_tax.py
+https://raw.githubusercontent.com/rdsteele/retirement-income-planner/main/services/ohio_tax.py
+https://raw.githubusercontent.com/rdsteele/retirement-income-planner/main/services/social_security.py
+https://raw.githubusercontent.com/rdsteele/retirement-income-planner/main/services/total_cost.py
+```
 
 ---
 
@@ -144,3 +166,4 @@ source files from services/ and api/
 - App config and bracket data is in data/ and committed
 - All pages use vanilla JS, no frameworks
 - Plotly is served locally from api/static/plotly-2.26.0.min.js
+- Default landing page is Income Planning (/). EMR Analysis is at /emr.

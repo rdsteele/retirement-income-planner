@@ -36,7 +36,13 @@ def test_missing_config_returns_500(monkeypatch, tmp_path):
     assert "config.json" in resp.json()["detail"]
 
 
-def test_root_redirects_to_index():
+def test_root_redirects_to_income():
     resp = client.get("/", follow_redirects=False)
     assert resp.status_code in (301, 302, 307, 308)
-    assert "/static/index.html" in resp.headers["location"]
+    assert "/static/income.html" in resp.headers["location"]
+
+
+def test_emr_redirects_to_emr():
+    resp = client.get("/emr", follow_redirects=False)
+    assert resp.status_code in (301, 302, 307, 308)
+    assert "/static/emr.html" in resp.headers["location"]

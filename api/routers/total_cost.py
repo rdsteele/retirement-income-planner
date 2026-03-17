@@ -224,7 +224,6 @@ def post_total_cost(request: TotalCostRequest):
             ohio_medical_deduction=_to_decimal(request.ohio_medical_deduction),
             ohio_qualifying_retirement_income=_to_decimal(
                 request.ohio_qualifying_retirement_income),
-            aptc_monthly=_to_decimal(request.aptc_monthly),
             include_aca=request.include_aca,
         )
     except ValueError as exc:

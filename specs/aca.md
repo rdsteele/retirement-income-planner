@@ -95,9 +95,11 @@ class ACAResult:
     distance_to_cliff: Decimal       # cliff_magi - magi (negative if over)
     is_eligible: bool                # True if magi < cliff_magi and above
                                      # lowest schedule point
-    marginal_subsidy_loss: Decimal   # subsidy lost per $1 of additional income
-                                     # (slope between adjacent schedule points,
-                                     # or full APTC at cliff crossing)
+    marginal_subsidy_loss: Decimal   # annual APTC dollars lost per $1,000 of
+                                     # additional MAGI (matches _EMR_COMPUTE_STEP
+                                     # in total_cost.py so emr_aca = this / 1000);
+                                     # spikes to full annual APTC at cliff crossing,
+                                     # 0 above cliff or below schedule minimum
 
 def calculate_aca_subsidy(
     magi: Decimal,
@@ -105,6 +107,10 @@ def calculate_aca_subsidy(
     tax_year: int,
     baseline_magi: Decimal | None = None,  # MAGI for subsidy_loss reference
                                            # defaults to lowest schedule point
+    slcsp_annual_premium: Decimal = Decimal('0'),
+                                     # Second Lowest Cost Silver Plan annual premium.
+                                     # Only used when aptc_schedule is empty for the
+                                     # filing status (formula fallback path).
 ) -> ACAResult:
     ...
 ```
@@ -164,6 +170,14 @@ This fallback requires `slcsp_annual_premium` as an additional parameter.
 It is less accurate than the schedule-based approach for enrollees with
 age-rated premiums.
 
+**Note on formula fallback marginal loss:** In the formula fallback path,
+`marginal_subsidy_loss` spikes to the full annual APTC at the cliff crossing
+and is `0` everywhere else. The gradual slope is not modeled in the fallback
+because the applicable percentage formula requires a full SLCSP premium curve
+to compute accurately. This is an acceptable simplification since the formula
+fallback is only used for filing statuses with no configured schedule (e.g. MFJ
+when `aptc_schedule.mfj` is empty).
+
 ### 4. Subsidy Loss
 
 ```
@@ -176,23 +190,35 @@ rises toward and above the cliff.
 
 ### 5. Marginal Subsidy Loss
 
-The marginal subsidy loss at a given MAGI is the rate of subsidy decline:
+The marginal subsidy loss at a given MAGI is expressed as annual APTC dollars
+lost per $1,000 of additional MAGI, consistent with `_EMR_COMPUTE_STEP = 1000`
+in `total_cost.py` (so that `emr_aca = marginal_subsidy_loss / 1000`):
 
 ```
-# Below cliff — slope between adjacent schedule points:
+# Below cliff — slope between adjacent schedule points (per $1,000 MAGI):
 marginal_subsidy_loss = (
-    (upper.aptc_annual - lower.aptc_annual) / (upper.magi - lower.magi)
-) × (-1)   # negative slope → positive loss rate
+    (lower.aptc_annual - upper.aptc_annual) / (upper.magi - lower.magi)
+) × 1000
 
-# At cliff crossing:
-marginal_subsidy_loss = aptc_annual_just_below_cliff  # full loss
+# Exception: last interval before cliff (upper.magi >= cliff_magi) → 0
+# because the {cliff_magi, 0} schedule entry represents the cliff drop,
+# not a gradual slope to be modeled continuously.
+
+# At cliff crossing (magi == cliff_magi):
+marginal_subsidy_loss = aptc_annual_just_below_cliff  # full annual APTC
 
 # Above cliff:
 marginal_subsidy_loss = 0  # already lost
+
+# Below schedule minimum:
+marginal_subsidy_loss = 0
 ```
 
-This is what creates the EMR component — both the gradual slope below the
-cliff and the spike at the cliff crossing.
+This produces:
+- A small positive `emr_aca` component for each $1,000 of income in the
+  gradual slope zone (typically 1–3% per $1,000)
+- A large spike at the cliff crossing (`emr_aca = full_aptc / 1000`,
+  e.g. 624% for a $6,240 annual APTC)
 
 ### 6. Distance to Cliff
 ```
@@ -295,7 +321,7 @@ Unit tests in `tests/unit/test_aca.py`:
 4. At cliff — returns last non-zero APTC, distance_to_cliff=0
 5. One dollar over cliff — returns zero APTC, full subsidy_loss
 6. Subsidy loss correct vs baseline MAGI
-7. Marginal subsidy loss correct between schedule points (gradual slope)
-8. Marginal subsidy loss spikes at cliff crossing
+7. Marginal subsidy loss correct between schedule points (gradual slope, per $1,000)
+8. Marginal subsidy loss spikes at cliff crossing (full annual APTC)
 9. Empty schedule falls back to formula calculation
 10. MFJ cliff uses correct threshold

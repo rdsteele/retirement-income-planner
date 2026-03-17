@@ -1,6 +1,6 @@
 # Spec: Effective Marginal Rate (EMR) Service
 
-**Version:** 1.0
+**Version:** 1.1
 **Status:** Draft
 **Covers:** `services/emr.py`
 
@@ -26,6 +26,28 @@ This service composes:
 - `services/federal_tax.py` — ordinary and preferential tax calculation
 - `services/social_security.py` — SS taxability given provisional income
 - `services/ohio_tax.py` — Ohio state tax, included as an optional component
+
+---
+
+## Implementation Notes
+
+### EMR Compute Step
+The service uses `_EMR_COMPUTE_STEP = Decimal("1000")` as the finite-difference
+window for all EMR calculations — comparing tax at `sweep_value` vs
+`sweep_value + $1,000` rather than a $1 step. This eliminates alternating
+whole-dollar rounding noise in the Ohio and NIIT components, producing smooth
+curves at the cost of slightly reduced positional precision near bracket edges.
+
+`total_cost.py` uses the same constant so that
+`emr_aca = marginal_subsidy_loss / 1000` is consistent with the tax EMR
+calculation.
+
+### Extra Boundary Points
+`calculate_emr()` accepts an optional `extra_boundary_points: list[Decimal] | None`
+parameter. These are merged with the internally computed boundary points before
+deduplication and sorting. This allows callers (e.g. `total_cost.py`) to inject
+additional boundaries such as the ACA cliff and ACA schedule MAGI points without
+modifying the EMR service's internal boundary logic.
 
 ---
 
@@ -65,15 +87,16 @@ output so the visualization knows what is on the x-axis.
 
 ### Mode and Sweep Inputs
 
-| Field                  | Type         | Default                        | Description                     |
-|------------------------|--------------|--------------------------------|---------------------------------|
-| `sweep_mode`           | `SweepMode`  | required                       | `ORDINARY` or `PREFERENTIAL`    |
-| `variable_ordinary`    | `Decimal`    | `0` (PREFERENTIAL mode only)   | Fixed IRA/Roth amount when sweeping preferential |
-| `sweep_floor`          | `Decimal`    | `Decimal('0')`                 | Start of sweep range            |
-| `sweep_ceiling`        | `Decimal`    | top of 24% bracket             | End of sweep range              |
-| `sweep_step`           | `Decimal`    | `Decimal('100')`               | Increment between sweep points  |
-| `filing_status`        | `str`        | required                       | `"single"` or `"mfj"`          |
-| `tax_year`             | `int`        | required                       | e.g. `2025`                     |
+| Field                   | Type                    | Default                        | Description                     |
+|-------------------------|-------------------------|--------------------------------|---------------------------------|
+| `sweep_mode`            | `SweepMode`             | required                       | `ORDINARY` or `PREFERENTIAL`    |
+| `variable_ordinary`     | `Decimal`               | `0` (PREFERENTIAL mode only)   | Fixed IRA/Roth amount when sweeping preferential |
+| `sweep_floor`           | `Decimal`               | `Decimal('0')`                 | Start of sweep range            |
+| `sweep_ceiling`         | `Decimal`               | top of 24% bracket             | End of sweep range              |
+| `sweep_step`            | `Decimal`               | `Decimal('100')`               | Increment between sweep points  |
+| `filing_status`         | `str`                   | required                       | `"single"` or `"mfj"`          |
+| `tax_year`              | `int`                   | required                       | e.g. `2025`                     |
+| `extra_boundary_points` | `list[Decimal] \| None` | `None`                         | Additional sweep values to insert as exact boundary points, merged with internally computed boundaries before deduplication and sorting |
 
 ### Ohio Inputs (all optional)
 
@@ -111,7 +134,7 @@ Returns an `EMRResult` dataclass:
 | `income`               | `Decimal` | Variable income level at this point                      |
 | `total_tax`            | `Decimal` | Total tax at this income level (federal + Ohio if included) |
 | `emr`                  | `Decimal` | EMR on next dollar (4 decimal places)                    |
-| `emr_ordinary`         | `Decimal` | EMR component: actual marginal ordinary rate (0 below standard deduction) |
+| `emr_ordinary`         | `Decimal` | EMR component: actual marginal ordinary rate (0 below standard deduction; always 0 in PREFERENTIAL mode) |
 | `emr_ss_torpedo`       | `Decimal` | EMR component: additional rate from SS becoming taxable  |
 | `emr_pref_stacking`    | `Decimal` | EMR component: additional rate from preferential stacking|
 | `emr_niit`             | `Decimal` | EMR component: NIIT rate on preferential income          |
@@ -161,7 +184,8 @@ the amount of SS that becomes taxable, which is an important planning interactio
 ### 5. AGI and Taxable Income
 ```
 agi = total_ordinary + ss_taxable + total_preferential - above_the_line_adjustments
-taxable_ordinary = max(0, total_ordinary + ss_taxable - standard_deduction - additional_deductions)
+taxable_ordinary = max(0, total_ordinary + ss_taxable - standard_deduction
+                           - additional_deductions - above_the_line_adjustments)
 ```
 `above_the_line_adjustments` reduces AGI before SS taxability flows to Ohio.
 `additional_deductions` reduces taxable ordinary income below the standard deduction
@@ -175,9 +199,20 @@ Call `federal_tax` service with:
 - `filing_status`, `tax_year`
 
 ### 7. NIIT
+
+NIIT applies to net investment income (NII). The NII base includes both
+preferential income and ordinary investment income (interest and ordinary
+dividends), as these are passive investment income. IRA and RMD withdrawals
+are ordinary income and do not count toward NII, but they increase MAGI,
+which can push fixed NII into the NIIT range in ORDINARY mode.
+
+Internally, `investment_ordinary = interest + ordinary_dividends` is computed
+as the ordinary income component of NII. The full NII base is
+`investment_ordinary + total_preferential`.
+
 ```
 if agi > niit_threshold:
-    niit_base = min(total_preferential, agi - niit_threshold)
+    niit_base = min(investment_ordinary + total_preferential, agi - niit_threshold)
     niit = round_tax(niit_base × 0.038)
 else:
     niit = 0
@@ -212,15 +247,22 @@ Where `ohio_tax = 0` if `include_ohio = False`.
 
 ### 10. EMR Calculation
 ```
-emr = (total_tax(sweep_value + sweep_step) - total_tax(sweep_value)) / sweep_step
+emr = (total_tax(sweep_value + _EMR_COMPUTE_STEP) - total_tax(sweep_value)) / _EMR_COMPUTE_STEP
 ```
 Rounded to 4 decimal places. Computed by calling the full tax calculation
-twice — once at `sweep_value`, once at `sweep_value + sweep_step`.
+twice — once at `sweep_value`, once at `sweep_value + _EMR_COMPUTE_STEP`
+(where `_EMR_COMPUTE_STEP = 1000`). See Implementation Notes for rationale.
 
 ### 11. EMR Component Attribution
 Components must sum to `emr` (within rounding tolerance):
 
-**`emr_ordinary`** — actual marginal federal ordinary tax rate at this sweep point. Below the standard deduction (where `taxable_ordinary = 0`), `emr_ordinary = 0` because no federal ordinary tax is owed on the next dollar. At and above the standard deduction, `emr_ordinary` equals the statutory bracket rate at the top dollar of `taxable_ordinary`. This ensures all components reflect actual marginal cost and sum correctly to `emr`.
+**`emr_ordinary`** — actual marginal federal ordinary tax rate at this sweep point.
+Below the standard deduction (where `taxable_ordinary = 0`), `emr_ordinary = 0`
+because no federal ordinary tax is owed on the next dollar. At and above the
+standard deduction, `emr_ordinary` equals the statutory bracket rate at the top
+dollar of `taxable_ordinary`. In PREFERENTIAL mode, `emr_ordinary = 0` at all
+points because ordinary income is fixed — no ordinary tax delta occurs as
+preferential income is swept.
 
 **`emr_ss_torpedo`** — additional EMR from SS becoming taxable. Non-zero only when
 `ss_benefit > 0` and provisional income is in an active torpedo range:
@@ -242,12 +284,12 @@ Where `preferential_rate_delta` is the rate difference at the stacking boundary
 **`emr_niit`** — NIIT component. Non-zero only when MAGI crosses or is above the
 NIIT threshold:
 ```
-emr_niit = 0.038 × (niit_base_delta / sweep_step)
+emr_niit = 0.038 × (niit_base_delta / _EMR_COMPUTE_STEP)
 ```
 
 **`emr_ohio`** — Ohio state tax component. Non-zero only when `include_ohio = True`:
 ```
-emr_ohio = (ohio_tax(sweep_value + sweep_step) - ohio_tax(sweep_value)) / sweep_step
+emr_ohio = (ohio_tax(sweep_value + _EMR_COMPUTE_STEP) - ohio_tax(sweep_value)) / _EMR_COMPUTE_STEP
 ```
 Approximately 2.75% on most ordinary income after exemption. Steps to 3.125% above
 $100,000 Ohio tax base. Zero in the zero-rate bracket (Ohio tax base ≤ $26,050).
@@ -261,6 +303,7 @@ points at known thresholds to ensure sharp transitions in the visualization:
 - SS maximum taxability point (where 85% cap is reached)
 - NIIT threshold
 - Standard deduction exhaustion point
+- Any points supplied via `extra_boundary_points` (e.g. ACA cliff from `total_cost.py`)
 
 Boundary points are deduplicated and sorted. The final array is ordered ascending
 by `income`.
@@ -293,14 +336,14 @@ These thresholds have not been inflation-adjusted since NIIT was enacted in 2013
 #### NIIT Base — Net Investment Income
 
 ```
-niit_base = interest + ordinary_dividends + qualified_dividends + fixed_ltcg + sweep_variable
+niit_base = investment_ordinary + total_preferential
 ```
 
-Where `sweep_variable` is:
-- In **ORDINARY mode**: the variable ordinary income being swept (IRA/RMD withdrawals
-  are ordinary income, not NII — but they increase MAGI, pushing fixed NII into NIIT range)
-- In **PREFERENTIAL mode**: the variable preferential income being swept (each additional
-  dollar of LTCG is simultaneously NII and MAGI)
+Where:
+- `investment_ordinary = interest + ordinary_dividends` (passive investment
+  income that counts as NII; not IRA/RMD withdrawals)
+- `total_preferential = qualified_dividends + fixed_ltcg` (ORDINARY mode)
+  or `qualified_dividends + fixed_ltcg + sweep_value` (PREFERENTIAL mode)
 
 **Important:** IRA and RMD withdrawals are ordinary income and do **not** count toward NII.
 Only passive investment income (interest, dividends, LTCG) counts. This distinction matters
@@ -343,7 +386,7 @@ is why income ranges that appear to be in the "0% LTCG bracket" are actually sub
 
 #### Implementation Note
 
-NIIT logic is implemented directly in `services/emr.py` (`_compute_niit_at_point`).
+NIIT logic is implemented directly in `services/emr.py` (`_compute_niit`).
 There is no separate `niit.py` service because NIIT has no independent use case outside
 the EMR calculation — it is always computed as part of the total tax snapshot.
 
@@ -475,6 +518,7 @@ capacity before the 15% rate applies.
 - `fixed_ordinary`: `35000`
 - `taxable_ordinary`: `20000` (35000 − 15000 standard deduction)
 - 0% LTCG space: `48350 − 20000 − 2000 = 26350` — LTCG at 0% up to `26350`
+- `emr_ordinary = 0` at all points (PREFERENTIAL mode — ordinary income is fixed)
 
 **Selected sweep points:**
 
@@ -511,6 +555,8 @@ in the output array (boundary insertion rule).
 | `include_ohio = True`, `ohio_medical_deduction = 0` | Ohio EMR slightly overstated — documented simplification |
 | Unsupported `tax_year` or `filing_status`         | Raise `ValueError`                                        |
 | `sweep_step` larger than sweep range              | Return boundary points only                               |
+| `sweep_mode = PREFERENTIAL`                       | `emr_ordinary = 0` at all points                          |
+| `extra_boundary_points` provided                  | Merged with internal boundaries, deduplicated and sorted  |
 
 ---
 
