@@ -38,6 +38,8 @@ entirely on your machine — no cloud, no accounts, no data leaves your computer
 - Social Security taxability: torpedo calculation across both tiers
 - IRMAA reference thresholds displayed on EMR chart
 
+![Income Planning](docs/income-planning-1.png)
+
 ---
 
 ## Requirements
@@ -82,6 +84,9 @@ the Income Planning page.
 |---|---|---|
 | Income Planning | `/` | Main planning page — spending, income, withdrawals, Tax Map |
 | EMR Analysis | `/emr` | Detailed effective marginal rate sweep chart |
+
+![EMR Analysis](docs/emr-1.png)
+
 | Tax Detail | `/tax` | Point-in-time federal and Ohio tax breakdown |
 | Scenarios | `/scenarios` | Save, load, export, and import named scenarios |
 | Accounts | `/accounts` | Manage portfolio accounts and balances |
