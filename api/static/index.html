@@ -252,6 +252,31 @@
     }
 
     #chart { width: 100%; height: 500px; }
+
+    /* ── Scenario bar ── */
+    .scenario-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 0 8px;
+      font-size: 13px;
+      border-bottom: 1px solid #dee2e6;
+      margin-bottom: 14px;
+    }
+    .scenario-name { color: #495057; text-decoration: none; flex: 1; }
+    .scenario-name:hover { color: #1a1a2e; }
+    .scenario-btn {
+      padding: 3px 10px;
+      font-size: 12px;
+      border: 1px solid #ced4da;
+      border-radius: 4px;
+      background: #fff;
+      cursor: pointer;
+      color: #495057;
+      white-space: nowrap;
+    }
+    .scenario-btn:hover:not(:disabled) { background: #f0f2f5; }
+    .scenario-btn:disabled { opacity: 0.45; cursor: default; }
   </style>
 </head>
 <body>
@@ -262,10 +287,14 @@
     <a href="/static/income.html" class="nav-link">Income Planning</a>
     <a href="/static/index.html" class="nav-link active">EMR Analysis</a>
     <a href="/static/tax.html" class="nav-link">Tax Detail</a>
+    <a href="/static/scenarios.html" class="nav-link">Scenarios</a>
   </div>
 </nav>
 
 <div class="page">
+  <div class="scenario-bar">
+    <a class="scenario-name" id="scenario-name-display" href="/static/scenarios.html">📋 No scenario loaded</a>
+  </div>
   <h1>EMR Analyzer</h1>
 
   <div class="two-col">
@@ -498,7 +527,91 @@
   el('tax_year').addEventListener('change', updateSweepCeilingHint);
   el('filing_status').addEventListener('change', updateSweepCeilingHint);
 
-  Promise.all([loadConfig(), loadTaxYears()]).then(() => runBtn.click());
+  // ── Scenario management ───────────────────────────────────────────────────
+  let currentScenarioName = null;
+
+  function updateScenarioBar() {
+    const display = el('scenario-name-display');
+    if (display) display.textContent = currentScenarioName
+      ? '📋 ' + currentScenarioName
+      : '📋 No scenario loaded';
+  }
+
+  function setField(id, value) {
+    const e = el(id);
+    if (!e || value == null) return;
+    if (e.type === 'checkbox') e.checked = Boolean(value);
+    else e.value = value;
+  }
+
+  function populateSharedInputs(scenario) {
+    const inp  = scenario.inputs  || {};
+    const ohio = scenario.ohio    || {};
+    const aca  = scenario.aca     || {};
+    const ip   = scenario.income_planning || {};
+
+    const tradSum = (ip.trad_withdrawals || []).reduce((s, w) => s + (w.amount || 0), 0);
+    const gainSum = (ip.withdrawals      || []).reduce((s, w) => s + Math.max(0, (w.amount || 0) - (w.basis || 0)), 0);
+
+    setField('tax_year',                           inp.tax_year);
+    setField('filing_status',                      inp.filing_status);
+    setField('pension',                            inp.pension);
+    setField('interest',                           inp.interest);
+    setField('ordinary_dividends',                 inp.ordinary_dividends);
+    setField('qualified_dividends',                inp.qualified_dividends);
+    setField('ira_distributions',                  (inp.ira_distributions || 0) + tradSum);
+    setField('ss_benefit',                         inp.ss_benefit);
+    setField('fixed_ltcg',                         (inp.fixed_ltcg || 0) + gainSum);
+    setField('tax_exempt_interest',                inp.tax_exempt_interest);
+    setField('above_the_line_adjustments',         inp.above_the_line_adjustments);
+    setField('additional_deductions',              inp.additional_deductions);
+    setField('wages',                              inp.wages);
+    setField('include_ohio',                       ohio.include_ohio);
+    setField('ohio_medical_deduction',             ohio.gross_medical_expenses);
+    setField('gross_medical_expenses',             ohio.gross_medical_expenses);
+    setField('ohio_qualifying_retirement_income',  ohio.ohio_qualifying_retirement_income);
+    setField('include_aca',                        aca.include_aca);
+    // Trigger ohio visibility
+    if (ohio.include_ohio != null) {
+      const checked = Boolean(ohio.include_ohio);
+      el('ohio-medical-wrap')?.classList.toggle('hidden', !checked);
+      el('ohio-retirement-wrap')?.classList.toggle('hidden', !checked);
+    }
+  }
+
+  function populatePageInputs(scenario) {
+    const emr = scenario.emr_settings || {};
+    if (emr.sweep_mode != null) {
+      setField('sweep_mode', emr.sweep_mode);
+      el('variable-ordinary-wrap')?.classList.toggle('hidden', emr.sweep_mode !== 'preferential');
+    }
+    setField('variable_ordinary',    emr.variable_ordinary);
+    setField('sweep_floor',          emr.sweep_floor);
+    if (el('sweep_ceiling')) el('sweep_ceiling').value = emr.sweep_ceiling ?? '';
+    setField('sweep_step',           emr.sweep_step);
+    setField('irmaa_inflation_adj',  emr.irmaa_adjust);
+    setField('irmaa_inflation_rate', emr.irmaa_inflation_rate);
+  }
+
+  async function loadCurrentScenario() {
+    try {
+      const resp = await fetch('/api/scenarios/current');
+      if (!resp.ok) return;
+      const { name } = await resp.json();
+      currentScenarioName = name || null;
+      updateScenarioBar();
+      if (!currentScenarioName) return;
+      const sResp = await fetch(`/api/scenarios/${encodeURIComponent(currentScenarioName)}`);
+      if (!sResp.ok) return;
+      const scenario = await sResp.json();
+      populateSharedInputs(scenario);
+      populatePageInputs(scenario);
+    } catch (_) {}
+  }
+
+  Promise.all([loadConfig(), loadTaxYears()])
+    .then(() => loadCurrentScenario())
+    .then(() => runBtn.click());
 
   // ── Build payload ─────────────────────────────────────────────────────────
   function buildPayload() {

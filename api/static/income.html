@@ -406,6 +406,31 @@
     }
     .acct-details[open] > summary::before { transform: rotate(90deg); }
 
+    /* ── Scenario bar ── */
+    .scenario-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 0 8px;
+      font-size: 13px;
+      border-bottom: 1px solid #dee2e6;
+      margin-bottom: 14px;
+    }
+    .scenario-name { color: #495057; text-decoration: none; flex: 1; }
+    .scenario-name:hover { color: #1a1a2e; }
+    .scenario-btn {
+      padding: 3px 10px;
+      font-size: 12px;
+      border: 1px solid #ced4da;
+      border-radius: 4px;
+      background: #fff;
+      cursor: pointer;
+      color: #495057;
+      white-space: nowrap;
+    }
+    .scenario-btn:hover:not(:disabled) { background: #f0f2f5; }
+    .scenario-btn:disabled { opacity: 0.45; cursor: default; }
+
     /* ── Account subtotals row ── */
     .acct-subtotals {
       display: flex;
@@ -428,10 +453,16 @@
     <a href="/static/income.html" class="nav-link active">Income Planning</a>
     <a href="/static/index.html" class="nav-link">EMR Analysis</a>
     <a href="/static/tax.html" class="nav-link">Tax Detail</a>
+    <a href="/static/scenarios.html" class="nav-link">Scenarios</a>
   </div>
 </nav>
 
 <div class="page">
+  <div class="scenario-bar">
+    <a class="scenario-name" id="scenario-name-display" href="/static/scenarios.html">📋 No scenario loaded</a>
+    <button class="scenario-btn" id="save-btn" disabled>Save</button>
+    <button class="scenario-btn" id="save-as-btn">Save As</button>
+  </div>
   <h1>Income Planning</h1>
 
   <div class="two-col">
@@ -482,7 +513,7 @@
             <div class="field"><label>Taxable Interest</label><input type="number" id="interest" min="0" step="1" placeholder="0"></div>
             <div class="field"><label>Non-Qualified Dividends</label><input type="number" id="ordinary_dividends" min="0" step="1" placeholder="0"><span class="field-hint">Ordinary dividends minus qualified dividends (1040 line 3b minus 3a)</span></div>
             <div class="field"><label>Qualified Dividends</label><input type="number" id="qualified_dividends" min="0" step="1" placeholder="0"></div>
-            <div class="field"><label>Tax-Deferred Distributions</label><input type="number" id="rmds" min="0" step="1" placeholder="0"><span class="field-hint">Traditional IRA/401k withdrawals, RMDs, and Roth conversions (1040 line 4b)</span></div>
+            <div class="field"><label>Tax-Deferred Distributions</label><input type="number" id="ira_distributions" min="0" step="1" placeholder="0"><span class="field-hint">Traditional IRA/401k withdrawals, RMDs, and Roth conversions (1040 line 4b)</span></div>
             <div class="field"><label>Social Security Benefit</label><input type="number" id="ss_benefit" min="0" step="1" placeholder="0"><span class="field-hint">Gross annual SS benefit</span></div>
             <div class="field"><label>Fixed LTCG</label><input type="number" id="fixed_ltcg" min="0" step="1" placeholder="0"><span class="field-hint">Known capital gain distributions or forced sales</span></div>
           </div>
@@ -492,7 +523,7 @@
         <details>
           <summary>Adjustments</summary>
           <div class="section-body">
-            <div class="field field-wide"><label>HSA Contribution</label><input type="number" id="hsa_contribution" min="0" step="1" placeholder="0"><span class="field-hint">Above-the-line deduction; pre-filled from accounts if available</span></div>
+            <div class="field field-wide"><label>HSA Contribution</label><input type="number" id="above_the_line_adjustments" min="0" step="1" placeholder="0"><span class="field-hint">Above-the-line deduction; pre-filled from accounts if available</span></div>
           </div>
         </details>
 
@@ -746,7 +777,7 @@
       if (!resp.ok) throw new Error('Failed to load summary');
       const summary = await resp.json();
       if (summary.hsa_annual_contribution > 0) {
-        el('hsa_contribution').value = summary.hsa_annual_contribution;
+        el('above_the_line_adjustments').value = summary.hsa_annual_contribution;
       }
       renderPortfolioSummary(summary);
     } catch (_) {
@@ -968,11 +999,11 @@
     const pension            = fnum('pension');
     const interest           = fnum('interest');
     const ordinaryDividends  = fnum('ordinary_dividends');
-    const rmds               = fnum('rmds');
+    const iraDistributions   = fnum('ira_distributions');
     const fixedLtcg          = fnum('fixed_ltcg');
     const ssBenefit          = fnum('ss_benefit');
     const qualifiedDividends = fnum('qualified_dividends');
-    const hsaContribution    = fnum('hsa_contribution');
+    const hsaContribution    = fnum('above_the_line_adjustments');
     const essential          = fnum('essential_spending');
     const discretionary      = fnum('discretionary_spending');
     const totalSpending      = essential + discretionary;
@@ -982,7 +1013,7 @@
 
     // Provisional income for SS taxability approximation
     const provisionalIncome =
-      pension + interest + ordinaryDividends + rmds
+      pension + interest + ordinaryDividends + iraDistributions
       + qualifiedDividends + fixedLtcg + totalGainWithdrawals + totalTradWithdrawals
       - hsaContribution + ssBenefit * 0.50;
 
@@ -990,18 +1021,18 @@
 
     // Income breakdown: ordinary stack vs. preferential stack
     const plannedOrdinary =
-      pension + interest + ordinaryDividends + rmds
+      pension + interest + ordinaryDividends + iraDistributions
       + totalTradWithdrawals + ssTaxableApprox - hsaContribution;
     const plannedPref     = qualifiedDividends + fixedLtcg + totalGainWithdrawals;
     const magi            = plannedOrdinary + plannedPref;
 
     const distance            = acaCliffMagi - magi;
-    const forcedIncome        = pension + interest + ordinaryDividends + rmds
+    const forcedIncome        = pension + interest + ordinaryDividends + iraDistributions
                                 + qualifiedDividends + fixedLtcg + ssBenefit;
     const totalTaxableWithdrawals = totalBasisWithdrawals + totalGainWithdrawals;
     const totalAllWithdrawals     = totalTaxableWithdrawals + totalTradWithdrawals + totalRothWithdrawals + totalHsaWithdrawals;
     const totalExpenses           = totalSpending + hsaContribution + estimatedTaxes;
-    const forcedOrdinary          = pension + interest + ordinaryDividends + rmds + ssBenefit;
+    const forcedOrdinary          = pension + interest + ordinaryDividends + iraDistributions + ssBenefit;
     const forcedPref              = qualifiedDividends + fixedLtcg;
     const withdrawalOrdinary      = totalTradWithdrawals;
     const withdrawalPref          = totalGainWithdrawals;
@@ -1094,11 +1125,11 @@
       pension:                    fnum('pension'),
       interest:                   fnum('interest'),
       ordinary_dividends:         fnum('ordinary_dividends'),
-      inherited_ira_rmd:          fnum('rmds') + calcTrad,
+      ira_distributions:          fnum('ira_distributions') + calcTrad,
       ss_benefit:                 fnum('ss_benefit'),
       qualified_dividends:        fnum('qualified_dividends'),
       fixed_ltcg:                 fnum('fixed_ltcg') + calcGains,
-      above_the_line_adjustments: fnum('hsa_contribution'),
+      above_the_line_adjustments: fnum('above_the_line_adjustments'),
       sweep_mode:                 'ordinary',
       filing_status:              'single',
       tax_year:                   parseInt(el('tax_year')?.value) || 2026,
@@ -1401,8 +1432,197 @@
   // ── Update MAGI on blur of any input field ────────────────────────────
   document.addEventListener('focusout', updateMagi);
 
+  // ── Scenario management ───────────────────────────────────────────────
+  let currentScenarioName = null;
+
+  function updateScenarioBar() {
+    const display = el('scenario-name-display');
+    const saveBtn = el('save-btn');
+    if (display) display.textContent = currentScenarioName
+      ? '📋 ' + currentScenarioName
+      : '📋 No scenario loaded';
+    if (saveBtn) saveBtn.disabled = !currentScenarioName;
+  }
+
+  function setField(id, value) {
+    const e = el(id);
+    if (!e || value == null) return;
+    if (e.type === 'checkbox') e.checked = Boolean(value);
+    else e.value = value;
+  }
+
+  function fnumFirst(...ids) {
+    for (const id of ids) {
+      if (el(id)) return parseFloat(el(id).value) || 0;
+    }
+    return 0;
+  }
+
+  function gatherSharedInputs() {
+    return {
+      inputs: {
+        tax_year:                   parseInt(el('tax_year')?.value) || 2026,
+        pension:                    fnum('pension'),
+        interest:                   fnum('interest'),
+        ordinary_dividends:         fnum('ordinary_dividends'),
+        qualified_dividends:        fnum('qualified_dividends'),
+        ira_distributions:          fnum('ira_distributions'),
+        ss_benefit:                 fnum('ss_benefit'),
+        fixed_ltcg:                 fnum('fixed_ltcg'),
+        above_the_line_adjustments: fnum('above_the_line_adjustments'),
+      },
+      aca: { include_aca: el('include_aca')?.checked ?? true },
+    };
+  }
+
+  function populateSharedInputs(scenario) {
+    const inp = scenario.inputs || {};
+    const aca = scenario.aca    || {};
+    setField('tax_year',                   inp.tax_year);
+    setField('pension',                    inp.pension);
+    setField('interest',                   inp.interest);
+    setField('ordinary_dividends',         inp.ordinary_dividends);
+    setField('qualified_dividends',        inp.qualified_dividends);
+    setField('ira_distributions',          inp.ira_distributions);
+    setField('ss_benefit',                 inp.ss_benefit);
+    setField('fixed_ltcg',                 inp.fixed_ltcg);
+    setField('above_the_line_adjustments', inp.above_the_line_adjustments);
+    setField('include_aca',                aca.include_aca);
+  }
+
+  function gatherPageInputs() {
+    const withdrawals     = [];
+    const tradWithdrawals = [];
+    const rothWithdrawals = [];
+    const hsaWithdrawals  = [];
+
+    for (const acct of accounts) {
+      if (acct.account_type === 'taxable' && acct.holdings) {
+        for (const h of acct.holdings) {
+          const w = parseFloat(el(`withdraw_${h.id}`)?.value) || 0;
+          const b = parseFloat(el(`basis_${h.id}`)?.value)   || 0;
+          withdrawals.push({ id: h.id, amount: w, basis: b });
+        }
+      } else if (acct.account_type === 'traditional') {
+        tradWithdrawals.push({ id: acct.id, amount: parseFloat(el(`trad_${acct.id}`)?.value) || 0 });
+      } else if (acct.account_type === 'roth') {
+        rothWithdrawals.push({ id: acct.id, amount: parseFloat(el(`roth_${acct.id}`)?.value) || 0 });
+      } else if (acct.account_type === 'hsa') {
+        hsaWithdrawals.push({ id: acct.id, amount: parseFloat(el(`hsa_${acct.id}`)?.value) || 0 });
+      }
+    }
+
+    return {
+      income_planning: {
+        essential_spending:    fnum('essential_spending'),
+        discretionary_spending: fnum('discretionary_spending'),
+        withdrawals,
+        trad_withdrawals: tradWithdrawals,
+        roth_withdrawals: rothWithdrawals,
+        hsa_withdrawals:  hsaWithdrawals,
+      },
+    };
+  }
+
+  function populatePageInputs(scenario) {
+    const ip = scenario.income_planning || {};
+    setField('essential_spending',     ip.essential_spending);
+    setField('discretionary_spending', ip.discretionary_spending);
+    for (const w of (ip.withdrawals || [])) {
+      setField(`withdraw_${w.id}`, w.amount);
+      if (w.basis != null) setField(`basis_${w.id}`, w.basis);
+    }
+    for (const w of (ip.trad_withdrawals || [])) setField(`trad_${w.id}`, w.amount);
+    for (const w of (ip.roth_withdrawals || [])) setField(`roth_${w.id}`, w.amount);
+    for (const w of (ip.hsa_withdrawals  || [])) setField(`hsa_${w.id}`,  w.amount);
+  }
+
+  async function loadCurrentScenario() {
+    try {
+      const resp = await fetch('/api/scenarios/current');
+      if (!resp.ok) return;
+      const { name } = await resp.json();
+      currentScenarioName = name || null;
+      updateScenarioBar();
+      if (!currentScenarioName) return;
+      const sResp = await fetch(`/api/scenarios/${encodeURIComponent(currentScenarioName)}`);
+      if (!sResp.ok) return;
+      const scenario = await sResp.json();
+      populateSharedInputs(scenario);
+      populatePageInputs(scenario);
+    } catch (_) {}
+  }
+
+  async function saveCurrentScenario() {
+    if (!currentScenarioName) return;
+    try {
+      let existing = {};
+      try {
+        const r = await fetch(`/api/scenarios/${encodeURIComponent(currentScenarioName)}`);
+        if (r.ok) existing = await r.json();
+      } catch (_) {}
+      const shared = gatherSharedInputs();
+      const data = {
+        ...existing,
+        name: currentScenarioName,
+        saved_at: new Date().toISOString().slice(0, 19),
+        version: '1.0',
+        inputs: { ...(existing.inputs || {}), ...shared.inputs },
+        aca:    { ...(existing.aca    || {}), ...shared.aca    },
+        ...gatherPageInputs(),
+      };
+      await fetch(`/api/scenarios/${encodeURIComponent(currentScenarioName)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+    } catch (_) {}
+  }
+
+  async function saveAsScenario() {
+    const name = prompt('Enter scenario name:');
+    if (!name || !name.trim()) return;
+    const trimmed = name.trim();
+    let existing = {};
+    try {
+      const r = await fetch(`/api/scenarios/${encodeURIComponent(trimmed)}`);
+      if (r.ok) {
+        existing = await r.json();
+        if (!confirm(`"${trimmed}" already exists. Overwrite?`)) return;
+      }
+    } catch (_) {}
+    try {
+      const shared = gatherSharedInputs();
+      const data = {
+        ...existing,
+        name: trimmed,
+        saved_at: new Date().toISOString().slice(0, 19),
+        version: '1.0',
+        inputs: { ...(existing.inputs || {}), ...shared.inputs },
+        aca:    { ...(existing.aca    || {}), ...shared.aca    },
+        ...gatherPageInputs(),
+      };
+      await fetch(`/api/scenarios/${encodeURIComponent(trimmed)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      await fetch('/api/scenarios/current', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: trimmed }),
+      });
+      currentScenarioName = trimmed;
+      updateScenarioBar();
+    } catch (_) {}
+  }
+
+  el('save-btn')?.addEventListener('click', saveCurrentScenario);
+  el('save-as-btn')?.addEventListener('click', saveAsScenario);
+
   // ── Page load ─────────────────────────────────────────────────────────
   Promise.all([loadConfig(), loadTaxYears(), loadAccounts(), loadAccountsSummary()])
+    .then(() => loadCurrentScenario())
     .then(() => { updateMagi(); updateAcaVisibility(); });
 </script>
 </body>

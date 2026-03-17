@@ -85,7 +85,7 @@ def _compute_zero_ordinary_space(
     std_ded = _get_standard_deduction(request.tax_year, request.filing_status)
     fixed_ordinary = (
         request.pension + request.interest
-        + request.ordinary_dividends + request.inherited_ira_rmd
+        + request.ordinary_dividends + request.ira_distributions
     )
     if mode == SweepMode.PREFERENTIAL:
         fixed_ordinary += request.variable_ordinary
@@ -206,7 +206,7 @@ def post_total_cost(request: TotalCostRequest):
             pension=_to_decimal(request.pension),
             interest=_to_decimal(request.interest),
             ordinary_dividends=_to_decimal(request.ordinary_dividends),
-            ira_distributions=_to_decimal(request.inherited_ira_rmd),
+            ira_distributions=_to_decimal(request.ira_distributions),
             ss_benefit=_to_decimal(request.ss_benefit),
             qualified_dividends=_to_decimal(request.qualified_dividends),
             fixed_ltcg=_to_decimal(request.fixed_ltcg),

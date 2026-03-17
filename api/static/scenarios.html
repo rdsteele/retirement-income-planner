@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Scenarios — Retirement Income Planner</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      background: #f8f9fa;
+      color: #212529;
+      padding: 12px 16px;
+    }
+
+    /* ── Nav bar ── */
+    .navbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 0 12px;
+      margin-bottom: 0;
+      border-bottom: 1px solid #dee2e6;
+    }
+    .nav-brand { font-weight: 700; font-size: 16px; color: #1a1a2e; }
+    .nav-links { display: flex; gap: 24px; }
+    .nav-link {
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      color: #6c757d;
+      padding-bottom: 2px;
+    }
+    .nav-link:hover { color: #1a1a2e; }
+    .nav-link.active { color: #1a1a2e; border-bottom: 2px solid #4c6ef5; }
+
+    /* ── Scenario bar ── */
+    .scenario-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 0 8px;
+      font-size: 13px;
+      border-bottom: 1px solid #dee2e6;
+      margin-bottom: 20px;
+    }
+    .scenario-name { color: #495057; text-decoration: none; flex: 1; }
+    .scenario-name:hover { color: #1a1a2e; }
+    .scenario-btn {
+      padding: 3px 10px;
+      font-size: 12px;
+      border: 1px solid #ced4da;
+      border-radius: 4px;
+      background: #fff;
+      cursor: pointer;
+      color: #495057;
+      white-space: nowrap;
+    }
+    .scenario-btn:hover:not(:disabled) { background: #f0f2f5; }
+    .scenario-btn:disabled { opacity: 0.45; cursor: default; }
+
+    /* ── Page ── */
+    .page { max-width: 800px; margin: 0 auto; }
+    h1 { font-size: 22px; font-weight: 600; margin-bottom: 20px; color: #1a1a2e; }
+
+    /* ── Section cards ── */
+    .section-card {
+      background: #fff;
+      border: 1px solid #dee2e6;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .section-card h2 {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 14px;
+      color: #1a1a2e;
+    }
+
+    /* ── Current scenario ── */
+    .current-name {
+      font-size: 15px;
+      font-weight: 600;
+      color: #1a1a2e;
+      margin-bottom: 10px;
+    }
+    .current-none { color: #6c757d; font-size: 13px; margin-bottom: 10px; }
+
+    /* ── Scenarios table ── */
+    .scenarios-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .scenarios-table th {
+      text-align: left;
+      padding: 8px 10px;
+      border-bottom: 2px solid #dee2e6;
+      font-weight: 600;
+      font-size: 12px;
+      color: #495057;
+    }
+    .scenarios-table td {
+      padding: 8px 10px;
+      border-bottom: 1px solid #f0f0f0;
+      color: #212529;
+    }
+    .scenarios-table tr:last-child td { border-bottom: none; }
+    .scenarios-table tr:hover td { background: #f8f9fa; }
+    .empty-state {
+      color: #6c757d;
+      font-size: 13px;
+      padding: 10px 0;
+    }
+
+    /* ── Action buttons ── */
+    .action-row { display: flex; gap: 6px; }
+    .btn {
+      padding: 4px 12px;
+      font-size: 12px;
+      border: 1px solid #ced4da;
+      border-radius: 4px;
+      background: #fff;
+      cursor: pointer;
+      color: #495057;
+      white-space: nowrap;
+    }
+    .btn:hover { background: #f0f2f5; }
+    .btn-primary { background: #4c6ef5; color: #fff; border-color: #4c6ef5; }
+    .btn-primary:hover { background: #3b5bdb; }
+    .btn-danger { border-color: #dc3545; color: #dc3545; }
+    .btn-danger:hover { background: #fff0f0; }
+
+    /* ── Import ── */
+    .import-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .file-input {
+      font-size: 13px;
+      color: #495057;
+    }
+    .message {
+      font-size: 13px;
+      padding: 6px 0;
+    }
+    .message.success { color: #16a34a; }
+    .message.error   { color: #dc2626; }
+
+    /* ── New scenario ── */
+    .new-row { display: flex; gap: 8px; align-items: center; }
+    .new-row input[type="text"] {
+      flex: 1;
+      padding: 6px 10px;
+      font-size: 13px;
+      border: 1px solid #ced4da;
+      border-radius: 4px;
+      color: #212529;
+    }
+    .new-row input[type="text"]:focus {
+      outline: none;
+      border-color: #4c6ef5;
+    }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <span class="nav-brand">Retirement Income Planner</span>
+  <div class="nav-links">
+    <a href="/static/income.html" class="nav-link">Income Planning</a>
+    <a href="/static/index.html" class="nav-link">EMR Analysis</a>
+    <a href="/static/tax.html" class="nav-link">Tax Detail</a>
+    <a href="/static/scenarios.html" class="nav-link active">Scenarios</a>
+  </div>
+</nav>
+
+<div class="scenario-bar">
+  <a class="scenario-name" id="scenario-name-display" href="/static/scenarios.html">📋 No scenario loaded</a>
+  <button class="scenario-btn" id="save-btn" disabled>Save</button>
+  <button class="scenario-btn" id="save-as-btn" disabled>Save As</button>
+</div>
+
+<div class="page">
+  <h1>Scenarios</h1>
+
+  <!-- Current Scenario -->
+  <div class="section-card">
+    <h2>Current Scenario</h2>
+    <div id="current-scenario-display" class="current-none">None loaded</div>
+    <button class="btn" id="clear-btn" disabled>Clear</button>
+  </div>
+
+  <!-- Saved Scenarios -->
+  <div class="section-card">
+    <h2>Saved Scenarios</h2>
+    <div id="scenarios-list-container">
+      <p class="empty-state">Loading…</p>
+    </div>
+  </div>
+
+  <!-- Import -->
+  <div class="section-card">
+    <h2>Import</h2>
+    <div class="import-row">
+      <input type="file" id="import-file" accept=".json" class="file-input">
+    </div>
+    <div id="import-message" class="message"></div>
+  </div>
+
+  <!-- New Scenario -->
+  <div class="section-card">
+    <h2>New Scenario</h2>
+    <div class="new-row">
+      <input type="text" id="new-scenario-name" placeholder="Scenario name (e.g. 2026 Base Plan)">
+      <button class="btn btn-primary" id="create-btn">Create</button>
+    </div>
+    <div id="create-message" class="message"></div>
+  </div>
+</div>
+
+<script>
+  const el = id => document.getElementById(id);
+
+  let currentScenarioName = null;
+
+  // ── Scenario bar update ───────────────────────────────────────────────
+  function updateScenarioBar() {
+    const display = el('scenario-name-display');
+    if (display) display.textContent = currentScenarioName
+      ? '📋 ' + currentScenarioName
+      : '📋 No scenario loaded';
+  }
+
+  // ── Current scenario section update ──────────────────────────────────
+  function updateCurrentSection() {
+    const disp = el('current-scenario-display');
+    const clearBtn = el('clear-btn');
+    if (currentScenarioName) {
+      disp.className = 'current-name';
+      disp.textContent = currentScenarioName;
+      if (clearBtn) clearBtn.disabled = false;
+    } else {
+      disp.className = 'current-none';
+      disp.textContent = 'None loaded';
+      if (clearBtn) clearBtn.disabled = true;
+    }
+  }
+
+  // ── Load current scenario name ────────────────────────────────────────
+  async function loadCurrentName() {
+    console.log('[scenarios] loadCurrentName: fetching /api/scenarios/current');
+    try {
+      const resp = await fetch('/api/scenarios/current');
+      if (!resp.ok) {
+        console.error('[scenarios] loadCurrentName: response not ok', resp.status);
+        return;
+      }
+      const { name } = await resp.json();
+      currentScenarioName = name || null;
+      updateScenarioBar();
+      updateCurrentSection();
+      console.log('[scenarios] loadCurrentName: current =', currentScenarioName);
+    } catch (e) {
+      console.error('[scenarios] loadCurrentName error:', e);
+    }
+  }
+
+  // ── Clear current scenario ────────────────────────────────────────────
+  async function clearCurrentScenario() {
+    try {
+      await fetch('/api/scenarios/current', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: null }),
+      });
+      currentScenarioName = null;
+      updateScenarioBar();
+      updateCurrentSection();
+    } catch (e) {
+      console.error('[scenarios] clearCurrentScenario error:', e);
+    }
+  }
+
+  // ── Load scenario list ────────────────────────────────────────────────
+  async function loadScenarioList() {
+    console.log('[scenarios] loadScenarioList: fetching /api/scenarios');
+    const container = el('scenarios-list-container');
+    try {
+      const resp = await fetch('/api/scenarios');
+      if (!resp.ok) {
+        console.error('[scenarios] loadScenarioList: response not ok', resp.status);
+        container.innerHTML = '<p class="empty-state" style="color:#dc2626;">Failed to load scenarios.</p>';
+        return;
+      }
+      const scenarios = await resp.json();
+      console.log('[scenarios] loadScenarioList: received', scenarios.length, 'scenarios');
+
+      if (!scenarios.length) {
+        container.innerHTML = '<p class="empty-state">No saved scenarios. Use Save or Save As on any page to create one.</p>';
+        return;
+      }
+
+      const rows = scenarios.map(s => {
+        const saved = new Date(s.saved_at).toLocaleString('en-US', {
+          year: 'numeric', month: 'short', day: 'numeric',
+          hour: '2-digit', minute: '2-digit',
+        });
+        const name = escHtml(s.name);
+        return `<tr>
+          <td>${name}</td>
+          <td style="color:#6c757d;">${saved}</td>
+          <td>
+            <div class="action-row">
+              <button class="btn btn-primary" onclick="loadAndGo(${escHtml(JSON.stringify(s.name))})">Load</button>
+              <button class="btn" onclick="exportScenario(${escHtml(JSON.stringify(s.name))})">Export</button>
+              <button class="btn btn-danger" onclick="deleteScenario(${escHtml(JSON.stringify(s.name))})">Delete</button>
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+
+      container.innerHTML = `
+        <table class="scenarios-table">
+          <thead><tr><th>Name</th><th>Saved</th><th>Actions</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+    } catch (e) {
+      console.error('[scenarios] loadScenarioList error:', e);
+      container.innerHTML = '<p class="empty-state" style="color:#dc2626;">Failed to load scenarios.</p>';
+    }
+  }
+
+  function escHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  // ── Load scenario and navigate ────────────────────────────────────────
+  async function loadAndGo(name) {
+    try {
+      await fetch('/api/scenarios/current', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      window.location.href = '/static/income.html';
+    } catch (e) {
+      console.error('[scenarios] loadAndGo error:', e);
+    }
+  }
+
+  // ── Export scenario ───────────────────────────────────────────────────
+  async function exportScenario(name) {
+    try {
+      const resp = await fetch(`/api/scenarios/${encodeURIComponent(name)}`);
+      if (!resp.ok) return;
+      const data = await resp.json();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = `${name.replace(/\s+/g, '_')}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (_) {}
+  }
+
+  // ── Delete scenario ───────────────────────────────────────────────────
+  async function deleteScenario(name) {
+    if (!confirm(`Delete scenario "${name}"? This cannot be undone.`)) return;
+    try {
+      const resp = await fetch(`/api/scenarios/${encodeURIComponent(name)}`, { method: 'DELETE' });
+      if (resp.ok || resp.status === 204) {
+        if (currentScenarioName === name) {
+          await clearCurrentScenario();
+        }
+        await loadScenarioList();
+      }
+    } catch (e) {
+      console.error('[scenarios] deleteScenario error:', e);
+    }
+  }
+
+  // ── Import scenario ───────────────────────────────────────────────────
+  async function importScenario(file) {
+    const msgEl = el('import-message');
+    msgEl.textContent = '';
+    msgEl.className = 'message';
+
+    let data;
+    try {
+      const text = await file.text();
+      data = JSON.parse(text);
+    } catch (_) {
+      msgEl.textContent = 'Error: file is not valid JSON.';
+      msgEl.className = 'message error';
+      return;
+    }
+
+    if (!data.name || !data.version) {
+      msgEl.textContent = 'Error: file must have "name" and "version" fields.';
+      msgEl.className = 'message error';
+      return;
+    }
+
+    const name = data.name;
+
+    // Check for name conflict
+    try {
+      const check = await fetch(`/api/scenarios/${encodeURIComponent(name)}`);
+      if (check.ok) {
+        const overwrite = confirm(`Scenario "${name}" already exists. Overwrite?`);
+        if (!overwrite) {
+          el('import-file').value = '';
+          return;
+        }
+      }
+    } catch (_) {}
+
+    try {
+      const resp = await fetch(`/api/scenarios/${encodeURIComponent(name)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (resp.ok) {
+        msgEl.textContent = `Imported "${name}" successfully.`;
+        msgEl.className = 'message success';
+        await loadScenarioList();
+      } else {
+        msgEl.textContent = 'Import failed. Please try again.';
+        msgEl.className = 'message error';
+      }
+    } catch (_) {
+      msgEl.textContent = 'Import failed. Please try again.';
+      msgEl.className = 'message error';
+    }
+
+    el('import-file').value = '';
+  }
+
+  // ── Create new scenario ───────────────────────────────────────────────
+  async function createNewScenario() {
+    const nameInput = el('new-scenario-name');
+    const msgEl = el('create-message');
+    const name = nameInput.value.trim();
+    msgEl.textContent = '';
+    msgEl.className = 'message';
+
+    if (!name) {
+      msgEl.textContent = 'Please enter a scenario name.';
+      msgEl.className = 'message error';
+      return;
+    }
+
+    const data = {
+      name,
+      saved_at: new Date().toISOString().slice(0, 19),
+      version: '1.0',
+      inputs: {},
+      ohio: {},
+      aca: {},
+      emr_settings: {},
+      income_planning: {},
+    };
+
+    try {
+      await fetch(`/api/scenarios/${encodeURIComponent(name)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      await fetch('/api/scenarios/current', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      window.location.href = '/static/income.html';
+    } catch (e) {
+      console.error('[scenarios] createNewScenario error:', e);
+      msgEl.textContent = 'Failed to create scenario. Please try again.';
+      msgEl.className = 'message error';
+    }
+  }
+
+  // ── Page load ─────────────────────────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', () => {
+    console.log('[scenarios] DOMContentLoaded — starting init');
+
+    el('clear-btn').addEventListener('click', clearCurrentScenario);
+    el('create-btn').addEventListener('click', createNewScenario);
+    el('new-scenario-name').addEventListener('keydown', e => {
+      if (e.key === 'Enter') createNewScenario();
+    });
+    el('import-file').addEventListener('change', e => {
+      const file = e.target.files?.[0];
+      if (file) importScenario(file);
+    });
+
+    Promise.all([loadCurrentName(), loadScenarioList()])
+      .then(() => console.log('[scenarios] init complete'))
+      .catch(e => console.error('[scenarios] init error:', e));
+  });
+</script>
+</body>
+</html>

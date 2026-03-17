@@ -16,7 +16,7 @@ _BASE = {
     "pension": 0.0,
     "interest": 0.0,
     "ordinary_dividends": 0.0,
-    "inherited_ira_rmd": 0.0,
+    "ira_distributions": 0.0,
     "ss_benefit": 0.0,
     "qualified_dividends": 0.0,
     "fixed_ltcg": 0.0,

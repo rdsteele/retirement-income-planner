@@ -50,6 +50,7 @@ data/scenarios/local_*.json
 # Personal profile data
 profile/accounts.json
 profile/scenarios/
+profile/current_scenario.json
 
 # Claude Code local settings
 .claude/settings.local.json*.xml

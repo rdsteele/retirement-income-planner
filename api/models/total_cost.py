@@ -8,7 +8,7 @@ class TotalCostRequest(BaseModel):
     pension: float = Field(default=0.0, ge=0)
     interest: float = Field(default=0.0, ge=0)
     ordinary_dividends: float = Field(default=0.0, ge=0)
-    inherited_ira_rmd: float = Field(default=0.0, ge=0)
+    ira_distributions: float = Field(default=0.0, ge=0)
     ss_benefit: float = Field(default=0.0, ge=0)
     qualified_dividends: float = Field(default=0.0, ge=0)
     fixed_ltcg: float = Field(default=0.0, ge=0)
