@@ -113,7 +113,7 @@ def calculate_total_cost(
     sweep_mode: SweepMode = SweepMode.ORDINARY,
     variable_ordinary: Decimal = _ZERO,
     filing_status: str = "single",
-    tax_year: int = 2026,
+    tax_year: int,
     sweep_floor: Decimal = _ZERO,
     sweep_ceiling: Decimal | None = None,
     sweep_step: Decimal = Decimal("100"),

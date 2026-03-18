@@ -310,10 +310,7 @@
           <div class="section-body">
             <div class="field">
               <label>Filing Status</label>
-              <select id="filing_status">
-                <option value="single">Single</option>
-                <option value="mfj">Married Filing Jointly</option>
-              </select>
+              <select id="filing_status"></select>
             </div>
             <div class="field">
               <label>Tax Year</label>
@@ -397,6 +394,28 @@
 </div><!-- /.page -->
 
 <script>
+  // ── App config — filing statuses and tax years ────────────────────────────
+  const APP_CONFIG = {
+    filingStatuses: [
+      { value: 'single', label: 'Single' },
+      { value: 'mfj',    label: 'Married Filing Jointly' },
+    ],
+    taxYears: [2025, 2026],
+  };
+
+  function populateSelect(selectId, options, defaultValue) {
+    const el = document.getElementById(selectId);
+    if (!el) return;
+    el.innerHTML = '';
+    options.forEach(opt => {
+      const o = document.createElement('option');
+      o.value = opt.value ?? opt;
+      o.textContent = opt.label ?? opt;
+      if (String(o.value) === String(defaultValue)) o.selected = true;
+      el.appendChild(o);
+    });
+  }
+
   // ── Helpers ──────────────────────────────────────────────────────────────
   const el   = id => document.getElementById(id);
   const fnum = id => parseFloat(el(id).value) || 0;
@@ -698,6 +717,8 @@
   }
 
   // ── Page load ─────────────────────────────────────────────────────────────
+  populateSelect('filing_status', APP_CONFIG.filingStatuses, 'single');
+
   Promise.all([loadConfig(), loadTaxYears()])
     .then(() => loadCurrentScenario())
     .then(calculate);

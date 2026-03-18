@@ -4,10 +4,18 @@
     {"from": "0",     "to": "26050", "base": "0",      "rate": "0.0000", "excess_over": "0"},
     {"from": "26050", "to": null,    "base": "332.00", "rate": "0.0275", "excess_over": "26050"}
   ],
-  "personal_exemption": [
-    {"agi_up_to": "40000", "amount": "2400"},
-    {"agi_up_to": "80000", "amount": "2150"},
-    {"agi_up_to": null,    "amount": "1900"}
+  "personal_exemption_single": [
+    {"agi_up_to": "40000",  "amount": "2400"},
+    {"agi_up_to": "80000",  "amount": "2150"},
+    {"agi_up_to": "749999", "amount": "1900"},
+    {"agi_up_to": null,     "amount": "0"}
+  ],
+  "_note_exemptions": "2026 personal exemption amounts are placeholders — 2025 amounts used pending official Ohio IT 1040 booklet publication",
+  "personal_exemption_mfj": [
+    {"agi_up_to": "40000",  "amount": "4800"},
+    {"agi_up_to": "80000",  "amount": "4300"},
+    {"agi_up_to": "749999", "amount": "3800"},
+    {"agi_up_to": null,     "amount": "0"}
   ],
   "retirement_income_credit": [
     {"income_up_to": "500",  "credit": "0"},

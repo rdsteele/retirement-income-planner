@@ -196,6 +196,7 @@ def _compute_ohio_tax_at_point(
     ohio_medical_deduction: Decimal,
     ohio_qualifying_retirement_income: Decimal,
     tax_year: int,
+    filing_status: str = "single",
 ) -> Decimal:
     """Compute Ohio tax, reverse-engineering gross medical for fixed deduction."""
     ohio_floor_rate = Decimal(load_ohio_data(tax_year)["medical_expense_floor_rate"])
@@ -209,6 +210,7 @@ def _compute_ohio_tax_at_point(
         qualifying_retirement_income=ohio_qualifying_retirement_income,
         ss_taxable_federal=ss_taxable,
         tax_year=tax_year,
+        filing_status=filing_status,
     )
     return result.ohio_tax
 
@@ -292,6 +294,7 @@ def _compute_tax_snapshot(
         ohio_tax = _compute_ohio_tax_at_point(
             agi, ss_taxable, ohio_medical_deduction,
             ohio_qualifying_retirement_income, tax_year,
+            filing_status=filing_status,
         )
 
     total_tax = fed_result.total_tax + niit + ohio_tax
@@ -378,6 +381,7 @@ def _compute_ohio_boundaries(
     ohio_agi_base: Decimal,
     ohio_medical_deduction: Decimal,
     tax_year: int,
+    filing_status: str = "single",
 ) -> list[Decimal]:
     """Return Ohio-specific boundary sweep_values for zero-rate and MAGI credit thresholds.
 
@@ -386,20 +390,21 @@ def _compute_ohio_boundaries(
     threshold but personal exemption is taken from the expected tier at each boundary.
     """
     ohio_data = load_ohio_data(tax_year)
+    exemption_key = "personal_exemption_mfj" if filing_status == "mfj" else "personal_exemption_single"
     boundaries: list[Decimal] = []
 
     # Zero-rate threshold: ohio_tax_base enters the first taxable bracket
     # ohio_tax_base = ohio_agi - personal_exemption - ohio_medical_deduction = brackets[1]["from"]
     # At this ohio_agi the personal_exemption is from the lowest tier (ohio_agi < $40,000)
-    zero_bracket = Decimal(ohio_data["brackets"][1]["from"])          # $26,050
-    exemption_low = Decimal(ohio_data["personal_exemption"][0]["amount"])  # $2,400
+    zero_bracket = Decimal(ohio_data["brackets"][1]["from"])
+    exemption_low = Decimal(ohio_data[exemption_key][0]["amount"])
     ohio_agi_zero = zero_bracket + exemption_low + ohio_medical_deduction
     boundaries.append(ohio_agi_zero - ohio_agi_base)
 
     # MAGI credit threshold: ohio_agi - personal_exemption crosses $100,000
-    # At this ohio_agi (> $80,000) the personal_exemption is the highest tier
-    magi_threshold = Decimal(ohio_data["magi_credit_threshold"])      # $100,000
-    exemption_high = Decimal(ohio_data["personal_exemption"][-1]["amount"])  # $1,900
+    # At this ohio_agi (> $80,000) the personal_exemption is the highest non-zero tier
+    magi_threshold = Decimal(ohio_data["magi_credit_threshold"])
+    exemption_high = Decimal(ohio_data[exemption_key][-2]["amount"])  # -2: skip the $0 sentinel tier
     ohio_agi_magi = magi_threshold + exemption_high
     boundaries.append(ohio_agi_magi - ohio_agi_base)
 
@@ -472,7 +477,8 @@ def _compute_ordinary_boundaries(
     if include_ohio:
         ohio_agi_base = fixed_ordinary + total_preferential
         boundaries.extend(
-            _compute_ohio_boundaries(ohio_agi_base, ohio_medical_deduction, tax_year))
+            _compute_ohio_boundaries(ohio_agi_base, ohio_medical_deduction, tax_year,
+                                     filing_status))
 
     return boundaries
 
@@ -539,7 +545,8 @@ def _compute_preferential_boundaries(
     if include_ohio:
         ohio_agi_base = total_ordinary + fixed_pref
         boundaries.extend(
-            _compute_ohio_boundaries(ohio_agi_base, ohio_medical_deduction, tax_year))
+            _compute_ohio_boundaries(ohio_agi_base, ohio_medical_deduction, tax_year,
+                                     filing_status))
 
     return boundaries
 

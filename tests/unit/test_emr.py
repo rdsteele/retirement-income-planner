@@ -136,7 +136,8 @@ def _mock_ss_single(ss_benefit, agi_excluding_ss, tax_exempt_interest,
 
 
 def _mock_ohio(federal_agi, gross_medical_expenses,
-               qualifying_retirement_income, ss_taxable_federal, tax_year):
+               qualifying_retirement_income, ss_taxable_federal, tax_year,
+               filing_status="single"):
     """Simplified Ohio tax returning a fixed-rate result for EMR testing."""
     ohio_agi = federal_agi - ss_taxable_federal
     pe = dec("2400") if ohio_agi <= dec("40000") else (

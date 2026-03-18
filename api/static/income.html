@@ -490,6 +490,10 @@
                 <!-- populated dynamically by loadTaxYears() -->
               </select>
             </div>
+            <div class="field">
+              <label>Filing Status</label>
+              <select id="filing_status"></select>
+            </div>
           </div>
         </details>
 
@@ -704,6 +708,28 @@
 
 <script>
   'use strict';
+
+  // ── App config — filing statuses and tax years ────────────────────────────
+  const APP_CONFIG = {
+    filingStatuses: [
+      { value: 'single', label: 'Single' },
+      { value: 'mfj',    label: 'Married Filing Jointly' },
+    ],
+    taxYears: [2025, 2026],
+  };
+
+  function populateSelect(selectId, options, defaultValue) {
+    const el = document.getElementById(selectId);
+    if (!el) return;
+    el.innerHTML = '';
+    options.forEach(opt => {
+      const o = document.createElement('option');
+      o.value = opt.value ?? opt;
+      o.textContent = opt.label ?? opt;
+      if (String(o.value) === String(defaultValue)) o.selected = true;
+      el.appendChild(o);
+    });
+  }
 
   // ── State ─────────────────────────────────────────────────────────────
   const CONFIG = {};
@@ -1132,8 +1158,8 @@
       fixed_ltcg:                 fnum('fixed_ltcg') + calcGains,
       above_the_line_adjustments: fnum('above_the_line_adjustments'),
       sweep_mode:                 'ordinary',
-      filing_status:              'single',
-      tax_year:                   parseInt(el('tax_year')?.value) || 2026,
+      filing_status:              el('filing_status')?.value || 'single',
+      tax_year:                   parseInt(el('tax_year')?.value),
       sweep_floor:                0,
       sweep_ceiling:              150000,
       sweep_step:                 100,
@@ -1462,7 +1488,8 @@
   function gatherSharedInputs() {
     return {
       inputs: {
-        tax_year:                   parseInt(el('tax_year')?.value) || 2026,
+        tax_year:                   parseInt(el('tax_year')?.value),
+        filing_status:              el('filing_status')?.value || 'single',
         pension:                    fnum('pension'),
         interest:                   fnum('interest'),
         ordinary_dividends:         fnum('ordinary_dividends'),
@@ -1480,6 +1507,7 @@
     const inp = scenario.inputs || {};
     const aca = scenario.aca    || {};
     setField('tax_year',                   inp.tax_year);
+    setField('filing_status',              inp.filing_status);
     setField('pension',                    inp.pension);
     setField('interest',                   inp.interest);
     setField('ordinary_dividends',         inp.ordinary_dividends);
@@ -1622,6 +1650,8 @@
   el('save-as-btn')?.addEventListener('click', saveAsScenario);
 
   // ── Page load ─────────────────────────────────────────────────────────
+  populateSelect('filing_status', APP_CONFIG.filingStatuses, 'single');
+
   Promise.all([loadConfig(), loadTaxYears(), loadAccounts(), loadAccountsSummary()])
     .then(() => loadCurrentScenario())
     .then(() => { updateMagi(); updateAcaVisibility(); });

@@ -1,14 +1,14 @@
 # Spec: Ohio State Income Tax Service
 
-**Version:** 1.0
+**Version:** 1.1
 **Status:** Draft
-**Covers:** `services/ohio_tax.py`, `data/brackets/ohio_2025.json`
+**Covers:** `services/ohio_tax.py`, `data/brackets/ohio_2025.json`, `data/brackets/ohio_2026.json`
 
 ---
 
 ## Purpose
 
-Calculate Ohio state income tax liability for a single filer. Handles Ohio-specific
+Calculate Ohio state income tax liability for single and MFJ filers. Handles Ohio-specific
 rules including: progressive bracket calculation, AGI-tiered personal exemption,
 medical expense deduction with 7.5% AGI floor, Social Security exemption, and
 retirement income credit.
@@ -26,7 +26,8 @@ bracket schedule.
 | `gross_medical_expenses` | `Decimal` | Total unreimbursed medical/dental expenses before 7.5% floor    |
 | `qualifying_retirement_income` | `Decimal` | IRA distributions + pension/annuity income qualifying for retirement income credit |
 | `ss_taxable_federal`     | `Decimal` | Taxable SS from federal return (line 6b) — Ohio deducts this    |
-| `tax_year`               | `int`     | `2025`                                                           |
+| `tax_year`               | `int`     | Supported years: `2025`, `2026`                                  |
+| `filing_status`          | `str`     | `"single"` (default) or `"mfj"`                                 |
 
 All `Decimal` inputs must be whole dollar amounts, non-negative.
 
@@ -39,7 +40,7 @@ Returns an `OhioTaxResult` dataclass:
 | Field                      | Type      | Description                                                    |
 |----------------------------|-----------|----------------------------------------------------------------|
 | `ohio_agi`                 | `Decimal` | Federal AGI less SS deduction and other Ohio adjustments       |
-| `personal_exemption`       | `Decimal` | Exemption amount based on Ohio AGI tier                        |
+| `personal_exemption`       | `Decimal` | Exemption amount based on Ohio AGI tier and filing status      |
 | `medical_deduction`        | `Decimal` | Allowable medical deduction after 7.5% floor                   |
 | `ohio_tax_base`            | `Decimal` | Ohio AGI less exemption less medical deduction                 |
 | `tax_before_credits`       | `Decimal` | Ohio bracket tax before applying credits                       |
@@ -60,14 +61,28 @@ is deducted on the Ohio Schedule of Adjustments (line 16). If `ss_taxable_federa
 is zero, Ohio AGI equals federal AGI.
 
 ### 2. Personal Exemption
-Ohio uses a tiered personal exemption based on Ohio AGI instead of a standard
-deduction. For tax year 2025, single filer:
+Ohio uses a tiered personal exemption based on Ohio AGI. Exemptions are **per person**.
+MFJ filers receive two exemptions (taxpayer + spouse), stored as totals in the data file.
+The MAGI tier thresholds are the same for single and MFJ.
 
-| Ohio AGI                  | Exemption |
-|---------------------------|-----------|
-| $0 – $40,000              | $2,400    |
-| $40,001 – $80,000         | $2,150    |
-| Over $80,000              | $1,900    |
+Amounts reflect HB96 (House Bill 96, effective September 2025), which added a $750,000+
+income cap tier returning $0.
+
+**Tax year 2025 — confirmed from official Ohio IT 1040 booklet:**
+
+| Ohio AGI                  | Single    | MFJ (×2 per-person) |
+|---------------------------|-----------|---------------------|
+| $0 – $40,000              | $2,400    | $4,800              |
+| $40,001 – $80,000         | $2,150    | $4,300              |
+| $80,001 – $749,999        | $1,900    | $3,800              |
+| $750,000 or greater       | $0        | $0                  |
+
+**Tax year 2026** — 2025 amounts used as placeholders pending official Ohio IT 1040
+booklet publication.
+
+The service selects the exemption table (`personal_exemption_single` or
+`personal_exemption_mfj`) based on `filing_status`. Raises `ValueError` for
+unsupported filing statuses.
 
 ### 3. Medical Deduction
 Ohio allows a deduction for unreimbursed medical and health care expenses exceeding
@@ -92,6 +107,13 @@ Ohio uses a cumulative formula (not marginal bracket iteration). For tax year 20
 | $26,051 – $100,000        | $342.00 + 2.75% of excess over $26,050             |
 | Over $100,000             | $2,394.32 + 3.125% of excess over $100,000         |
 
+For tax year 2026 (flat rate, HB96):
+
+| Ohio Taxable Income       | Tax Calculation                                    |
+|---------------------------|----------------------------------------------------|
+| $0 – $26,050              | $0                                                 |
+| Over $26,050              | $332.00 + 2.75% of excess over $26,050             |
+
 Apply `ROUND_HALF_UP` to whole dollar after computing the formula result.
 
 ### 6. Retirement Income Credit
@@ -103,6 +125,9 @@ A nonrefundable credit against Ohio tax for qualifying retirement income.
 - Qualifying retirement income received on account of retirement
 - Income is included in Ohio AGI
 - Taxpayer has not previously claimed the Ohio lump sum retirement credit
+
+For MFJ filers, the combined MFJ personal exemption (e.g. $4,800 at the lowest tier)
+is used in the eligibility check, which slightly raises the effective MAGI ceiling.
 
 **Credit tier table (from R.C. § 5747.055):**
 
@@ -131,8 +156,8 @@ If Ohio AGI is zero, effective rate is `Decimal('0')`.
 
 ### 9. Data Loading
 Bracket thresholds and formula constants are loaded from
-`data/brackets/ohio_2025.json`. The service must raise `ValueError`
-for unsupported tax years.
+`data/brackets/ohio_{year}.json`. The service raises `ValueError`
+for unsupported tax years and unsupported filing statuses.
 
 ---
 
@@ -142,14 +167,21 @@ for unsupported tax years.
 {
   "tax_year": 2025,
   "brackets": [
-    {"from": "0",      "to": "26050",  "base": "0",       "rate": "0.0000", "excess_over": "0"},
-    {"from": "26050",  "to": "100000", "base": "342.00",  "rate": "0.0275", "excess_over": "26050"},
-    {"from": "100000", "to": null,     "base": "2394.32", "rate": "0.03125","excess_over": "100000"}
+    {"from": "0",      "to": "26050",  "base": "0",       "rate": "0.0000",  "excess_over": "0"},
+    {"from": "26050",  "to": "100000", "base": "342.00",  "rate": "0.0275",  "excess_over": "26050"},
+    {"from": "100000", "to": null,     "base": "2394.32", "rate": "0.03125", "excess_over": "100000"}
   ],
-  "personal_exemption": [
+  "personal_exemption_single": [
     {"agi_up_to": "40000",  "amount": "2400"},
     {"agi_up_to": "80000",  "amount": "2150"},
-    {"agi_up_to": null,     "amount": "1900"}
+    {"agi_up_to": "749999", "amount": "1900"},
+    {"agi_up_to": null,     "amount": "0"}
+  ],
+  "personal_exemption_mfj": [
+    {"agi_up_to": "40000",  "amount": "4800"},
+    {"agi_up_to": "80000",  "amount": "4300"},
+    {"agi_up_to": "749999", "amount": "3800"},
+    {"agi_up_to": null,     "amount": "0"}
   ],
   "retirement_income_credit": [
     {"income_up_to": "500",  "credit": "0"},
@@ -168,25 +200,20 @@ for unsupported tax years.
 
 ## Worked Examples
 
-All examples: Single filer, tax year 2025, no Social Security income.
-
 ---
 
-### Example 1 — 2025 Income Profile Proxy
-
-Inputs closely mirror actual 2025 income profile. Uses back-calculated gross
-medical to reproduce the 2024 Schedule of Adjustments deduction of $3,154
-(2025 proxy — to be replaced with actual 2025 return values once filed).
+### Example 1 — 2025 Income Profile Proxy (Single)
 
 **Inputs:**
 - `federal_agi`: `45370`
 - `gross_medical_expenses`: `6557`
 - `qualifying_retirement_income`: `47089` (IRA $45,493 + pension $1,596)
 - `ss_taxable_federal`: `0`
+- `filing_status`: `"single"`
 
 **Calculation flow:**
 - Ohio AGI: `45370`
-- Personal exemption: `2150` (AGI in $40,001–$80,000 tier)
+- Personal exemption: `2150` (single, AGI in $40,001–$80,000 tier)
 - Medical floor: `3403` (45370 × 7.5%)
 - Medical deduction: `3154` (6557 − 3403)
 - Ohio tax base: `40066` (45370 − 2150 − 3154)
@@ -206,13 +233,14 @@ medical to reproduce the 2024 Schedule of Adjustments deduction of $3,154
 
 ---
 
-### Example 2 — Clean Round Numbers, 2.75% Bracket
+### Example 2 — Clean Round Numbers, 2.75% Bracket (Single)
 
 **Inputs:**
 - `federal_agi`: `60000`
 - `gross_medical_expenses`: `8000`
 - `qualifying_retirement_income`: `50000`
 - `ss_taxable_federal`: `0`
+- `filing_status`: `"single"`
 
 **Calculation flow:**
 - Ohio AGI: `60000`
@@ -235,13 +263,14 @@ medical to reproduce the 2024 Schedule of Adjustments deduction of $3,154
 
 ---
 
-### Example 3 — Income Below $26,050 Threshold, Zero Tax
+### Example 3 — Income Below $26,050 Threshold, Zero Tax (Single)
 
 **Inputs:**
 - `federal_agi`: `28000`
 - `gross_medical_expenses`: `3000`
 - `qualifying_retirement_income`: `20000`
 - `ss_taxable_federal`: `0`
+- `filing_status`: `"single"`
 
 **Calculation flow:**
 - Ohio AGI: `28000`
@@ -263,13 +292,14 @@ medical to reproduce the 2024 Schedule of Adjustments deduction of $3,154
 
 ---
 
-### Example 4 — High Medical Expenses, Minimal Tax
+### Example 4 — High Medical Expenses, Minimal Tax (Single)
 
 **Inputs:**
 - `federal_agi`: `40000`
 - `gross_medical_expenses`: `10000`
 - `qualifying_retirement_income`: `30000`
 - `ss_taxable_federal`: `0`
+- `filing_status`: `"single"`
 
 **Calculation flow:**
 - Ohio AGI: `40000`
@@ -292,13 +322,14 @@ medical to reproduce the 2024 Schedule of Adjustments deduction of $3,154
 
 ---
 
-### Example 5 — Income Into 3.125% Bracket, Credit Disqualified
+### Example 5 — Income Into 3.125% Bracket, Credit Disqualified (Single)
 
 **Inputs:**
 - `federal_agi`: `110000`
 - `gross_medical_expenses`: `5000`
 - `qualifying_retirement_income`: `90000`
 - `ss_taxable_federal`: `0`
+- `filing_status`: `"single"`
 
 **Calculation flow:**
 - Ohio AGI: `110000`
@@ -320,6 +351,37 @@ medical to reproduce the 2024 Schedule of Adjustments deduction of $3,154
 
 ---
 
+### Example 6 — MFJ Pension + IRA Withdrawals, 2025
+
+**Inputs:**
+- `federal_agi`: `90000`
+- `gross_medical_expenses`: `5000`
+- `qualifying_retirement_income`: `70000`
+- `ss_taxable_federal`: `0`
+- `filing_status`: `"mfj"`
+
+**Calculation flow:**
+- Ohio AGI: `90000` (no SS deduction)
+- Personal exemption: `3800` (MFJ, AGI $80,001–$749,999 → $1,900 × 2)
+- Medical floor: `6750` (90000 × 7.5%) — exceeds gross medical, deduction is zero
+- Medical deduction: `0`
+- Ohio tax base: `86200` (90000 − 3800 − 0)
+- Tax before credits: `1996` ($342.00 + 2.75% × (86200 − 26050) = 342.00 + 1654.13 → rounded)
+- MAGI less exemption: `86200` — under $100,000, credit applies
+- Retirement income credit: `200` (retirement income > $8,000)
+
+**Expected outputs:**
+- `ohio_agi`: `90000`
+- `personal_exemption`: `3800`
+- `medical_deduction`: `0`
+- `ohio_tax_base`: `86200`
+- `tax_before_credits`: `1996`
+- `retirement_income_credit`: `200`
+- `ohio_tax`: `1796`
+- `effective_rate`: `0.0200`
+
+---
+
 ## Edge Cases
 
 | Scenario                                           | Expected Behavior                                              |
@@ -333,16 +395,18 @@ medical to reproduce the 2024 Schedule of Adjustments deduction of $3,154
 | Credit exceeds tax before credits                  | `ohio_tax = 0` (credit is nonrefundable)                       |
 | `ohio_tax_base` falls in zero bracket (≤ $26,050)  | `tax_before_credits = 0`                                       |
 | Unsupported `tax_year`                             | Raise `ValueError`                                             |
+| Unsupported `filing_status`                        | Raise `ValueError`                                             |
+| `filing_status = "mfj"`                            | Use `personal_exemption_mfj` table (doubled per-person amount) |
 
 ---
 
 ## Out of Scope for This Service
 
-- MFJ filing status (single filer only for now)
+- Ohio joint filing credit (MFJ-only; requires earned income — not applicable to
+  retirement income scenarios)
 - Ohio school district income tax (separate tax, separate service if needed)
 - Lump sum retirement credit
 - Senior citizen credit (taxpayer is under 65)
 - Business income deduction (no business income in scope)
 - Municipal/local income tax
 - Ohio minimum income credit
-- 2026 tax year (flat rate structure differs — separate spec when needed)

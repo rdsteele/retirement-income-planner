@@ -5,7 +5,7 @@ deduction with 7.5% AGI floor, Social Security exemption, progressive bracket
 tax using Ohio's cumulative formula, and retirement income credit.
 
 Ohio starts from federal AGI and applies its own adjustments before applying
-the bracket schedule. Single filer only; tax year 2025.
+the bracket schedule. Supports single and MFJ filing statuses.
 """
 
 from dataclasses import dataclass
@@ -99,11 +99,16 @@ def calculate_ohio_tax(
     qualifying_retirement_income: Decimal,
     ss_taxable_federal: Decimal,
     tax_year: int,
+    filing_status: str = "single",
 ) -> OhioTaxResult:
+    if filing_status not in ("single", "mfj"):
+        raise ValueError(f"Unsupported filing status: {filing_status!r}")
+
     data = load_ohio_data(tax_year)
 
     ohio_agi = _compute_ohio_agi(federal_agi, ss_taxable_federal)
-    personal_exemption = _lookup_personal_exemption(ohio_agi, data["personal_exemption"])
+    exemption_key = "personal_exemption_mfj" if filing_status == "mfj" else "personal_exemption_single"
+    personal_exemption = _lookup_personal_exemption(ohio_agi, data[exemption_key])
     medical_deduction = _compute_medical_deduction(
         ohio_agi, gross_medical_expenses, Decimal(data["medical_expense_floor_rate"])
     )

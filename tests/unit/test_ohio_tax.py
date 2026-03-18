@@ -332,3 +332,116 @@ class TestOhio2026FlatRate:
     def test_unsupported_tax_year_raises_value_error(self):
         with pytest.raises(ValueError, match="Unsupported tax year"):
             calculate_ohio_tax(dec("50000"), dec("0"), dec("0"), dec("0"), 2099)
+
+
+# ---------------------------------------------------------------------------
+# MFJ filing status — personal exemption and retirement income credit
+# ---------------------------------------------------------------------------
+
+class TestMFJExemptionTiers:
+    """MFJ exemption is the doubled per-person amount stored in personal_exemption_mfj."""
+
+    def test_mfj_tier_40k_or_less(self):
+        # AGI = $30,000 → MFJ tier ≤ $40,000 → exemption = $4,800
+        result = calculate_ohio_tax(dec("30000"), dec("0"), dec("0"), dec("0"), 2025,
+                                    filing_status="mfj")
+        assert result.personal_exemption == dec("4800")
+
+    def test_mfj_tier_40k_to_80k(self):
+        # AGI = $60,000 → MFJ tier $40,001–$80,000 → exemption = $4,300
+        result = calculate_ohio_tax(dec("60000"), dec("0"), dec("0"), dec("0"), 2025,
+                                    filing_status="mfj")
+        assert result.personal_exemption == dec("4300")
+
+    def test_mfj_tier_80k_to_749k(self):
+        # AGI = $90,000 → MFJ tier $80,001–$749,999 → exemption = $3,800
+        result = calculate_ohio_tax(dec("90000"), dec("0"), dec("0"), dec("0"), 2025,
+                                    filing_status="mfj")
+        assert result.personal_exemption == dec("3800")
+
+    def test_mfj_tier_750k_plus(self):
+        # AGI = $800,000 → MFJ tier ≥ $750,000 → exemption = $0
+        result = calculate_ohio_tax(dec("800000"), dec("0"), dec("0"), dec("0"), 2025,
+                                    filing_status="mfj")
+        assert result.personal_exemption == dec("0")
+
+
+class TestMFJRetirementCreditEligibility:
+    """MFJ uses combined exemption in the MAGI < $100,000 eligibility check."""
+
+    def test_mfj_credit_eligible_uses_combined_exemption(self):
+        # AGI = $103,800 → MFJ exemption = $3,800 → MAGI−exemption = $100,000
+        # < $100,000 is False → disqualified
+        # AGI = $103,799 → 103,799−3,800 = 99,999 < $100,000 → eligible
+        result = calculate_ohio_tax(dec("103799"), dec("0"), dec("50000"), dec("0"), 2025,
+                                    filing_status="mfj")
+        assert result.retirement_income_credit == dec("200")
+
+    def test_mfj_credit_disqualified_combined_threshold(self):
+        # AGI = $103,800 → 103,800−3,800 = 100,000 → NOT < 100,000 → disqualified
+        result = calculate_ohio_tax(dec("103800"), dec("0"), dec("50000"), dec("0"), 2025,
+                                    filing_status="mfj")
+        assert result.retirement_income_credit == dec("0")
+
+
+class TestMFJWorkedExample:
+    """MFJ worked example from spec: pension + IRA withdrawals, tax year 2025."""
+
+    def setup_method(self):
+        self.result = calculate_ohio_tax(
+            federal_agi=dec("90000"),
+            gross_medical_expenses=dec("5000"),
+            qualifying_retirement_income=dec("70000"),
+            ss_taxable_federal=dec("0"),
+            tax_year=2025,
+            filing_status="mfj",
+        )
+
+    def test_ohio_agi(self):
+        assert self.result.ohio_agi == dec("90000")
+
+    def test_personal_exemption(self):
+        assert self.result.personal_exemption == dec("3800")
+
+    def test_medical_deduction(self):
+        # Medical floor = 90000 × 7.5% = 6750 > 5000 → deduction = 0
+        assert self.result.medical_deduction == dec("0")
+
+    def test_ohio_tax_base(self):
+        assert self.result.ohio_tax_base == dec("86200")
+
+    def test_tax_before_credits(self):
+        # 342.00 + 2.75% × (86200 − 26050) = 342.00 + 1654.125 → $1996
+        assert self.result.tax_before_credits == dec("1996")
+
+    def test_retirement_income_credit(self):
+        # MAGI less exemption = 86200 < 100000 → eligible; income > 8000 → $200
+        assert self.result.retirement_income_credit == dec("200")
+
+    def test_ohio_tax(self):
+        assert self.result.ohio_tax == dec("1796")
+
+    def test_effective_rate(self):
+        assert self.result.effective_rate == dec("0.0200")
+
+
+class TestMFJWithSS:
+    """MFJ with SS income: ohio_agi = federal_agi - ss_taxable (same as single)."""
+
+    def test_mfj_ss_reduces_ohio_agi(self):
+        result = calculate_ohio_tax(dec("70000"), dec("0"), dec("0"), dec("10000"), 2025,
+                                    filing_status="mfj")
+        assert result.ohio_agi == dec("60000")
+
+    def test_mfj_ss_uses_mfj_exemption_on_reduced_agi(self):
+        # ohio_agi = 70000 − 10000 = 60000 → MFJ $40,001–$80,000 tier → $4,300
+        result = calculate_ohio_tax(dec("70000"), dec("0"), dec("0"), dec("10000"), 2025,
+                                    filing_status="mfj")
+        assert result.personal_exemption == dec("4300")
+
+
+class TestUnsupportedFilingStatus:
+    def test_raises_value_error(self):
+        with pytest.raises(ValueError, match="Unsupported filing status"):
+            calculate_ohio_tax(dec("50000"), dec("0"), dec("0"), dec("0"), 2025,
+                               filing_status="mfs")
