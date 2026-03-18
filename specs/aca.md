@@ -35,7 +35,7 @@ ACA parameters are stored in `data/aca/aca_{year}.json`:
   "tax_year": 2026,
   "filing_status_cliffs": {
     "single": 62600,
-    "mfj": 128600
+    "mfj": 85000
   },
   "fpl_100pct": {
     "single": 15650,

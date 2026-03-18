@@ -45,7 +45,7 @@ localhost — no cloud, no authentication.
 - Specs in specs/ directory
 
 ## Current State
-- Tests: 530 passing, 97%+ coverage
+- Tests: 591 passing, 97%+ coverage
 - CI: ruff, mypy, pytest, bandit, pip-audit on every push
 
 I want to design: [FEATURE NAME]
@@ -69,13 +69,13 @@ Tech stack: FastAPI, vanilla JS, Plotly, local JSON file storage, Python 3.12+
 Pages: Income Planning, EMR Analysis, Tax Detail, Scenarios, Accounts
 Services: federal_tax, ohio_tax, social_security, emr, aca, total_cost,
           accounts, scenarios, data_loader
-Tests: 530 passing (update this number before each session)
+Tests: <ADD TEST COUNT HERE!!!> passing (update this number before each session)
 Python 3.12+, single filer only, tax years 2025/2026
 
 Here is the spec for what I want to build today:
 [UPLOAD SPEC FILE]
 
-Current test count: 530. All must still pass.
+Current test count: <ADD TEST COUNT HERE!!!>. All must still pass.
 Please read the spec carefully before writing any code.
 ```
 
@@ -95,7 +95,7 @@ Tech stack: FastAPI, vanilla JS, Plotly, local JSON file storage, Python 3.12+
 Pages: Income Planning, EMR Analysis, Tax Detail, Scenarios, Accounts
 Services: federal_tax, ohio_tax, social_security, emr, aca, total_cost,
           accounts, scenarios, data_loader
-Tests: 530 passing
+Tests: <ADD TEST COUNT HERE!!!> passing
 Python 3.12+
 
 I'm seeing this issue: [DESCRIPTION OF PROBLEM]
@@ -117,7 +117,7 @@ any source files directly related to the issue.
 I'm working on a Python/FastAPI retirement income planning application.
 
 GitHub: https://github.com/rdsteele/retirement-income-planner
-Tests: 530 passing
+Tests: <ADD TEST COUNT HERE!!!> passing
 
 Fetch the spec at [SPEC_URL] and review it against the code pasted below.
 

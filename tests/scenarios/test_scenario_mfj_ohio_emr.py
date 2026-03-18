@@ -28,7 +28,7 @@ from decimal import Decimal
 
 import pytest
 
-from services.emr import EMRPoint, SweepMode, calculate_emr
+from services.emr import SweepMode, calculate_emr
 
 
 @pytest.fixture(scope="module")

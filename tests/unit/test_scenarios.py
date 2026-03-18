@@ -18,7 +18,6 @@ from services.scenarios import (
     set_current_scenario,
 )
 
-
 # ---------------------------------------------------------------------------
 # 1. list_scenarios returns empty list when directory missing
 # ---------------------------------------------------------------------------
