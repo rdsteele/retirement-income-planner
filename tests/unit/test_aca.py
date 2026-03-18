@@ -13,15 +13,24 @@ Tests:
  6. Subsidy loss correct vs non-default baseline MAGI
  7. Marginal subsidy loss correct between schedule points (gradual slope)
  8. Marginal subsidy loss spikes at cliff crossing
- 9. Empty schedule (MFJ) falls back to formula calculation
-10. MFJ cliff uses correct threshold ($128,600)
+ 9. MFJ schedule populated — interpolation at $50,000
+10. MFJ cliff uses schedule-derived threshold ($85,000)
+11. Formula fallback — empty schedule uses applicable_percentage formula
 """
 
 from decimal import Decimal
+from unittest.mock import patch
 
 import pytest
 
-from services.aca import calculate_aca_subsidy
+from services.aca import (
+    _cliff_from_fpl,
+    _interpolate_monthly_aptc,
+    _last_nonzero_annual,
+    _marginal_loss_from_schedule,
+    calculate_aca_subsidy,
+    get_aptc_schedule_magis,
+)
 
 D = Decimal
 
@@ -328,3 +337,224 @@ def test_invalid_filing_status_raises():
             filing_status="mfs",
             tax_year=TAX_YEAR,
         )
+
+
+# ---------------------------------------------------------------------------
+# 11. Formula fallback — empty schedule uses applicable_percentage formula
+#
+# Synthetic data: "single" aptc_schedule is empty, so the formula path runs.
+# cliff_magi = 62600 (from filing_status_cliffs), slcsp = $10,000/year.
+# applicable_percentage = 0.0996
+#
+# At magi=50000:
+#   required = round_tax(50000 × 0.0996) = 4980
+#   aptc_annual = round_tax(10000 − 4980) = 5020
+#   aptc_monthly = round_tax(5020 / 12) = 418
+#
+# At magi=62600 (cliff):
+#   cliff_aptc = round_tax(10000 − round_tax(62600 × 0.0996)) = 3765
+#   marginal_subsidy_loss = 3765 (cliff spike)
+#
+# baseline_magi=30000:
+#   baseline_aptc = round_tax(10000 − round_tax(30000 × 0.0996)) = 7012
+#   subsidy_loss vs magi=50000: round_tax(7012 − 5020) = 1992
+# ---------------------------------------------------------------------------
+
+_FORMULA_DATA = {
+    "filing_status_cliffs": {"single": 62600},
+    "fpl_100pct": {"single": "15650", "mfj": "32150"},
+    "applicable_percentage_400pct": "0.0996",
+    "aptc_schedule": {"single": [], "mfj": []},
+}
+
+_SLCSP = D("10000")
+
+
+class TestFormulaFallback:
+    """Empty aptc_schedule → formula path in calculate_aca_subsidy."""
+
+    def _calc(self, magi, baseline_magi=None):
+        with patch("services.aca._load_aca_data", return_value=_FORMULA_DATA):
+            return calculate_aca_subsidy(
+                magi=magi,
+                filing_status="single",
+                tax_year=TAX_YEAR,
+                baseline_magi=baseline_magi,
+                slcsp_annual_premium=_SLCSP,
+            )
+
+    def test_eligible_below_cliff(self):
+        result = self._calc(D("50000"))
+        assert result.is_eligible is True
+        assert result.aptc_annual == D("5020")
+        assert result.aptc_monthly == D("418")
+        assert result.cliff_magi == D("62600")
+        assert result.distance_to_cliff == D("12600")
+
+    def test_eligible_subsidy_loss_zero_at_own_magi(self):
+        # Default baseline = aptc_annual itself → loss = 0
+        result = self._calc(D("50000"))
+        assert result.subsidy_loss == D("0")
+
+    def test_at_cliff_marginal_equals_cliff_aptc(self):
+        # At exactly cliff_magi: aptc=0, marginal = cliff_aptc (formula spike)
+        result = self._calc(D("62600"))
+        assert result.is_eligible is False
+        assert result.aptc_annual == D("0")
+        assert result.marginal_subsidy_loss == D("3765")
+
+    def test_above_cliff_ineligible_marginal_zero(self):
+        result = self._calc(D("70000"))
+        assert result.is_eligible is False
+        assert result.aptc_annual == D("0")
+        assert result.marginal_subsidy_loss == D("0")
+
+    def test_subsidy_loss_vs_explicit_baseline(self):
+        # baseline_magi=30000 → baseline_aptc=7012; current_aptc=5020 → loss=1992
+        result = self._calc(D("50000"), baseline_magi=D("30000"))
+        assert result.subsidy_loss == D("1992")
+
+    def test_fpl_cliff_fallback_when_no_filing_status_cliffs_key(self):
+        # Covers lines 174-175: else branch when data has no filing_status_cliffs.
+        # Also covers line 51: _cliff_from_fpl returns fpl_100pct × 4.
+        # cliff = 15650 × 4 = 62600 (same numeric result as the data-driven cliff)
+        formula_no_cliffs = {
+            "fpl_100pct": {"single": "15650", "mfj": "32150"},
+            "applicable_percentage_400pct": "0.0996",
+            "aptc_schedule": {"single": [], "mfj": []},
+        }
+        with patch("services.aca._load_aca_data", return_value=formula_no_cliffs):
+            result = calculate_aca_subsidy(
+                magi=D("50000"),
+                filing_status="single",
+                tax_year=TAX_YEAR,
+                slcsp_annual_premium=_SLCSP,
+            )
+        assert result.cliff_magi == D("62600")
+        assert result.is_eligible is True
+
+
+# ---------------------------------------------------------------------------
+# Internal helper: _cliff_from_fpl
+# ---------------------------------------------------------------------------
+
+def test_cliff_from_fpl_multiplies_by_four():
+    # Line 51: direct unit test of the helper
+    assert _cliff_from_fpl(D("15650")) == D("62600")
+    assert _cliff_from_fpl(D("32150")) == D("128600")
+
+
+# ---------------------------------------------------------------------------
+# Internal helper: _interpolate_monthly_aptc — defensive returns
+# ---------------------------------------------------------------------------
+
+_SIMPLE_SCHEDULE = [
+    {"magi": 22000, "monthly_aptc": 972},
+    {"magi": 35000, "monthly_aptc": 820},
+]
+
+
+def test_interpolate_below_first_point_returns_zero():
+    # Line 70: i==0 and first pt_magi > magi → return _ZERO
+    assert _interpolate_monthly_aptc(_SIMPLE_SCHEDULE, D("10000")) == D("0")
+
+
+def test_interpolate_above_last_point_returns_zero():
+    # Line 79: magi above all schedule points → loop ends, return _ZERO
+    assert _interpolate_monthly_aptc(_SIMPLE_SCHEDULE, D("50000")) == D("0")
+
+
+# ---------------------------------------------------------------------------
+# Internal helper: _last_nonzero_annual — all-zero schedule
+# ---------------------------------------------------------------------------
+
+def test_last_nonzero_annual_all_zero_schedule():
+    # Line 88: no non-zero monthly_aptc entry → return _ZERO
+    all_zero = [
+        {"magi": 22000, "monthly_aptc": 0},
+        {"magi": 62600, "monthly_aptc": 0},
+    ]
+    assert _last_nonzero_annual(all_zero) == D("0")
+
+
+# ---------------------------------------------------------------------------
+# Internal helper: _marginal_loss_from_schedule — past-end return
+# ---------------------------------------------------------------------------
+
+def test_marginal_loss_above_last_interval_returns_zero():
+    # Line 125: magi sits above all schedule intervals but below cliff.
+    # Schedule only covers up to 35000; cliff is 62600; magi=50000 falls past
+    # all (lower, upper) pairs in the loop.
+    cliff = D("62600")
+    assert _marginal_loss_from_schedule(_SIMPLE_SCHEDULE, D("50000"), cliff) == D("0")
+
+
+# ---------------------------------------------------------------------------
+# Internal helper: _last_nonzero_annual called from schedule path at cliff
+# when all monthly_aptc are zero — marginal = 0
+# ---------------------------------------------------------------------------
+
+def test_all_zero_schedule_marginal_zero_at_cliff():
+    # Covers line 88 via the schedule path in calculate_aca_subsidy:
+    # at magi==cliff_magi with an all-zero schedule, marginal = _last_nonzero = 0.
+    all_zero_data = {
+        "filing_status_cliffs": {"single": 62600},
+        "fpl_100pct": {"single": "15650", "mfj": "32150"},
+        "applicable_percentage_400pct": "0.0996",
+        "aptc_schedule": {
+            "single": [
+                {"magi": 22000, "monthly_aptc": 0},
+                {"magi": 62600, "monthly_aptc": 0},
+            ],
+            "mfj": [],
+        },
+    }
+    with patch("services.aca._load_aca_data", return_value=all_zero_data):
+        result = calculate_aca_subsidy(
+            magi=D("62600"),
+            filing_status="single",
+            tax_year=TAX_YEAR,
+        )
+    assert result.marginal_subsidy_loss == D("0")
+
+
+# ---------------------------------------------------------------------------
+# get_aptc_schedule_magis (lines 143-145)
+# ---------------------------------------------------------------------------
+
+def test_get_aptc_schedule_magis_single_2026():
+    # Lines 143-145: loads schedule and returns magi list
+    magis = get_aptc_schedule_magis("single", TAX_YEAR)
+    assert isinstance(magis, list)
+    assert D("22000") in magis
+    assert D("62600") in magis
+
+
+def test_get_aptc_schedule_magis_empty_when_no_schedule():
+    # Empty schedule → empty list
+    empty_data = {
+        "fpl_100pct": {"single": "15650", "mfj": "32150"},
+        "applicable_percentage_400pct": "0.0996",
+        "aptc_schedule": {"single": [], "mfj": []},
+    }
+    with patch("services.aca._load_aca_data", return_value=empty_data):
+        magis = get_aptc_schedule_magis("single", TAX_YEAR)
+    assert magis == []
+
+
+# ---------------------------------------------------------------------------
+# Baseline_magi below schedule minimum triggers _interpolate line 70
+# via the baseline calculation path in calculate_aca_subsidy
+# ---------------------------------------------------------------------------
+
+def test_baseline_below_schedule_minimum_yields_zero_baseline():
+    # baseline_magi=10000 < 22000 (min_schedule_magi).
+    # _interpolate_monthly_aptc(schedule, 10000) → hits line 70, returns 0.
+    # baseline_aptc = 0; subsidy_loss = max(0, 0 - current_aptc) = 0.
+    result = calculate_aca_subsidy(
+        magi=D("35000"),
+        filing_status="single",
+        tax_year=TAX_YEAR,
+        baseline_magi=D("10000"),
+    )
+    assert result.subsidy_loss == D("0")

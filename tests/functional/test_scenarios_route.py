@@ -123,3 +123,63 @@ def test_current_route_not_treated_as_name_param() -> None:
     # Would be 404 if "current" were treated as a name with no saved scenario
     body = resp.json()
     assert "name" in body
+
+
+# ---------------------------------------------------------------------------
+# Error branches — each route's except handler returns the correct HTTP status
+# ---------------------------------------------------------------------------
+
+def test_list_scenarios_500(monkeypatch) -> None:
+    def boom():
+        raise Exception("disk error")
+    monkeypatch.setattr(svc, "list_scenarios", boom)
+    resp = client.get("/api/scenarios")
+    assert resp.status_code == 500
+
+
+def test_get_current_500(monkeypatch) -> None:
+    def boom():
+        raise Exception("disk error")
+    monkeypatch.setattr(svc, "get_current_scenario", boom)
+    resp = client.get("/api/scenarios/current")
+    assert resp.status_code == 500
+
+
+def test_set_current_500(monkeypatch) -> None:
+    def boom(name):
+        raise Exception("disk error")
+    monkeypatch.setattr(svc, "set_current_scenario", boom)
+    resp = client.post("/api/scenarios/current", json={"name": "plan"})
+    assert resp.status_code == 500
+
+
+def test_get_scenario_404(monkeypatch) -> None:
+    def boom(name):
+        raise ValueError(f"Scenario not found: {name!r}")
+    monkeypatch.setattr(svc, "load_scenario", boom)
+    resp = client.get("/api/scenarios/Missing")
+    assert resp.status_code == 404
+
+
+def test_get_scenario_500(monkeypatch) -> None:
+    def boom(name):
+        raise Exception("disk error")
+    monkeypatch.setattr(svc, "load_scenario", boom)
+    resp = client.get("/api/scenarios/AnyName")
+    assert resp.status_code == 500
+
+
+def test_post_scenario_500(monkeypatch) -> None:
+    def boom(name, data):
+        raise Exception("disk error")
+    monkeypatch.setattr(svc, "save_scenario", boom)
+    resp = client.post("/api/scenarios/AnyName", json=_SCENARIO_DATA)
+    assert resp.status_code == 500
+
+
+def test_delete_scenario_500(monkeypatch) -> None:
+    def boom(name):
+        raise Exception("disk error")
+    monkeypatch.setattr(svc, "delete_scenario", boom)
+    resp = client.delete("/api/scenarios/AnyName")
+    assert resp.status_code == 500
