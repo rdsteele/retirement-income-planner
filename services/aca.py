@@ -168,8 +168,11 @@ def calculate_aca_subsidy(
     if filing_status not in ("single", "mfj"):
         raise ValueError(f"Unsupported filing status: {filing_status!r}")
 
-    fpl_100pct = Decimal(str(data["fpl_100pct"][filing_status]))
-    cliff_magi = _cliff_from_fpl(fpl_100pct)
+    if "filing_status_cliffs" in data and filing_status in data["filing_status_cliffs"]:
+        cliff_magi = Decimal(str(data["filing_status_cliffs"][filing_status]))
+    else:
+        fpl_100pct = Decimal(str(data["fpl_100pct"][filing_status]))
+        cliff_magi = _cliff_from_fpl(fpl_100pct)
     distance_to_cliff = cliff_magi - magi
     schedule = _schedule_for(data, filing_status)
 

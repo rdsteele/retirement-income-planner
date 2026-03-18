@@ -2,7 +2,7 @@
   "tax_year": 2026,
   "filing_status_cliffs": {
     "single": 62600,
-    "mfj": 128600
+    "mfj": 85000
   },
   "fpl_100pct": {
     "single": 15650,
@@ -31,7 +31,7 @@
       {"magi": 50000, "monthly_aptc": 707},
       {"magi": 55000, "monthly_aptc": 637},
       {"magi": 60000, "monthly_aptc": 565},
-      {"magi": 365000, "monthly_aptc": 499},
+      {"magi": 65000, "monthly_aptc": 499},
       {"magi": 70000, "monthly_aptc": 457},
       {"magi": 75000, "monthly_aptc": 416},
       {"magi": 80000, "monthly_aptc": 374},

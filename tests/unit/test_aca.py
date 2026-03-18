@@ -1,8 +1,8 @@
 """Unit tests for services/aca.py — schedule-based APTC calculation.
 
-2026 single filer: cliff = $15,650 × 4 = $62,600.
+2026 single filer: cliff = $62,600 (from filing_status_cliffs in data).
 Schedule minimum: $22,000 (Medicaid boundary).
-MFJ cliff: $32,150 × 4 = $128,600 (empty schedule → formula fallback).
+MFJ cliff: $85,000 (from filing_status_cliffs; schedule ends at {85000, 0}).
 
 Tests:
  1. Schedule interpolation between two points
@@ -26,7 +26,7 @@ from services.aca import calculate_aca_subsidy
 D = Decimal
 
 CLIFF_SINGLE = D("62600")
-CLIFF_MFJ    = D("128600")
+CLIFF_MFJ    = D("85000")
 TAX_YEAR     = 2026
 
 
@@ -263,38 +263,39 @@ def test_marginal_spike_at_cliff():
 
 
 # ---------------------------------------------------------------------------
-# 9. Empty schedule (MFJ) falls back to applicable-percentage formula
+# 9. MFJ schedule populated — interpolation at $50,000
 # ---------------------------------------------------------------------------
 
-def test_empty_schedule_formula_fallback():
-    """MFJ has an empty aptc_schedule; formula uses applicable_percentage_400pct."""
-    # required = round_tax(50000 × 0.0996) = 4980
-    # aptc     = max(0, 10000 - 4980) = 5020
+def test_mfj_schedule_at_50k():
+    """MFJ schedule is populated; $50,000 is an exact schedule point → $707/month."""
+    # Schedule entry: {magi: 50000, monthly_aptc: 707}
+    # aptc_annual = 707 × 12 = 8484
     result = calculate_aca_subsidy(
         magi=D("50000"),
         filing_status="mfj",
         tax_year=TAX_YEAR,
-        slcsp_annual_premium=D("10000"),
     )
-    assert result.aptc_annual == D("5020")
+    assert result.aptc_monthly == D("707")
+    assert result.aptc_annual == D("8484")
     assert result.is_eligible is True
     assert result.cliff_magi == CLIFF_MFJ
 
 
 # ---------------------------------------------------------------------------
-# 10. MFJ cliff uses correct threshold ($128,600)
+# 10. MFJ cliff uses schedule-derived threshold ($85,000)
 # ---------------------------------------------------------------------------
 
 class TestMFJCliff:
     def test_cliff_is_mfj_threshold(self):
+        # At $80,000: below the $85,000 cliff, eligible
         result = calculate_aca_subsidy(
-            magi=D("100000"),
+            magi=D("80000"),
             filing_status="mfj",
             tax_year=TAX_YEAR,
         )
         assert result.cliff_magi == CLIFF_MFJ
         assert result.is_eligible is True
-        assert result.distance_to_cliff == D("28600")
+        assert result.distance_to_cliff == D("5000")
 
     def test_mfj_over_cliff_ineligible(self):
         result = calculate_aca_subsidy(
