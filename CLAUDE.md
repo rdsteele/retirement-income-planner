@@ -82,6 +82,31 @@ Default route `/` redirects to `income.html`. `/emr` redirects to `emr.html`.
 
 ---
 
+## Hardcoding Rules — Non-Negotiable
+
+**Never hardcode values that come from configuration or data files.**
+This includes but is not limited to:
+- Tax years (e.g. `2025`, `2026`)
+- Filing statuses (e.g. `"single"`, `"mfj"`)
+- Dollar thresholds, bracket boundaries, or rates
+- Page URLs or route paths
+
+These values must always be:
+- **Backend:** loaded from data files in `data/` via `data_loader.py`
+- **Frontend:** populated dynamically from an `APP_CONFIG` object or
+  from an API response — never written inline in HTML or as JS constants
+
+**The only acceptable hardcoded values** are structural constants that
+will never change regardless of tax law or configuration — for example,
+the NIIT rate (3.8%) is statutory and has not changed since 2013, but
+even then prefer loading from data if it already exists there.
+
+If you find yourself writing a literal year, dollar amount, or filing
+status string anywhere outside of a data file or test fixture, stop and
+ask whether it should come from config instead.
+
+---
+
 ## Coding Style
 
 - **Prefer small, single-purpose functions.** If a function is doing more than one
