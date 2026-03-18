@@ -23,6 +23,20 @@
       {"magi": 62500, "monthly_aptc": 520},
       {"magi": 62600, "monthly_aptc": 0}
     ],
-    "mfj": []
+    "mfj": [
+      {"magi": 30000, "monthly_aptc": 946},
+      {"magi": 35000, "monthly_aptc": 894},
+      {"magi": 40000, "monthly_aptc": 836},
+      {"magi": 45000, "monthly_aptc": 773},
+      {"magi": 50000, "monthly_aptc": 707},
+      {"magi": 55000, "monthly_aptc": 637},
+      {"magi": 60000, "monthly_aptc": 565},
+      {"magi": 365000, "monthly_aptc": 499},
+      {"magi": 70000, "monthly_aptc": 457},
+      {"magi": 75000, "monthly_aptc": 416},
+      {"magi": 80000, "monthly_aptc": 374},
+      {"magi": 84000, "monthly_aptc": 341},
+      {"magi": 85000, "monthly_aptc": 0}
+    ]
   }
 }
