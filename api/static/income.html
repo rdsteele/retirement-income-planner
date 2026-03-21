@@ -343,7 +343,7 @@
       padding: 4px 4px 4px 2px;
       vertical-align: middle;
     }
-    .holding-table td.td-left { text-align: left; font-weight: 500; }
+    .holding-table td.td-left { text-align: left; font-weight: 500; text-transform: none; }
     .holding-table tr:nth-child(even) td { background: #f8f9fa; }
     .holding-table .derived-cell { color: #495057; }
     .mix-input {
@@ -553,103 +553,45 @@
 
       <!-- MAGI Summary Card (live) -->
       <div class="card" id="magi-card">
-        <div class="card-header">MAGI Summary</div>
-        <!-- Always-visible top rows -->
-        <div class="magi-row" style="padding-top:10px;">
-          <span class="magi-label">Projected MAGI</span>
-          <span class="magi-value" id="magi-value">$0</span>
-        </div>
-        <div class="magi-row" style="padding-bottom:8px;">
-          <span class="magi-label">Shortfall</span>
-          <span class="magi-value" id="shortfall-display">—</span>
-        </div>
-        <!-- Collapsible sections -->
-        <!-- ACA section (hidden until Include ACA checked) -->
-        <details id="aca-details-section" style="display:none;">
-          <summary><span>ACA</span><span class="section-summary-value" id="aca-section-summary">—</span></summary>
+        <div class="card-header">Plan Summary</div>
+        <!-- Withdrawals sub-section (collapsed by default) -->
+        <details>
+          <summary><span>Withdrawals</span></summary>
           <div class="magi-row">
-            <span class="magi-label">ACA Cliff</span>
-            <span class="magi-value" id="aca-cliff-display">$62,600</span>
+            <span class="magi-label">Basis Withdrawals</span>
+            <span class="magi-value" id="basis-withdrawals-display">$0</span>
+          </div>
+          <div class="magi-row" style="padding-bottom:10px;">
+            <span class="magi-label">Roth Withdrawals</span>
+            <span class="magi-value" id="roth-withdrawals-display">$0</span>
+          </div>
+        </details>
+        <!-- Income sub-section (collapsed by default) -->
+        <details>
+          <summary><span>Income</span></summary>
+          <div class="magi-row">
+            <span class="magi-label">Projected MAGI</span>
+            <span class="magi-value" id="magi-value">$0</span>
           </div>
           <div class="magi-row">
+            <span class="magi-label">ACA Cliff</span>
+            <span class="magi-value" id="aca-cliff-display">$0</span>
+          </div>
+          <div class="magi-row" style="padding-bottom:10px;">
             <span class="magi-label">Distance to Cliff</span>
             <span class="magi-value" id="distance-display">—</span>
           </div>
-          <div class="magi-row" style="padding-bottom:10px;">
-            <span class="magi-label">Estimated APTC</span>
-            <span class="magi-value" id="aptc-estimate-display">Run Calculate to estimate</span>
-          </div>
         </details>
-        <!-- Withdrawals section -->
-        <details open>
-          <summary><span>Withdrawals</span><span class="section-summary-value" id="withdrawals-section-summary">$0</span></summary>
+        <!-- Expenses sub-section (collapsed by default) -->
+        <details>
+          <summary><span>Expenses</span></summary>
           <div class="magi-row">
-            <span class="magi-label">Taxable</span>
-            <span class="magi-value" id="taxable-withdrawals-display">$0</span>
-          </div>
-          <div class="magi-row">
-            <span class="magi-label">Tax-Deferred</span>
-            <span class="magi-value" id="trad-withdrawals-display">$0</span>
-          </div>
-          <div class="magi-row">
-            <span class="magi-label">Tax-Free</span>
-            <span class="magi-value" id="roth-withdrawals-display">$0</span>
+            <span class="magi-label">Total Spending</span>
+            <span class="magi-value" id="total-spending-display">$0</span>
           </div>
           <div class="magi-row" style="padding-bottom:10px;">
-            <span class="magi-label">HSA Medical</span>
-            <span class="magi-value" id="hsa-withdrawals-display">$0</span>
-          </div>
-        </details>
-        <!-- Income section -->
-        <details open>
-          <summary><span>Income</span><span class="section-summary-value" id="income-section-summary">$0</span></summary>
-          <div class="magi-row">
-            <span class="magi-label" style="font-weight:600; color:#212529;">Total Forced Income</span>
-            <span class="magi-value" id="forced-income-display">$0</span>
-          </div>
-          <div class="magi-row">
-            <span class="magi-label" style="padding-left:12px; color:#adb5bd;">Ordinary</span>
-            <span class="magi-value" id="forced-ordinary-display" style="color:#6c757d;">$0</span>
-          </div>
-          <div class="magi-row">
-            <span class="magi-label" style="padding-left:12px; color:#adb5bd;">Preferential</span>
-            <span class="magi-value" id="forced-pref-display" style="color:#6c757d;">$0</span>
-          </div>
-          <div class="magi-row" style="margin-top:4px;">
-            <span class="magi-label" style="font-weight:600; color:#212529;">Total Planned Withdrawals</span>
-            <span class="magi-value" id="planned-withdrawals-display">$0</span>
-          </div>
-          <div class="magi-row">
-            <span class="magi-label" style="padding-left:12px; color:#adb5bd;">Ordinary</span>
-            <span class="magi-value" id="withdrawal-ordinary-display" style="color:#6c757d;">$0</span>
-          </div>
-          <div class="magi-row">
-            <span class="magi-label" style="padding-left:12px; color:#adb5bd;">Preferential</span>
-            <span class="magi-value" id="withdrawal-pref-display" style="color:#6c757d;">$0</span>
-          </div>
-          <div class="magi-row" style="margin-top:4px; padding-bottom:10px;">
-            <span class="magi-label" style="font-weight:600; color:#212529;">Total Income</span>
-            <span class="magi-value" id="total-income-display">$0</span>
-          </div>
-        </details>
-        <!-- Expenses section -->
-        <details open>
-          <summary><span>Expenses</span><span class="section-summary-value" id="expenses-section-summary">$0</span></summary>
-          <div class="magi-row">
-            <span class="magi-label">Essential Spending</span>
-            <span class="magi-value" id="essential-spending-display">$0</span>
-          </div>
-          <div class="magi-row">
-            <span class="magi-label">Discretionary</span>
-            <span class="magi-value" id="discretionary-spending-display">$0</span>
-          </div>
-          <div class="magi-row">
-            <span class="magi-label">HSA Contribution</span>
-            <span class="magi-value" id="hsa-contribution-display">$0</span>
-          </div>
-          <div class="magi-row" style="padding-bottom:10px;">
-            <span class="magi-label">Estimated Taxes</span>
-            <span class="magi-value" id="estimated-taxes-display">$0</span>
+            <span class="magi-label">Shortfall</span>
+            <span class="magi-value" id="shortfall-display">—</span>
           </div>
         </details>
       </div>
@@ -657,7 +599,7 @@
       <!-- Withdrawal Mix (collapsed by default) -->
       <div class="card" id="withdrawal-mix-card">
         <details>
-          <summary class="card-header">Withdrawal Mix</summary>
+          <summary class="card-header">Planned Withdrawals</summary>
           <div id="withdrawal-mix-body" class="mix-body">
             <p style="color:#6c757d; font-size:13px;">Loading accounts…</p>
           </div>
@@ -1059,58 +1001,28 @@
     const totalTaxableWithdrawals = totalBasisWithdrawals + totalGainWithdrawals;
     const totalAllWithdrawals     = totalTaxableWithdrawals + totalTradWithdrawals + totalRothWithdrawals + totalHsaWithdrawals;
     const totalExpenses           = totalSpending + hsaContribution + estimatedTaxes;
-    const forcedOrdinary          = pension + interest + ordinaryDividends + iraDistributions + ssBenefit;
-    const forcedPref              = qualifiedDividends + fixedLtcg;
-    const withdrawalOrdinary      = totalTradWithdrawals;
-    const withdrawalPref          = totalGainWithdrawals;
-    const totalPlannedWithdrawals = withdrawalOrdinary + withdrawalPref;
-    const totalIncome             = forcedIncome + totalPlannedWithdrawals;
 
-    // Always-visible top rows
-    el('magi-value').textContent    = fmt$(magi);
-    el('total-spending-display').textContent = fmt$(totalSpending);
+    // Withdrawals sub-section
+    el('basis-withdrawals-display').textContent = fmt$(totalBasisWithdrawals);
+    el('roth-withdrawals-display').textContent  = fmt$(totalRothWithdrawals);
 
-    // ACA section
+    // Income sub-section
+    el('magi-value').textContent        = fmt$(magi);
     el('aca-cliff-display').textContent = fmt$(acaCliffMagi);
     const distEl = el('distance-display');
-    const acaSummaryEl = el('aca-section-summary');
     if (distance > 5000) {
-      distEl.textContent      = fmt$(distance) + ' under';
-      distEl.className        = 'magi-value distance-green';
-      if (acaSummaryEl) { acaSummaryEl.textContent = fmt$(distance) + ' under'; acaSummaryEl.className = 'section-summary-value distance-green'; }
+      distEl.textContent = fmt$(distance) + ' under';
+      distEl.className   = 'magi-value distance-green';
     } else if (distance >= 0) {
-      distEl.textContent      = fmt$(distance) + ' under';
-      distEl.className        = 'magi-value distance-yellow';
-      if (acaSummaryEl) { acaSummaryEl.textContent = fmt$(distance) + ' under'; acaSummaryEl.className = 'section-summary-value distance-yellow'; }
+      distEl.textContent = fmt$(distance) + ' under';
+      distEl.className   = 'magi-value distance-yellow';
     } else {
-      distEl.textContent      = fmt$(-distance) + ' OVER';
-      distEl.className        = 'magi-value distance-red';
-      if (acaSummaryEl) { acaSummaryEl.textContent = fmt$(-distance) + ' OVER'; acaSummaryEl.className = 'section-summary-value distance-red'; }
+      distEl.textContent = fmt$(-distance) + ' OVER';
+      distEl.className   = 'magi-value distance-red';
     }
 
-    // Withdrawals section
-    el('taxable-withdrawals-display').textContent  = fmt$(totalTaxableWithdrawals);
-    el('trad-withdrawals-display').textContent     = fmt$(totalTradWithdrawals);
-    el('roth-withdrawals-display').textContent     = fmt$(totalRothWithdrawals);
-    el('hsa-withdrawals-display').textContent      = fmt$(totalHsaWithdrawals);
-    el('withdrawals-section-summary').textContent  = 'Total ' + fmt$(totalAllWithdrawals);
-
-    // Income section
-    el('forced-income-display').textContent        = fmt$(forcedIncome);
-    el('forced-ordinary-display').textContent      = fmt$(forcedOrdinary);
-    el('forced-pref-display').textContent          = fmt$(forcedPref);
-    el('planned-withdrawals-display').textContent  = fmt$(totalPlannedWithdrawals);
-    el('withdrawal-ordinary-display').textContent  = fmt$(withdrawalOrdinary);
-    el('withdrawal-pref-display').textContent      = fmt$(withdrawalPref);
-    el('total-income-display').textContent         = fmt$(totalIncome);
-    el('income-section-summary').textContent       = 'Total ' + fmt$(totalIncome);
-
-    // Expenses section
-    el('essential-spending-display').textContent   = fmt$(essential);
-    el('discretionary-spending-display').textContent = fmt$(discretionary);
-    el('hsa-contribution-display').textContent     = fmt$(hsaContribution);
-    el('estimated-taxes-display').textContent      = fmt$(estimatedTaxes);
-    el('expenses-section-summary').textContent     = 'Total ' + fmt$(totalExpenses);
+    // Expenses sub-section
+    el('total-spending-display').textContent = fmt$(totalSpending);
 
     // Shortfall = Total Expenses - Total Forced Income - Total Withdrawals
     const shortfall   = totalExpenses - forcedIncome - totalAllWithdrawals;
