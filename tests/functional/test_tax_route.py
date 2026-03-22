@@ -288,3 +288,92 @@ def test_unexpected_error_returns_500():
         resp = client.post("/api/tax", json=_BASE)
     assert resp.status_code == 500
     assert "unexpected" in resp.json()["detail"].lower()
+
+
+# ── 12. Top ordinary bracket (unbounded, line 56) ────────────────────────
+#
+# 2026 single, pension=700000
+# taxable_ordinary = 700000 - 16100 = 683900
+# Top bracket 37% starts at 640600 (unbounded, to=null) → else branch fires
+# income_taxed in top bracket = 683900 - 640600 = 43300
+
+class TestTopOrdinaryBracket:
+    def setup_method(self):
+        payload = {"pension": 700000.0, "filing_status": "single", "tax_year": 2026}
+        self.body = client.post("/api/tax", json=payload).json()
+        self.rows = self.body["federal"]["bracket_breakdown"]
+
+    def test_status_200(self):
+        assert self.body["federal"]["total_tax"] > 0
+
+    def test_top_bracket_rate_is_37pct(self):
+        assert self.rows[-1]["rate"] == pytest.approx(0.37)
+
+    def test_top_bracket_income_taxed(self):
+        # 683900 - 640600 = 43300
+        assert self.rows[-1]["income_taxed"] == pytest.approx(43300.0)
+
+
+# ── 13. Pref bracket skipped when ordinary fills it (line 82) ────────────
+#
+# 2026 single, pension=100000, qualified_dividends=10000
+# taxable_ordinary = 100000 - 16100 = 83900
+# 0% LTCG bracket ceiling = 49450; 83900 >= 49450 → bracket skipped
+# All 10000 of qualified_dividends land in the 15% bracket
+
+class TestPrefBracketSkipped:
+    def setup_method(self):
+        payload = {
+            "pension": 100000.0,
+            "qualified_dividends": 10000.0,
+            "filing_status": "single",
+            "tax_year": 2026,
+        }
+        self.body = client.post("/api/tax", json=payload).json()
+        self.rows = self.body["federal"]["preferential_breakdown"]
+
+    def test_only_one_pref_bracket(self):
+        # 0% bracket entirely skipped; only 15% bracket present
+        assert len(self.rows) == 1
+
+    def test_pref_bracket_rate_is_15pct(self):
+        assert self.rows[0]["rate"] == pytest.approx(0.15)
+
+    def test_pref_income_taxed(self):
+        assert self.rows[0]["income_taxed"] == pytest.approx(10000.0)
+
+    def test_pref_tax_amount(self):
+        assert self.rows[0]["tax_amount"] == pytest.approx(1500.0)
+
+
+# ── 14. Top pref bracket reached (unbounded 20%, line 85) ────────────────
+#
+# 2026 single, pension=600000, qualified_dividends=50000
+# taxable_ordinary = 600000 - 16100 = 583900
+# 20% LTCG bracket starts at 545500 (unbounded, to=null) → else branch fires
+# Both 0% and 15% brackets are skipped (ordinary fills past them)
+# All 50000 qualified_dividends fall in the 20% bracket
+
+class TestTopPrefBracket:
+    def setup_method(self):
+        payload = {
+            "pension": 600000.0,
+            "qualified_dividends": 50000.0,
+            "filing_status": "single",
+            "tax_year": 2026,
+        }
+        self.body = client.post("/api/tax", json=payload).json()
+        self.rows = self.body["federal"]["preferential_breakdown"]
+
+    def test_only_one_pref_bracket(self):
+        # 0% and 15% brackets entirely skipped; only 20% bracket present
+        assert len(self.rows) == 1
+
+    def test_pref_bracket_rate_is_20pct(self):
+        assert self.rows[0]["rate"] == pytest.approx(0.20)
+
+    def test_pref_income_taxed(self):
+        assert self.rows[0]["income_taxed"] == pytest.approx(50000.0)
+
+    def test_pref_tax_amount(self):
+        assert self.rows[0]["tax_amount"] == pytest.approx(10000.0)
