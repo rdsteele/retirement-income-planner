@@ -8,6 +8,11 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+    /* Remove spinner arrows from number inputs */
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type=number] { -moz-appearance: textfield; }
+
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       font-size: 14px;
@@ -494,8 +499,7 @@ HSA,hsa,,100000,5400"></textarea>
       const holdingRows = holdings.map(h => renderHoldingRow(id, h)).join('');
       const addRow = addingHoldingTo === id ? `
         <tr>
-          <td><input type="text" id="add-ticker-${id}" placeholder="TICKER"
-            oninput="this.value=this.value.toUpperCase()" style="text-transform:uppercase;"></td>
+          <td><input type="text" id="add-ticker-${id}" placeholder="Holding"></td>
           <td><input type="number" id="add-value-${id}" placeholder="Value" min="0" step="any"></td>
           <td><input type="number" id="add-basis-${id}" placeholder="Basis" min="0" step="any"></td>
           <td></td>
@@ -541,8 +545,7 @@ HSA,hsa,,100000,5400"></textarea>
     if (editingHolding && editingHolding.accountId === accountId && editingHolding.holdingId === hid) {
       return `
         <tr class="editing">
-          <td><input type="text" id="edit-hticker-${hid}" value="${escHtml(h.ticker)}"
-            oninput="this.value=this.value.toUpperCase()" style="text-transform:uppercase;"></td>
+          <td><input type="text" id="edit-hticker-${hid}" value="${escHtml(h.ticker)}"></td>
           <td><input type="number" id="edit-hvalue-${hid}" value="${h.value}" min="0" step="any"></td>
           <td><input type="number" id="edit-hbasis-${hid}" value="${h.basis}" min="0" step="any"></td>
           <td>${fmt(h.unrealized_gain)}</td>
@@ -668,7 +671,7 @@ HSA,hsa,,100000,5400"></textarea>
   }
 
   async function submitAddHolding(id) {
-    const ticker = (document.getElementById(`add-ticker-${id}`).value || '').trim().toUpperCase();
+    const ticker = (document.getElementById(`add-ticker-${id}`).value || '').trim();
     const value  = parseFloat(document.getElementById(`add-value-${id}`).value) || 0;
     const basis  = parseFloat(document.getElementById(`add-basis-${id}`).value) || 0;
     if (!ticker) return;
@@ -698,7 +701,7 @@ HSA,hsa,,100000,5400"></textarea>
   }
 
   async function saveHolding(accountId, holdingId) {
-    const ticker = (document.getElementById(`edit-hticker-${holdingId}`).value || '').trim().toUpperCase();
+    const ticker = (document.getElementById(`edit-hticker-${holdingId}`).value || '').trim();
     const value  = parseFloat(document.getElementById(`edit-hvalue-${holdingId}`).value) || 0;
     const basis  = parseFloat(document.getElementById(`edit-hbasis-${holdingId}`).value) || 0;
     try {
