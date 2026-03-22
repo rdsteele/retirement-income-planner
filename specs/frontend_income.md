@@ -108,7 +108,7 @@ Income that arrives regardless of withdrawal decisions.
 
 ---
 
-### Section: Withdrawal Mix
+### Section: Planned Withdrawals
 
 Populated dynamically from `GET /api/accounts` on page load. Accounts are
 displayed in this order: taxable, tax-deferred, Roth, HSA.
@@ -124,7 +124,7 @@ For each holding within the account:
 
 | Column | Notes |
 |---|---|
-| Ticker | Display only (from inventory) |
+| Holding | Display only (from inventory) |
 | Basis | Display only |
 | Value | Display only |
 | Unrealized Gain | Display only (`value - basis`) |
@@ -165,12 +165,12 @@ Contribution is captured in the Adjustments section.
 
 ## Right Panel — Outputs
 
-All output sections update on "Calculate" button click, except the MAGI
+All output sections update on "Calculate" button click, except the Plan
 Summary card which updates live as inputs change.
 
 ---
 
-### Section: MAGI Summary Card
+### Section: Plan Summary Card
 
 Updates live (no API call) as any input changes.
 
@@ -232,6 +232,10 @@ social security service when Calculate is clicked.
 by taxable gains, tax-deferred withdrawals, or Roth withdrawals (all captured
 in the withdrawal mix). A negative shortfall means forced income + basis
 withdrawals exceed spending (surplus).
+
+**Collapsible subsections:** The Withdrawals, Income, and Expenses subsections
+within Plan Summary are initially collapsed. The ACA subsection is hidden
+until "Include ACA" is checked.
 
 ---
 
