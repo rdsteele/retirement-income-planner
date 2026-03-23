@@ -168,6 +168,41 @@ Contribution is captured in the Adjustments section.
 All output sections update on "Calculate" button click, except the Plan
 Summary card which updates live as inputs change.
 
+Card order in the right panel: Plan Summary → Executed Withdrawals → Planned Withdrawals → Chart → Key Points → Portfolio Summary.
+
+---
+
+### Section: Executed Withdrawals
+
+Collapsed by default. Allows entry of withdrawal events already executed
+in the current year. Entries are not tied to accounts.
+
+Stored in `income_planning.executed_withdrawals` within the scenario JSON.
+
+| Field | Notes |
+|---|---|
+| Description | Free text (e.g., holding name or account) |
+| Withdraw ($) | Total withdrawal amount |
+| Basis Portion ($) | Cost basis; used for gain calculation on ltcg/stcg types |
+| Gain ($) | Derived display: `max(0, withdraw − basis)`; updates live |
+| Type | See table below |
+
+**Types:**
+
+| Type | Display | Income Impact | MAGI Impact | Withdrawals Section Target |
+|---|---|---|---|---|
+| `ltcg` | LTCG | gain (amount − basis) → preferential | yes | Taxable |
+| `stcg` | STCG | gain (amount − basis) → ordinary | yes | Taxable |
+| `tax_deferred` | Tax-Deferred | full amount → ordinary | yes | Tax-Deferred |
+| `tax_free_roth` | Tax-Free (Roth) | none | no | Tax-Free |
+| `tax_free_hsa` | Tax-Free (HSA) | none | no | HSA Medical |
+
+All types: full `amount` contributes to total withdrawals and reduces shortfall.
+
+**Calculate payload mapping:**
+- LTCG gains (`execPref`) → added to `fixed_ltcg`
+- STCG gains + tax-deferred amounts (`execOrdinary`) → added to `ira_distributions`
+
 ---
 
 ### Section: Plan Summary Card
@@ -180,9 +215,13 @@ Updates live (no API call) as any input changes.
 total_gain_withdrawals   = sum(gain portion from all taxable holdings)
 total_trad_withdrawals   = sum(trad withdrawal amounts)
 
+exec_ordinary            = sum(stcg gains + tax_deferred amounts from executed withdrawals)
+exec_pref                = sum(ltcg gains from executed withdrawals)
+
 provisional_income       = pension + interest + ordinary_dividends + rmds
                          + fixed_ltcg + total_gain_withdrawals
                          + total_trad_withdrawals
+                         + exec_ordinary + exec_pref
                          - hsa_contribution
                          + (ss_benefit × 0.50)
 
@@ -191,6 +230,7 @@ ss_taxable_approx        = approximate_ss_taxable(ss_benefit, provisional_income
 magi                     = pension + interest + ordinary_dividends + rmds
                          + fixed_ltcg + total_gain_withdrawals
                          + total_trad_withdrawals
+                         + exec_ordinary + exec_pref
                          + ss_taxable_approx
                          - hsa_contribution
 ```
@@ -218,10 +258,28 @@ social security service when Calculate is clicked.
 | Projected MAGI | Formatted as `$XX,XXX` |
 | ACA Cliff | `$62,600` (2026 single, hardcoded for now) |
 | Distance to Cliff | `cliff - magi`; formatted as `$X,XXX under` or `$X,XXX OVER` |
-| Basis Withdrawals | Sum of all basis portions across taxable holdings (MAGI-neutral) |
-| Roth Withdrawals | Sum of all Roth withdrawal inputs (MAGI-neutral) |
 | Total Spending | `essential + discretionary` |
-| Shortfall | `total_spending - forced_income - basis_withdrawals` |
+| Shortfall | `total_expenses - forced_income - total_all_withdrawals` (planned + executed) |
+
+**Income subsection layout (within Plan Summary):**
+```
+Total Forced Income        $XX,XXX
+  Ordinary                 $XX,XXX
+  Preferential             $XX,XXX
+Total Executed Withdrawal Income $XX,XXX   ← exec_ordinary + exec_pref (income portion only)
+  Ordinary                       $XX,XXX   ← exec_ordinary
+  Preferential                   $XX,XXX   ← exec_pref
+Total Planned Withdrawal Income  $XX,XXX
+  Ordinary                 $XX,XXX
+  Preferential             $XX,XXX
+Total Income               $XX,XXX   ← forced + executed income + planned
+```
+
+**Withdrawals subsection:** executed amounts are folded into existing type subtotals:
+- Taxable: planned taxable + executed ltcg/stcg full amounts
+- Tax-Deferred: planned trad + executed tax_deferred full amounts
+- Tax-Free: planned Roth + executed tax_free_roth full amounts
+- HSA Medical: planned HSA + executed tax_free_hsa full amounts
 
 **Status color on Distance to Cliff:**
 - Green: more than $5,000 under cliff

@@ -616,7 +616,19 @@
             <span class="magi-value" id="forced-pref-display" style="color:#6c757d;">$0</span>
           </div>
           <div class="magi-row" style="margin-top:4px;">
-            <span class="magi-label" style="font-weight:600; color:#212529;">Total Planned Withdrawals</span>
+            <span class="magi-label" style="font-weight:600; color:#212529;">Total Executed Withdrawal Income</span>
+            <span class="magi-value" id="executed-withdrawals-display">$0</span>
+          </div>
+          <div class="magi-row">
+            <span class="magi-label" style="padding-left:12px; color:#adb5bd;">Ordinary</span>
+            <span class="magi-value" id="executed-ordinary-display" style="color:#6c757d;">$0</span>
+          </div>
+          <div class="magi-row">
+            <span class="magi-label" style="padding-left:12px; color:#adb5bd;">Preferential</span>
+            <span class="magi-value" id="executed-pref-display" style="color:#6c757d;">$0</span>
+          </div>
+          <div class="magi-row" style="margin-top:4px;">
+            <span class="magi-label" style="font-weight:600; color:#212529;">Total Planned Withdrawal Income</span>
             <span class="magi-value" id="planned-withdrawals-display">$0</span>
           </div>
           <div class="magi-row">
@@ -654,7 +666,30 @@
         </details>
       </div>
 
-      <!-- Withdrawal Mix (collapsed by default) -->
+      <!-- Executed Withdrawals -->
+      <div class="card" id="executed-withdrawals-card">
+        <details>
+          <summary class="card-header">Executed Withdrawals</summary>
+          <div class="mix-body">
+            <table class="holding-table" id="executed-table" style="display:none;">
+              <thead><tr>
+                <th class="th-left">Description</th>
+                <th>Withdraw ($)</th>
+                <th>Basis Portion ($)</th>
+                <th>Gain ($)</th>
+                <th class="th-left">Type</th>
+                <th></th>
+              </tr></thead>
+              <tbody id="executed-tbody"></tbody>
+            </table>
+            <div style="margin-top:8px;">
+              <button class="scenario-btn" onclick="addExecutedRow()">+ Add Withdrawal</button>
+            </div>
+          </div>
+        </details>
+      </div>
+
+      <!-- Planned Withdrawals (collapsed by default) -->
       <div class="card" id="withdrawal-mix-card">
         <details>
           <summary class="card-header">Planned Withdrawals</summary>
@@ -733,9 +768,10 @@
 
   // ── State ─────────────────────────────────────────────────────────────
   const CONFIG = {};
-  let lastResult   = null;
-  let chartMode    = 'stacked';
-  let accounts     = [];
+  let lastResult         = null;
+  let chartMode          = 'stacked';
+  let accounts           = [];
+  let executedWithdrawals = [];  // [{ id, description, amount, basis, type }]
   let acaCliffMagi    = 62600; // default; updated from Calculate response
   let estimatedTaxes  = 0;     // total_tax at sweep_floor from last Calculate run
 
@@ -965,6 +1001,69 @@
     }
   }
 
+  // ── Executed Withdrawals ──────────────────────────────────────────────
+  function renderExecutedWithdrawals() {
+    const tbody = el('executed-tbody');
+    const table = el('executed-table');
+    if (!tbody || !table) return;
+    table.style.display = executedWithdrawals.length === 0 ? 'none' : '';
+    tbody.innerHTML = executedWithdrawals.map((ew, idx) => `
+      <tr>
+        <td class="td-left">
+          <input type="text" class="mix-input" style="width:120px; text-align:left;"
+            value="${escHtml(ew.description || '')}"
+            onblur="updateExecutedField(${idx}, 'description', this.value)">
+        </td>
+        <td>
+          <input type="number" class="mix-input" min="0" step="1" placeholder="0"
+            value="${ew.amount || ''}"
+            onchange="updateExecutedField(${idx}, 'amount', parseFloat(this.value)||0)">
+        </td>
+        <td>
+          <input type="number" class="mix-input" min="0" step="1" placeholder="0"
+            value="${ew.basis || ''}"
+            onchange="updateExecutedField(${idx}, 'basis', parseFloat(this.value)||0)">
+        </td>
+        <td class="derived-cell" id="ewgain_${ew.id}">${fmt$(Math.max(0, (ew.amount||0) - (ew.basis||0)))}</td>
+        <td>
+          <select class="mix-input" style="width:130px; text-align:left;"
+            onchange="updateExecutedField(${idx}, 'type', this.value)">
+            <option value="ltcg"          ${ew.type === 'ltcg'          ? 'selected' : ''}>LTCG</option>
+            <option value="stcg"          ${ew.type === 'stcg'          ? 'selected' : ''}>STCG</option>
+            <option value="tax_deferred"  ${ew.type === 'tax_deferred'  ? 'selected' : ''}>Tax-Deferred</option>
+            <option value="tax_free_roth" ${ew.type === 'tax_free_roth' ? 'selected' : ''}>Tax-Free (Roth)</option>
+            <option value="tax_free_hsa"  ${ew.type === 'tax_free_hsa'  ? 'selected' : ''}>Tax-Free (HSA)</option>
+          </select>
+        </td>
+        <td>
+          <button onclick="deleteExecutedRow(${idx})"
+            style="padding:2px 7px; font-size:11px; border:1px solid #dc3545; color:#dc3545; background:#fff; border-radius:3px; cursor:pointer;">×</button>
+        </td>
+      </tr>`).join('');
+  }
+
+  function addExecutedRow() {
+    executedWithdrawals.push({ id: 'ew_' + Date.now(), description: '', amount: 0, basis: 0, type: 'ltcg' });
+    renderExecutedWithdrawals();
+    updateMagi();
+  }
+
+  function deleteExecutedRow(idx) {
+    executedWithdrawals.splice(idx, 1);
+    renderExecutedWithdrawals();
+    updateMagi();
+  }
+
+  function updateExecutedField(idx, field, value) {
+    if (executedWithdrawals[idx]) {
+      executedWithdrawals[idx][field] = value;
+      const ew     = executedWithdrawals[idx];
+      const gainEl = el('ewgain_' + ew.id);
+      if (gainEl) gainEl.textContent = fmt$(Math.max(0, (ew.amount || 0) - (ew.basis || 0)));
+    }
+    updateMagi();
+  }
+
   function updateGainDisplay(holdingId) {
     const w = parseFloat(el(`withdraw_${holdingId}`)?.value) || 0;
     const b = parseFloat(el(`basis_${holdingId}`)?.value)   || 0;
@@ -1012,6 +1111,35 @@
     return { totalGainWithdrawals, totalBasisWithdrawals, totalTradWithdrawals, totalRothWithdrawals, totalHsaWithdrawals };
   }
 
+  // ── Executed withdrawal totals ─────────────────────────────────────────
+  function calcExecutedTotals() {
+    let execOrdinary = 0;
+    let execPref     = 0;
+    let execTaxable  = 0;
+    let execTrad     = 0;
+    let execRoth     = 0;
+    let execHsa      = 0;
+    for (const ew of executedWithdrawals) {
+      const amt  = ew.amount || 0;
+      const gain = Math.max(0, amt - (ew.basis || 0));
+      if (ew.type === 'ltcg') {
+        execPref    += gain;
+        execTaxable += amt;
+      } else if (ew.type === 'stcg') {
+        execOrdinary += gain;
+        execTaxable  += amt;
+      } else if (ew.type === 'tax_deferred') {
+        execOrdinary += amt;
+        execTrad     += amt;
+      } else if (ew.type === 'tax_free_roth') {
+        execRoth += amt;
+      } else if (ew.type === 'tax_free_hsa') {
+        execHsa += amt;
+      }
+    }
+    return { execOrdinary, execPref, execTaxable, execTrad, execRoth, execHsa };
+  }
+
   // ── SS taxability approximation (single filer, for live display only) ─
   function approximateSsTaxable(ssBenefit, provisionalIncome) {
     if (ssBenefit === 0) return 0;
@@ -1037,11 +1165,13 @@
 
     const { totalGainWithdrawals, totalBasisWithdrawals, totalTradWithdrawals, totalRothWithdrawals, totalHsaWithdrawals } =
       gatherWithdrawals();
+    const { execOrdinary, execPref, execTaxable, execTrad, execRoth, execHsa } = calcExecutedTotals();
 
     // Provisional income for SS taxability approximation
     const provisionalIncome =
       pension + interest + ordinaryDividends + iraDistributions
       + qualifiedDividends + fixedLtcg + totalGainWithdrawals + totalTradWithdrawals
+      + execOrdinary + execPref
       - hsaContribution + ssBenefit * 0.50;
 
     const ssTaxableApprox = approximateSsTaxable(ssBenefit, provisionalIncome);
@@ -1051,20 +1181,21 @@
       pension + interest + ordinaryDividends + iraDistributions
       + totalTradWithdrawals + ssTaxableApprox - hsaContribution;
     const plannedPref     = qualifiedDividends + fixedLtcg + totalGainWithdrawals;
-    const magi            = plannedOrdinary + plannedPref;
+    const magi            = plannedOrdinary + plannedPref + execOrdinary + execPref;
 
     const distance            = acaCliffMagi - magi;
     const forcedIncome        = pension + interest + ordinaryDividends + iraDistributions
                                 + qualifiedDividends + fixedLtcg + ssBenefit;
-    const totalTaxableWithdrawals = totalBasisWithdrawals + totalGainWithdrawals;
-    const totalAllWithdrawals     = totalTaxableWithdrawals + totalTradWithdrawals + totalRothWithdrawals + totalHsaWithdrawals;
+    const totalTaxableWithdrawals = totalBasisWithdrawals + totalGainWithdrawals + execTaxable;
+    const totalAllWithdrawals     = totalTaxableWithdrawals + (totalTradWithdrawals + execTrad) + (totalRothWithdrawals + execRoth) + (totalHsaWithdrawals + execHsa);
     const totalExpenses           = totalSpending + hsaContribution + estimatedTaxes;
     const forcedOrdinary          = pension + interest + ordinaryDividends + iraDistributions + ssBenefit;
     const forcedPref              = qualifiedDividends + fixedLtcg;
     const withdrawalOrdinary      = totalTradWithdrawals;
     const withdrawalPref          = totalGainWithdrawals;
     const totalPlannedWithdrawals = withdrawalOrdinary + withdrawalPref;
-    const totalIncome             = forcedIncome + totalPlannedWithdrawals;
+    const execIncome              = execOrdinary + execPref;
+    const totalIncome             = forcedIncome + execIncome + totalPlannedWithdrawals;
 
     // Always-visible top rows
     el('magi-value').textContent    = fmt$(magi);
@@ -1088,17 +1219,20 @@
       if (acaSummaryEl) { acaSummaryEl.textContent = fmt$(-distance) + ' OVER'; acaSummaryEl.className = 'section-summary-value distance-red'; }
     }
 
-    // Withdrawals section
+    // Withdrawals section (planned + executed combined per type)
     el('taxable-withdrawals-display').textContent  = fmt$(totalTaxableWithdrawals);
-    el('trad-withdrawals-display').textContent     = fmt$(totalTradWithdrawals);
-    el('roth-withdrawals-display').textContent     = fmt$(totalRothWithdrawals);
-    el('hsa-withdrawals-display').textContent      = fmt$(totalHsaWithdrawals);
+    el('trad-withdrawals-display').textContent     = fmt$(totalTradWithdrawals + execTrad);
+    el('roth-withdrawals-display').textContent     = fmt$(totalRothWithdrawals + execRoth);
+    el('hsa-withdrawals-display').textContent      = fmt$(totalHsaWithdrawals + execHsa);
     el('withdrawals-section-summary').textContent  = 'Total ' + fmt$(totalAllWithdrawals);
 
     // Income section
     el('forced-income-display').textContent        = fmt$(forcedIncome);
     el('forced-ordinary-display').textContent      = fmt$(forcedOrdinary);
     el('forced-pref-display').textContent          = fmt$(forcedPref);
+    el('executed-withdrawals-display').textContent = fmt$(execIncome);
+    el('executed-ordinary-display').textContent    = fmt$(execOrdinary);
+    el('executed-pref-display').textContent        = fmt$(execPref);
     el('planned-withdrawals-display').textContent  = fmt$(totalPlannedWithdrawals);
     el('withdrawal-ordinary-display').textContent  = fmt$(withdrawalOrdinary);
     el('withdrawal-pref-display').textContent      = fmt$(withdrawalPref);
@@ -1147,15 +1281,16 @@
     calcBtn.textContent = 'Calculating…';
 
     const { totalGainWithdrawals: calcGains, totalTradWithdrawals: calcTrad } = gatherWithdrawals();
+    const { execOrdinary: calcExecOrdinary, execPref: calcExecPref } = calcExecutedTotals();
 
     const payload = {
       pension:                    fnum('pension'),
       interest:                   fnum('interest'),
       ordinary_dividends:         fnum('ordinary_dividends'),
-      ira_distributions:          fnum('ira_distributions') + calcTrad,
+      ira_distributions:          fnum('ira_distributions') + calcTrad + calcExecOrdinary,
       ss_benefit:                 fnum('ss_benefit'),
       qualified_dividends:        fnum('qualified_dividends'),
-      fixed_ltcg:                 fnum('fixed_ltcg') + calcGains,
+      fixed_ltcg:                 fnum('fixed_ltcg') + calcGains + calcExecPref,
       above_the_line_adjustments: fnum('above_the_line_adjustments'),
       sweep_mode:                 'ordinary',
       filing_status:              el('filing_status')?.value || 'single',
@@ -1546,9 +1681,10 @@
         essential_spending:    fnum('essential_spending'),
         discretionary_spending: fnum('discretionary_spending'),
         withdrawals,
-        trad_withdrawals: tradWithdrawals,
-        roth_withdrawals: rothWithdrawals,
-        hsa_withdrawals:  hsaWithdrawals,
+        trad_withdrawals:      tradWithdrawals,
+        roth_withdrawals:      rothWithdrawals,
+        hsa_withdrawals:       hsaWithdrawals,
+        executed_withdrawals:  executedWithdrawals,
       },
     };
   }
@@ -1564,6 +1700,8 @@
     for (const w of (ip.trad_withdrawals || [])) setField(`trad_${w.id}`, w.amount);
     for (const w of (ip.roth_withdrawals || [])) setField(`roth_${w.id}`, w.amount);
     for (const w of (ip.hsa_withdrawals  || [])) setField(`hsa_${w.id}`,  w.amount);
+    executedWithdrawals = (ip.executed_withdrawals || []).map(ew => ({ ...ew }));
+    renderExecutedWithdrawals();
   }
 
   async function loadCurrentScenario() {
