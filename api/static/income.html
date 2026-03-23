@@ -773,7 +773,7 @@
   let chartMode          = 'stacked';
   let accounts           = [];
   let executedWithdrawals = [];  // [{ id, description, amount, basis, type }]
-  let acaCliffMagi    = 62600; // default; updated from Calculate response
+  let acaCliffMagi    = 0;     // updated from Calculate response
   let estimatedTaxes  = 0;     // total_tax at sweep_floor from last Calculate run
   let taxesStale      = true;  // true until Calculate is clicked; reset to true on any input change
 
@@ -1084,187 +1084,148 @@
     if (subW) subW.textContent = fmt$(totalW);
   }
 
-  // ── Gather withdrawal totals ───────────────────────────────────────────
-  function gatherWithdrawals() {
-    let totalGainWithdrawals  = 0;
-    let totalBasisWithdrawals = 0;
-    let totalTradWithdrawals  = 0;
-    let totalRothWithdrawals  = 0;
-    let totalHsaWithdrawals   = 0;
-
+  // ── Gather withdrawal arrays for API requests ─────────────────────────
+  function gatherPlannedWithdrawals() {
+    const planned = [];
     for (const acct of accounts) {
       if (acct.account_type === 'taxable' && acct.holdings) {
         for (const h of acct.holdings) {
-          const w    = parseFloat(el(`withdraw_${h.id}`)?.value) || 0;
-          const b    = parseFloat(el(`basis_${h.id}`)?.value)   || 0;
-          const gain = Math.max(0, w - b);
-          totalGainWithdrawals  += gain;
-          totalBasisWithdrawals += b;
+          planned.push({
+            account_type: 'taxable',
+            amount: parseFloat(el(`withdraw_${h.id}`)?.value) || 0,
+            basis:  parseFloat(el(`basis_${h.id}`)?.value)   || 0,
+          });
         }
       } else if (acct.account_type === 'traditional') {
-        totalTradWithdrawals += parseFloat(el(`trad_${acct.id}`)?.value) || 0;
+        planned.push({ account_type: 'traditional', amount: parseFloat(el(`trad_${acct.id}`)?.value) || 0, basis: 0 });
       } else if (acct.account_type === 'roth') {
-        totalRothWithdrawals += parseFloat(el(`roth_${acct.id}`)?.value) || 0;
+        planned.push({ account_type: 'roth', amount: parseFloat(el(`roth_${acct.id}`)?.value) || 0, basis: 0 });
       } else if (acct.account_type === 'hsa') {
-        totalHsaWithdrawals += parseFloat(el(`hsa_${acct.id}`)?.value) || 0;
+        planned.push({ account_type: 'hsa', amount: parseFloat(el(`hsa_${acct.id}`)?.value) || 0, basis: 0 });
       }
     }
-
-    return { totalGainWithdrawals, totalBasisWithdrawals, totalTradWithdrawals, totalRothWithdrawals, totalHsaWithdrawals };
+    return planned;
   }
 
-  // ── Executed withdrawal totals ─────────────────────────────────────────
-  function calcExecutedTotals() {
-    let execOrdinary = 0;
-    let execPref     = 0;
-    let execTaxable  = 0;
-    let execTrad     = 0;
-    let execRoth     = 0;
-    let execHsa      = 0;
-    for (const ew of executedWithdrawals) {
-      const amt  = ew.amount || 0;
-      const gain = Math.max(0, amt - (ew.basis || 0));
-      if (ew.type === 'ltcg') {
-        execPref    += gain;
-        execTaxable += amt;
-      } else if (ew.type === 'stcg') {
-        execOrdinary += gain;
-        execTaxable  += amt;
-      } else if (ew.type === 'tax_deferred') {
-        execOrdinary += amt;
-        execTrad     += amt;
-      } else if (ew.type === 'tax_free_roth') {
-        execRoth += amt;
-      } else if (ew.type === 'tax_free_hsa') {
-        execHsa += amt;
-      }
-    }
-    return { execOrdinary, execPref, execTaxable, execTrad, execRoth, execHsa };
+  function gatherExecutedWithdrawalsPayload() {
+    return executedWithdrawals.map(ew => ({
+      withdrawal_type: ew.type,
+      amount: ew.amount || 0,
+      basis:  ew.basis  || 0,
+    }));
   }
 
-  // ── SS taxability approximation (single filer, for live display only) ─
-  function approximateSsTaxable(ssBenefit, provisionalIncome) {
-    if (ssBenefit === 0) return 0;
-    const tier1    = Math.max(0, Math.min(provisionalIncome - 25000, 9000));
-    const tier2    = Math.max(0, provisionalIncome - 34000);
-    const included = Math.min(tier1 * 0.50 + tier2 * 0.85, ssBenefit * 0.85);
-    return Math.max(0, included);
-  }
-
-  // ── Live MAGI update ──────────────────────────────────────────────────
-  function updateMagi() {
-    const pension            = fnum('pension');
-    const interest           = fnum('interest');
-    const ordinaryDividends  = fnum('ordinary_dividends');
-    const iraDistributions   = fnum('ira_distributions');
-    const fixedLtcg          = fnum('fixed_ltcg');
-    const ssBenefit          = fnum('ss_benefit');
-    const qualifiedDividends = fnum('qualified_dividends');
-    const hsaContribution    = fnum('above_the_line_adjustments');
-    const essential          = fnum('essential_spending');
-    const discretionary      = fnum('discretionary_spending');
-    const totalSpending      = essential + discretionary;
-
-    const { totalGainWithdrawals, totalBasisWithdrawals, totalTradWithdrawals, totalRothWithdrawals, totalHsaWithdrawals } =
-      gatherWithdrawals();
-    const { execOrdinary, execPref, execTaxable, execTrad, execRoth, execHsa } = calcExecutedTotals();
-
-    // Provisional income for SS taxability approximation
-    const provisionalIncome =
-      pension + interest + ordinaryDividends + iraDistributions
-      + qualifiedDividends + fixedLtcg + totalGainWithdrawals + totalTradWithdrawals
-      + execOrdinary + execPref
-      - hsaContribution + ssBenefit * 0.50;
-
-    const ssTaxableApprox = approximateSsTaxable(ssBenefit, provisionalIncome);
-
-    // Income breakdown: ordinary stack vs. preferential stack
-    const plannedOrdinary =
-      pension + interest + ordinaryDividends + iraDistributions
-      + totalTradWithdrawals + ssTaxableApprox - hsaContribution;
-    const plannedPref     = qualifiedDividends + fixedLtcg + totalGainWithdrawals;
-    const magi            = plannedOrdinary + plannedPref + execOrdinary + execPref;
-
-    const distance            = acaCliffMagi - magi;
-    const forcedIncome        = pension + interest + ordinaryDividends + iraDistributions
-                                + qualifiedDividends + fixedLtcg + ssTaxableApprox;
-    const grossForcedIncome   = pension + interest + ordinaryDividends + iraDistributions
-                                + qualifiedDividends + fixedLtcg + ssBenefit;
-    const totalTaxableWithdrawals = totalBasisWithdrawals + totalGainWithdrawals + execTaxable;
-    const totalAllWithdrawals     = totalTaxableWithdrawals + (totalTradWithdrawals + execTrad) + (totalRothWithdrawals + execRoth) + (totalHsaWithdrawals + execHsa);
-    const totalExpenses           = totalSpending + hsaContribution + estimatedTaxes;
-    const forcedOrdinary          = pension + interest + ordinaryDividends + iraDistributions + ssTaxableApprox;
-    const forcedPref              = qualifiedDividends + fixedLtcg;
-    const withdrawalOrdinary      = totalTradWithdrawals;
-    const withdrawalPref          = totalGainWithdrawals;
-    const totalPlannedWithdrawals = withdrawalOrdinary + withdrawalPref;
-    const execIncome              = execOrdinary + execPref;
-    const totalIncome             = forcedIncome + execIncome + totalPlannedWithdrawals;
-
-    // Always-visible top rows
-    el('magi-value').textContent    = fmt$(magi);
-    el('total-spending-display').textContent = fmt$(totalSpending);
+  // ── Render Plan Summary from API response ─────────────────────────────
+  function renderPlanSummary(data) {
+    el('magi-value').textContent             = fmt$(data.magi);
+    el('total-spending-display').textContent = fmt$(data.total_spending);
 
     // ACA section
-    el('aca-cliff-display').textContent = fmt$(acaCliffMagi);
-    const distEl = el('distance-display');
+    el('aca-cliff-display').textContent = fmt$(data.aca_cliff_magi);
+    const distEl       = el('distance-display');
     const acaSummaryEl = el('aca-section-summary');
-    if (distance > 5000) {
-      distEl.textContent      = fmt$(distance) + ' under';
-      distEl.className        = 'magi-value distance-green';
-      if (acaSummaryEl) { acaSummaryEl.textContent = fmt$(distance) + ' under'; acaSummaryEl.className = 'section-summary-value distance-green'; }
-    } else if (distance >= 0) {
-      distEl.textContent      = fmt$(distance) + ' under';
-      distEl.className        = 'magi-value distance-yellow';
-      if (acaSummaryEl) { acaSummaryEl.textContent = fmt$(distance) + ' under'; acaSummaryEl.className = 'section-summary-value distance-yellow'; }
+    if (data.aca_distance === null || data.aca_distance === undefined) {
+      distEl.textContent = '—';
+      distEl.className   = 'magi-value';
+      if (acaSummaryEl) { acaSummaryEl.textContent = '—'; acaSummaryEl.className = 'section-summary-value'; }
     } else {
-      distEl.textContent      = fmt$(-distance) + ' OVER';
-      distEl.className        = 'magi-value distance-red';
-      if (acaSummaryEl) { acaSummaryEl.textContent = fmt$(-distance) + ' OVER'; acaSummaryEl.className = 'section-summary-value distance-red'; }
+      const distance = data.aca_distance;
+      if (distance > 5000) {
+        distEl.textContent = fmt$(distance) + ' under';
+        distEl.className   = 'magi-value distance-green';
+        if (acaSummaryEl) { acaSummaryEl.textContent = fmt$(distance) + ' under'; acaSummaryEl.className = 'section-summary-value distance-green'; }
+      } else if (distance >= 0) {
+        distEl.textContent = fmt$(distance) + ' under';
+        distEl.className   = 'magi-value distance-yellow';
+        if (acaSummaryEl) { acaSummaryEl.textContent = fmt$(distance) + ' under'; acaSummaryEl.className = 'section-summary-value distance-yellow'; }
+      } else {
+        distEl.textContent = fmt$(-distance) + ' OVER';
+        distEl.className   = 'magi-value distance-red';
+        if (acaSummaryEl) { acaSummaryEl.textContent = fmt$(-distance) + ' OVER'; acaSummaryEl.className = 'section-summary-value distance-red'; }
+      }
     }
 
-    // Withdrawals section (planned + executed combined per type)
-    el('taxable-withdrawals-display').textContent  = fmt$(totalTaxableWithdrawals);
-    el('trad-withdrawals-display').textContent     = fmt$(totalTradWithdrawals + execTrad);
-    el('roth-withdrawals-display').textContent     = fmt$(totalRothWithdrawals + execRoth);
-    el('hsa-withdrawals-display').textContent      = fmt$(totalHsaWithdrawals + execHsa);
-    el('withdrawals-section-summary').textContent  = 'Total ' + fmt$(totalAllWithdrawals);
+    // Withdrawals section
+    el('taxable-withdrawals-display').textContent  = fmt$(data.total_taxable_withdrawals);
+    el('trad-withdrawals-display').textContent     = fmt$(data.total_traditional_withdrawals);
+    el('roth-withdrawals-display').textContent     = fmt$(data.total_roth_withdrawals);
+    el('hsa-withdrawals-display').textContent      = fmt$(data.total_hsa_withdrawals);
+    el('withdrawals-section-summary').textContent  = 'Total ' + fmt$(data.total_all_withdrawals);
 
     // Income section
+    const forcedIncome = data.forced_ordinary + data.forced_preferential;
+    const execIncome   = data.executed_ordinary + data.executed_preferential;
+    const plannedIncome = data.withdrawal_ordinary + data.withdrawal_preferential;
     el('forced-income-display').textContent        = fmt$(forcedIncome);
-    el('forced-ordinary-display').textContent      = fmt$(forcedOrdinary);
-    el('forced-pref-display').textContent          = fmt$(forcedPref);
+    el('forced-ordinary-display').textContent      = fmt$(data.forced_ordinary);
+    el('forced-pref-display').textContent          = fmt$(data.forced_preferential);
     el('executed-withdrawals-display').textContent = fmt$(execIncome);
-    el('executed-ordinary-display').textContent    = fmt$(execOrdinary);
-    el('executed-pref-display').textContent        = fmt$(execPref);
-    el('planned-withdrawals-display').textContent  = fmt$(totalPlannedWithdrawals);
-    el('withdrawal-ordinary-display').textContent  = fmt$(withdrawalOrdinary);
-    el('withdrawal-pref-display').textContent      = fmt$(withdrawalPref);
-    el('total-income-display').textContent         = fmt$(totalIncome);
-    el('income-section-summary').textContent       = 'Total ' + fmt$(totalIncome);
+    el('executed-ordinary-display').textContent    = fmt$(data.executed_ordinary);
+    el('executed-pref-display').textContent        = fmt$(data.executed_preferential);
+    el('planned-withdrawals-display').textContent  = fmt$(plannedIncome);
+    el('withdrawal-ordinary-display').textContent  = fmt$(data.withdrawal_ordinary);
+    el('withdrawal-pref-display').textContent      = fmt$(data.withdrawal_preferential);
+    el('total-income-display').textContent         = fmt$(data.total_income);
+    el('income-section-summary').textContent       = 'Total ' + fmt$(data.total_income);
 
     // Expenses section
-    el('essential-spending-display').textContent   = fmt$(essential);
-    el('discretionary-spending-display').textContent = fmt$(discretionary);
-    el('hsa-contribution-display').textContent     = fmt$(hsaContribution);
-    el('estimated-taxes-display').textContent      = taxesStale ? '—' : fmt$(estimatedTaxes);
+    el('essential-spending-display').textContent     = fmt$(fnum('essential_spending'));
+    el('discretionary-spending-display').textContent = fmt$(fnum('discretionary_spending'));
+    el('hsa-contribution-display').textContent       = fmt$(fnum('above_the_line_adjustments'));
+    el('estimated-taxes-display').textContent        = taxesStale ? '—' : fmt$(estimatedTaxes);
     const taxHint = el('taxes-stale-hint');
     if (taxHint) taxHint.style.display = taxesStale ? 'block' : 'none';
-    el('expenses-section-summary').textContent     = 'Total ' + fmt$(totalExpenses);
+    const totalExpenses = data.total_spending + fnum('above_the_line_adjustments') + (taxesStale ? 0 : estimatedTaxes);
+    el('expenses-section-summary').textContent = 'Total ' + fmt$(totalExpenses);
 
-    // Shortfall = Total Expenses - Total Forced Income - Total Withdrawals
-    const shortfall   = totalExpenses - grossForcedIncome - totalAllWithdrawals;
+    // Shortfall
     const shortfallEl = el('shortfall-display');
-    if (totalSpending === 0 && estimatedTaxes === 0) {
+    if (data.shortfall === null || data.shortfall === undefined) {
       shortfallEl.textContent = '—';
       shortfallEl.style.color = '';
-    } else if (shortfall > 0) {
-      shortfallEl.textContent = fmt$(shortfall);
+    } else if (data.shortfall > 0) {
+      shortfallEl.textContent = fmt$(data.shortfall);
       shortfallEl.style.color = '#dc2626';
     } else {
-      shortfallEl.textContent = fmt$(-shortfall) + ' surplus';
+      shortfallEl.textContent = fmt$(-data.shortfall) + ' surplus';
       shortfallEl.style.color = '#16a34a';
     }
+  }
+
+  // ── Live MAGI update — debounced API call ─────────────────────────────
+  let _magiDebounceTimer = null;
+
+  function updateMagi() {
+    clearTimeout(_magiDebounceTimer);
+    _magiDebounceTimer = setTimeout(async () => {
+      const payload = {
+        filing_status:              el('filing_status')?.value || 'single',
+        tax_year:                   parseInt(el('tax_year')?.value) || 2026,
+        pension:                    fnum('pension'),
+        interest:                   fnum('interest'),
+        ordinary_dividends:         fnum('ordinary_dividends'),
+        ira_distributions:          fnum('ira_distributions'),
+        ss_benefit:                 fnum('ss_benefit'),
+        qualified_dividends:        fnum('qualified_dividends'),
+        fixed_ltcg:                 fnum('fixed_ltcg'),
+        above_the_line_adjustments: fnum('above_the_line_adjustments'),
+        essential_spending:         fnum('essential_spending'),
+        discretionary_spending:     fnum('discretionary_spending'),
+        include_aca:                el('include_aca')?.checked ?? false,
+        aca_cliff_magi:             acaCliffMagi,
+        estimated_taxes:            taxesStale ? 0 : estimatedTaxes,
+        planned_withdrawals:        gatherPlannedWithdrawals(),
+        executed_withdrawals:       gatherExecutedWithdrawalsPayload(),
+      };
+      try {
+        const resp = await fetch('/api/income-plan/summary', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify(payload),
+        });
+        if (resp.ok) renderPlanSummary(await resp.json());
+      } catch (_) { /* non-critical — summary is best-effort */ }
+    }, 150);
   }
 
   // ── Error helpers ─────────────────────────────────────────────────────
@@ -1286,30 +1247,28 @@
     calcBtn.disabled    = true;
     calcBtn.textContent = 'Calculating…';
 
-    const { totalGainWithdrawals: calcGains, totalTradWithdrawals: calcTrad } = gatherWithdrawals();
-    const { execOrdinary: calcExecOrdinary, execPref: calcExecPref } = calcExecutedTotals();
-
     const payload = {
+      filing_status:              el('filing_status')?.value || 'single',
+      tax_year:                   parseInt(el('tax_year')?.value),
       pension:                    fnum('pension'),
       interest:                   fnum('interest'),
       ordinary_dividends:         fnum('ordinary_dividends'),
-      ira_distributions:          fnum('ira_distributions') + calcTrad + calcExecOrdinary,
+      ira_distributions:          fnum('ira_distributions'),
       ss_benefit:                 fnum('ss_benefit'),
       qualified_dividends:        fnum('qualified_dividends'),
-      fixed_ltcg:                 fnum('fixed_ltcg') + calcGains + calcExecPref,
+      fixed_ltcg:                 fnum('fixed_ltcg'),
       above_the_line_adjustments: fnum('above_the_line_adjustments'),
-      sweep_mode:                 'ordinary',
-      filing_status:              el('filing_status')?.value || 'single',
-      tax_year:                   parseInt(el('tax_year')?.value),
+      include_aca:                el('include_aca')?.checked ?? true,
+      planned_withdrawals:        gatherPlannedWithdrawals(),
+      executed_withdrawals:       gatherExecutedWithdrawalsPayload(),
       sweep_floor:                0,
       sweep_ceiling:              150000,
       sweep_step:                 100,
       include_ohio:               true,
-      include_aca:                el('include_aca')?.checked ?? true,
     };
 
     try {
-      const resp = await fetch('/api/total-cost', {
+      const resp = await fetch('/api/income-plan/calculate', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify(payload),
