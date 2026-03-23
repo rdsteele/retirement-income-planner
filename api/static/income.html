@@ -659,10 +659,11 @@
             <span class="magi-label">HSA Contribution</span>
             <span class="magi-value" id="hsa-contribution-display">$0</span>
           </div>
-          <div class="magi-row" style="padding-bottom:10px;">
+          <div class="magi-row">
             <span class="magi-label">Estimated Taxes</span>
-            <span class="magi-value" id="estimated-taxes-display">$0</span>
+            <span class="magi-value" id="estimated-taxes-display">—</span>
           </div>
+          <div id="taxes-stale-hint" style="text-align:right;font-size:11px;color:#888;padding-bottom:10px;">click Calculate to estimate</div>
         </details>
       </div>
 
@@ -774,6 +775,7 @@
   let executedWithdrawals = [];  // [{ id, description, amount, basis, type }]
   let acaCliffMagi    = 62600; // default; updated from Calculate response
   let estimatedTaxes  = 0;     // total_tax at sweep_floor from last Calculate run
+  let taxesStale      = true;  // true until Calculate is clicked; reset to true on any input change
 
   // ── Helpers ───────────────────────────────────────────────────────────
   const el    = id => document.getElementById(id);
@@ -1185,11 +1187,13 @@
 
     const distance            = acaCliffMagi - magi;
     const forcedIncome        = pension + interest + ordinaryDividends + iraDistributions
+                                + qualifiedDividends + fixedLtcg + ssTaxableApprox;
+    const grossForcedIncome   = pension + interest + ordinaryDividends + iraDistributions
                                 + qualifiedDividends + fixedLtcg + ssBenefit;
     const totalTaxableWithdrawals = totalBasisWithdrawals + totalGainWithdrawals + execTaxable;
     const totalAllWithdrawals     = totalTaxableWithdrawals + (totalTradWithdrawals + execTrad) + (totalRothWithdrawals + execRoth) + (totalHsaWithdrawals + execHsa);
     const totalExpenses           = totalSpending + hsaContribution + estimatedTaxes;
-    const forcedOrdinary          = pension + interest + ordinaryDividends + iraDistributions + ssBenefit;
+    const forcedOrdinary          = pension + interest + ordinaryDividends + iraDistributions + ssTaxableApprox;
     const forcedPref              = qualifiedDividends + fixedLtcg;
     const withdrawalOrdinary      = totalTradWithdrawals;
     const withdrawalPref          = totalGainWithdrawals;
@@ -1243,11 +1247,13 @@
     el('essential-spending-display').textContent   = fmt$(essential);
     el('discretionary-spending-display').textContent = fmt$(discretionary);
     el('hsa-contribution-display').textContent     = fmt$(hsaContribution);
-    el('estimated-taxes-display').textContent      = fmt$(estimatedTaxes);
+    el('estimated-taxes-display').textContent      = taxesStale ? '—' : fmt$(estimatedTaxes);
+    const taxHint = el('taxes-stale-hint');
+    if (taxHint) taxHint.style.display = taxesStale ? 'block' : 'none';
     el('expenses-section-summary').textContent     = 'Total ' + fmt$(totalExpenses);
 
     // Shortfall = Total Expenses - Total Forced Income - Total Withdrawals
-    const shortfall   = totalExpenses - forcedIncome - totalAllWithdrawals;
+    const shortfall   = totalExpenses - grossForcedIncome - totalAllWithdrawals;
     const shortfallEl = el('shortfall-display');
     if (totalSpending === 0 && estimatedTaxes === 0) {
       shortfallEl.textContent = '—';
@@ -1327,6 +1333,7 @@
         acaCliffMagi = lastResult.aca_cliff_magi;
       }
       estimatedTaxes = lastResult.points?.total_tax?.[0] ?? 0;
+      taxesStale = false;
       const aptcEl = el('aptc-estimate-display');
       if (aptcEl) {
         aptcEl.textContent = lastResult.aptc_annual_max > 0
@@ -1593,6 +1600,12 @@
 
   // ── Update MAGI on blur of any input field ────────────────────────────
   document.addEventListener('focusout', updateMagi);
+
+  // ── Mark estimated taxes stale whenever any input changes ─────────────
+  document.addEventListener('input', () => {
+    estimatedTaxes = 0;
+    taxesStale = true;
+  });
 
   // ── Scenario management ───────────────────────────────────────────────
   let currentScenarioName = null;
