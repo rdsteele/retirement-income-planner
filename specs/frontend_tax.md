@@ -61,24 +61,27 @@ Calculation fires on `blur` event of any input field, and on page load.
 
 ### Section: Income
 
-| Label | Field | Notes |
-|---|---|---|
-| Wages | `wages` | W-2 wages |
-| Pension / Annuity | `pension` | Taxable pension and annuity income |
-| Taxable Interest | `interest` | Bank, brokerage, bonds |
-| Ordinary Dividends | `ordinary_dividends` | Includes qualified dividends as subset |
-| Qualified Dividends | `qualified_dividends` | Subset of ordinary dividends |
-| IRA Distributions / RMDs | `ira_distributions` | Taxable IRA/401k withdrawals, RMDs, Roth conversions |
-| Social Security Benefit | `ss_benefit` | Gross annual SS benefit; taxability calculated |
-| Capital Gains (LT) | `fixed_ltcg` | Long-term capital gains |
-| Tax-Exempt Interest | `tax_exempt_interest` | Municipal bond interest etc. |
+Fields are ordered to mirror Form 1040 line numbers. Each field has a
+`field-hint` showing the corresponding 1040 line reference.
 
-### Section: Adjustments
+| Label | Field | 1040 Line | Notes |
+|---|---|---|---|
+| Wages | `wages` | Line 1 | W-2 wages |
+| Taxable Interest | `interest` | Line 2b | Bank, brokerage, bonds |
+| Non-Qualified Dividends | `ordinary_dividends` | Line 3b minus 3a | Ordinary dividends minus qualified dividends |
+| Qualified Dividends | `qualified_dividends` | Line 3a | Subset of ordinary dividends |
+| Tax-Deferred Distributions | `ira_distributions` | Line 4b | Traditional IRA/401k withdrawals, RMDs, Roth conversions |
+| Pension / Annuity | `pension` | Line 5b | Taxable pension and annuity income |
+| Social Security Benefit | `ss_benefit` | Line 6a | Gross annual SS benefit; taxability computed |
+| Capital Gains (LT) | `fixed_ltcg` | Line 7 | Long-term capital gains |
+| Tax-Exempt Interest | `tax_exempt_interest` | N/A | Not on 1040 — used for SS provisional income calculation |
 
-| Label | Field | Notes |
-|---|---|---|
-| Above-the-Line Adjustments | `above_the_line_adjustments` | HSA contributions, IRA deductions, etc. |
-| Additional Deductions | `additional_deductions` | QBI deduction, excess itemized deductions |
+### Section: Adjustments & Deductions
+
+| Label | Field | 1040 Line | Notes |
+|---|---|---|---|
+| Above-the-Line Adjustments | `above_the_line_adjustments` | Line 10 | HSA contributions, IRA deductions, etc. |
+| Additional Deductions | `additional_deductions` | N/A | Beyond standard deduction (e.g. QBI, excess itemized) |
 
 ### Section: Settings
 
@@ -94,6 +97,27 @@ Calculation fires on `blur` event of any input field, and on page load.
 |---|---|---|
 | Gross Medical Expenses | `gross_medical_expenses` | Before 7.5% AGI floor |
 | Qualifying Retirement Income | `ohio_qualifying_retirement_income` | IRA + pension for retirement credit |
+
+---
+
+## Scenario Load — Withdrawal Folding
+
+When a scenario is loaded, income from the income planning page's planned and
+executed withdrawals is folded into the tax input fields so the tax calculation
+reflects the full income picture.
+
+**Planned withdrawals** (from `income_planning`):
+- `trad_withdrawals` — sum of amounts added to `ira_distributions`
+- `withdrawals` (taxable) — sum of gains (`max(0, amount - basis)`) added to `fixed_ltcg`
+
+**Executed withdrawals** (from `income_planning.executed_withdrawals`):
+- `tax_deferred` — full amount added to `ira_distributions`
+- `stcg` — gain (`max(0, amount - basis)`) added to `ira_distributions`
+- `ltcg` — gain (`max(0, amount - basis)`) added to `fixed_ltcg`
+- `tax_free_roth`, `tax_free_hsa` — MAGI-neutral, not folded
+
+**Wages** are not folded from scenarios — the wages field is manually entered
+on the tax page only.
 
 ---
 

@@ -11,8 +11,8 @@ entirely on your machine — no cloud, no accounts, no data leaves your computer
 - This tool is intended for **educational and entertainment purposes only**. It
   is not tax advice. Consult a qualified tax professional before making financial
   decisions.
-- Federal tax calculations are basic and work for a straightforward single-filer 
-  retirement income profile. More complex situations (AMT, business income, etc.)
+- Federal tax calculations are basic and work for a straightforward retirement 
+  income profile. More complex situations (AMT, business income, etc.)
   are not supported.
 - Ohio state tax calculations are included but Ohio's tax rules are unusual —
   results may not be accurate for all situations.

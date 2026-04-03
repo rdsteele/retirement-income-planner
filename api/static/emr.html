@@ -316,7 +316,7 @@
         <details open>
           <summary>Ordinary Income</summary>
           <div class="section-body">
-            <div class="field"><label>Pension / Annuity</label><input type="number" id="pension" min="0" step="1" placeholder="0"></div>
+            <div class="field"><label>Wages / Pension / Annuity</label><input type="number" id="pension" min="0" step="1" placeholder="0"></div>
             <div class="field"><label>Taxable Interest</label><input type="number" id="interest" min="0" step="1" placeholder="0"></div>
             <div class="field"><label>Non-Qualified Dividends</label><input type="number" id="ordinary_dividends" min="0" step="1" placeholder="0"><span class="field-hint">Ordinary dividends minus qualified dividends (1040 line 3b minus 3a)</span></div>
             <div class="field"><label>Tax-Deferred Distributions</label><input type="number" id="ira_distributions" min="0" step="1" placeholder="0"><span class="field-hint">Traditional IRA/401k withdrawals, RMDs, and Roth conversions (1040 line 4b)</span></div>
@@ -330,7 +330,7 @@
           <summary>Preferential Income</summary>
           <div class="section-body">
             <div class="field"><label>Qualified Dividends</label><input type="number" id="qualified_dividends" min="0" step="1" placeholder="0"></div>
-            <div class="field"><label>Fixed LTCG</label><input type="number" id="fixed_ltcg" min="0" step="1" placeholder="0"></div>
+            <div class="field"><label>Capital Gains (LT)</label><input type="number" id="fixed_ltcg" min="0" step="1" placeholder="0"></div>
           </div>
         </details>
 
@@ -573,19 +573,27 @@
     const tradSum = (ip.trad_withdrawals || []).reduce((s, w) => s + (w.amount || 0), 0);
     const gainSum = (ip.withdrawals      || []).reduce((s, w) => s + Math.max(0, (w.amount || 0) - (w.basis || 0)), 0);
 
+    // Executed withdrawals: classify into ordinary vs preferential income
+    let execOrdinary = 0, execPref = 0;
+    for (const ew of (ip.executed_withdrawals || [])) {
+      const amt = ew.amount || 0, basis = ew.basis || 0;
+      if (ew.type === 'tax_deferred')  execOrdinary += amt;
+      else if (ew.type === 'stcg')     execOrdinary += Math.max(0, amt - basis);
+      else if (ew.type === 'ltcg')     execPref     += Math.max(0, amt - basis);
+    }
+
     setField('tax_year',                           inp.tax_year);
     setField('filing_status',                      inp.filing_status);
-    setField('pension',                            inp.pension);
+    setField('pension',                            (inp.pension || 0) + (inp.wages || 0));
     setField('interest',                           inp.interest);
     setField('ordinary_dividends',                 inp.ordinary_dividends);
     setField('qualified_dividends',                inp.qualified_dividends);
-    setField('ira_distributions',                  (inp.ira_distributions || 0) + tradSum);
+    setField('ira_distributions',                  (inp.ira_distributions || 0) + tradSum + execOrdinary);
     setField('ss_benefit',                         inp.ss_benefit);
-    setField('fixed_ltcg',                         (inp.fixed_ltcg || 0) + gainSum);
+    setField('fixed_ltcg',                         (inp.fixed_ltcg || 0) + gainSum + execPref);
     setField('tax_exempt_interest',                inp.tax_exempt_interest);
     setField('above_the_line_adjustments',         inp.above_the_line_adjustments);
     setField('additional_deductions',              inp.additional_deductions);
-    setField('wages',                              inp.wages);
     setField('include_ohio',                       ohio.include_ohio);
     setField('ohio_medical_deduction',             ohio.gross_medical_expenses);
     setField('gross_medical_expenses',             ohio.gross_medical_expenses);

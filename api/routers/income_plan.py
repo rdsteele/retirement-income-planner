@@ -133,7 +133,7 @@ def post_income_plan_calculate(request: IncomePlanRequest):
     try:
         result = calculate_total_cost(
             **sweep_inputs,
-            additional_deductions=_D("0"),
+            additional_deductions=_D(str(request.additional_deductions)),
             sweep_mode=mode,
             variable_ordinary=_D("0"),
             filing_status=request.filing_status,
@@ -166,7 +166,7 @@ def post_income_plan_calculate(request: IncomePlanRequest):
         qualified_dividends = float(sweep_inputs["qualified_dividends"])
         fixed_ltcg = float(sweep_inputs["fixed_ltcg"])
         above_the_line_adjustments = float(sweep_inputs["above_the_line_adjustments"])
-        additional_deductions = 0.0
+        additional_deductions = float(request.additional_deductions)
         variable_ordinary = 0.0
         include_aca = request.include_aca
         tax_year = request.tax_year

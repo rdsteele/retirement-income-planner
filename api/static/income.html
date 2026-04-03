@@ -520,7 +520,8 @@
             <div class="field"><label>Qualified Dividends</label><input type="number" id="qualified_dividends" min="0" step="1" placeholder="0"></div>
             <div class="field"><label>Tax-Deferred Distributions</label><input type="number" id="ira_distributions" min="0" step="1" placeholder="0"><span class="field-hint">Traditional IRA/401k withdrawals, RMDs, and Roth conversions (1040 line 4b)</span></div>
             <div class="field"><label>Social Security Benefit</label><input type="number" id="ss_benefit" min="0" step="1" placeholder="0"><span class="field-hint">Gross annual SS benefit</span></div>
-            <div class="field"><label>Fixed LTCG</label><input type="number" id="fixed_ltcg" min="0" step="1" placeholder="0"><span class="field-hint">Known capital gain distributions or forced sales</span></div>
+            <div class="field"><label>Capital Gains (LT)</label><input type="number" id="fixed_ltcg" min="0" step="1" placeholder="0"><span class="field-hint">Known capital gain distributions or forced sales</span></div>
+            <div class="field"><label>Tax-Exempt Interest</label><input type="number" id="tax_exempt_interest" min="0" step="1" placeholder="0"><span class="field-hint">Municipal bond interest; affects SS taxability</span></div>
           </div>
         </details>
 
@@ -529,6 +530,7 @@
           <summary>Adjustments</summary>
           <div class="section-body">
             <div class="field field-wide"><label>HSA Contribution</label><input type="number" id="above_the_line_adjustments" min="0" step="1" placeholder="0"><span class="field-hint">Above-the-line deduction; pre-filled from accounts if available</span></div>
+            <div class="field field-wide"><label>Additional Deductions</label><input type="number" id="additional_deductions" min="0" step="1" placeholder="0"><span class="field-hint">e.g. QBI, excess itemized deductions</span></div>
           </div>
         </details>
 
@@ -1208,6 +1210,7 @@
         ss_benefit:                 fnum('ss_benefit'),
         qualified_dividends:        fnum('qualified_dividends'),
         fixed_ltcg:                 fnum('fixed_ltcg'),
+        tax_exempt_interest:        fnum('tax_exempt_interest'),
         above_the_line_adjustments: fnum('above_the_line_adjustments'),
         essential_spending:         fnum('essential_spending'),
         discretionary_spending:     fnum('discretionary_spending'),
@@ -1257,7 +1260,9 @@
       ss_benefit:                 fnum('ss_benefit'),
       qualified_dividends:        fnum('qualified_dividends'),
       fixed_ltcg:                 fnum('fixed_ltcg'),
+      tax_exempt_interest:        fnum('tax_exempt_interest'),
       above_the_line_adjustments: fnum('above_the_line_adjustments'),
+      additional_deductions:      fnum('additional_deductions'),
       include_aca:                el('include_aca')?.checked ?? true,
       planned_withdrawals:        gatherPlannedWithdrawals(),
       executed_withdrawals:       gatherExecutedWithdrawalsPayload(),
@@ -1604,7 +1609,9 @@
         ira_distributions:          fnum('ira_distributions'),
         ss_benefit:                 fnum('ss_benefit'),
         fixed_ltcg:                 fnum('fixed_ltcg'),
+        tax_exempt_interest:        fnum('tax_exempt_interest'),
         above_the_line_adjustments: fnum('above_the_line_adjustments'),
+        additional_deductions:      fnum('additional_deductions'),
       },
       aca: { include_aca: el('include_aca')?.checked ?? true },
     };
@@ -1622,7 +1629,9 @@
     setField('ira_distributions',          inp.ira_distributions);
     setField('ss_benefit',                 inp.ss_benefit);
     setField('fixed_ltcg',                 inp.fixed_ltcg);
+    setField('tax_exempt_interest',        inp.tax_exempt_interest);
     setField('above_the_line_adjustments', inp.above_the_line_adjustments);
+    setField('additional_deductions',      inp.additional_deductions);
     setField('include_aca',                aca.include_aca);
   }
 

@@ -242,6 +242,7 @@ The sweep is always run in `ordinary` mode with the full withdrawal mix baked in
 | `fixed_ltcg` | float ≥ 0 | 0 | Fixed LTCG (not including withdrawal gains) |
 | `tax_exempt_interest` | float ≥ 0 | 0 | Added to ACA MAGI |
 | `above_the_line_adjustments` | float ≥ 0 | 0 | e.g., HSA contribution |
+| `additional_deductions` | float ≥ 0 | 0 | Beyond standard deduction (e.g. QBI, excess itemized); passed through to `calculate_total_cost` |
 | `essential_spending` | float ≥ 0 | 0 | |
 | `discretionary_spending` | float ≥ 0 | 0 | |
 | `include_aca` | bool | false | |

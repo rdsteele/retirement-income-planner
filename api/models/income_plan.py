@@ -30,6 +30,7 @@ class IncomePlanRequest(BaseModel):
     fixed_ltcg: float = Field(default=0.0, ge=0)
     tax_exempt_interest: float = Field(default=0.0, ge=0)
     above_the_line_adjustments: float = Field(default=0.0, ge=0)
+    additional_deductions: float = Field(default=0.0, ge=0)
 
     # Spending
     essential_spending: float = Field(default=0.0, ge=0)

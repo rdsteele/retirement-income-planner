@@ -81,13 +81,14 @@ Income that arrives regardless of withdrawal decisions.
 
 | Label | Field | Notes |
 |---|---|---|
-| Pension | `pension` | |
-| Interest | `interest` | Bank, brokerage, bonds — all taxable interest |
-| Ordinary Dividends | `ordinary_dividends` | Includes qualified dividends as a subset |
+| Pension / Annuity | `pension` | |
+| Taxable Interest | `interest` | Bank, brokerage, bonds — all taxable interest |
+| Non-Qualified Dividends | `ordinary_dividends` | Ordinary dividends minus qualified dividends |
 | Qualified Dividends | `qualified_dividends` | Subset of ordinary dividends, preferential rate |
-| RMDs | `rmds` | Required minimum distributions from tax-deferred accounts |
+| Tax-Deferred Distributions | `ira_distributions` | Traditional IRA/401k withdrawals, RMDs, and Roth conversions |
 | Social Security Benefit | `ss_benefit` | Gross annual SS benefit; taxability is calculated |
-| Fixed LTCG | `fixed_ltcg` | Known capital gain distributions or forced sales |
+| Capital Gains (LT) | `fixed_ltcg` | Known capital gain distributions or forced sales |
+| Tax-Exempt Interest | `tax_exempt_interest` | Municipal bond interest; affects SS taxability |
 
 ---
 
@@ -95,7 +96,8 @@ Income that arrives regardless of withdrawal decisions.
 
 | Label | Field | Notes |
 |---|---|---|
-| HSA Contribution | `hsa_contribution` | Above-the-line deduction; pre-filled from `GET /api/accounts/summary` `hsa_annual_contribution` if present; editable override |
+| HSA Contribution | `above_the_line_adjustments` | Above-the-line deduction; pre-filled from `GET /api/accounts/summary` `hsa_annual_contribution` if present; editable override |
+| Additional Deductions | `additional_deductions` | e.g. QBI, excess itemized deductions |
 
 ---
 
@@ -218,21 +220,23 @@ total_trad_withdrawals   = sum(trad withdrawal amounts)
 exec_ordinary            = sum(stcg gains + tax_deferred amounts from executed withdrawals)
 exec_pref                = sum(ltcg gains from executed withdrawals)
 
-provisional_income       = pension + interest + ordinary_dividends + rmds
+provisional_income       = pension + interest + ordinary_dividends + ira_distributions
                          + fixed_ltcg + total_gain_withdrawals
                          + total_trad_withdrawals
                          + exec_ordinary + exec_pref
-                         - hsa_contribution
+                         - above_the_line_adjustments
+                         + tax_exempt_interest
                          + (ss_benefit × 0.50)
 
 ss_taxable_approx        = approximate_ss_taxable(ss_benefit, provisional_income)
 
-magi                     = pension + interest + ordinary_dividends + rmds
+magi                     = pension + interest + ordinary_dividends + ira_distributions
                          + fixed_ltcg + total_gain_withdrawals
                          + total_trad_withdrawals
                          + exec_ordinary + exec_pref
                          + ss_taxable_approx
-                         - hsa_contribution
+                         + tax_exempt_interest
+                         - above_the_line_adjustments
 ```
 
 SS taxability approximation (single filer, for live display only — exact

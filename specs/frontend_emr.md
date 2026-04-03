@@ -80,7 +80,7 @@ become visible (`style.display = 'block'`) after the first successful API respon
 ### Section 1 — Ordinary Income (open by default)
 | Label | Field name | Default | Notes |
 |---|---|---|---|
-| Pension / Annuity | `pension` | blank | |
+| Wages / Pension / Annuity | `pension` | blank | When loading from scenario, wages are folded into this field |
 | Taxable Interest | `interest` | blank | |
 | Ordinary Dividends | `ordinary_dividends` | blank | |
 | RMDs | `ira_distributions` | blank | |
@@ -93,7 +93,7 @@ The two adjustment fields display a `.field-hint` span below the input with expl
 | Label | Field name | Default |
 |---|---|---|
 | Qualified Dividends | `qualified_dividends` | blank |
-| Fixed LTCG | `fixed_ltcg` | blank |
+| Capital Gains (LT) | `fixed_ltcg` | blank |
 
 ### Section 3 — Social Security (collapsed)
 | Label | Field name | Default |
@@ -122,6 +122,27 @@ The two adjustment fields display a `.field-hint` span below the input with expl
 **Sweep mode behavior:**
 - When `sweep_mode = "preferential"`, show the "Variable Ordinary" field
 - When `sweep_mode = "ordinary"`, hide it
+
+---
+
+## Scenario Load — Withdrawal Folding
+
+When a scenario is loaded, income from the income planning page's planned and
+executed withdrawals is folded into the EMR input fields so the sweep reflects
+the full tax picture.
+
+**Planned withdrawals** (from `income_planning`):
+- `trad_withdrawals` — sum of amounts added to `ira_distributions`
+- `withdrawals` (taxable) — sum of gains (`max(0, amount - basis)`) added to `fixed_ltcg`
+
+**Executed withdrawals** (from `income_planning.executed_withdrawals`):
+- `tax_deferred` — full amount added to `ira_distributions`
+- `stcg` — gain (`max(0, amount - basis)`) added to `ira_distributions`
+- `ltcg` — gain (`max(0, amount - basis)`) added to `fixed_ltcg`
+- `tax_free_roth`, `tax_free_hsa` — MAGI-neutral, not folded
+
+**Wages** from `inputs.wages` are folded into the `pension` field (combined
+as "Wages / Pension / Annuity").
 
 ---
 
