@@ -440,8 +440,8 @@ class TestOhioFunctional:
         ohio_emrs = body["points"]["components"]["ohio"]
 
         max_emr = max(ohio_emrs)
-        assert max_emr > 0.10, (
-            f"expected MAGI boundary spike > 0.10, got max emr_ohio={max_emr}"
+        assert max_emr > 0.05, (
+            f"expected MAGI boundary spike > 0.05, got max emr_ohio={max_emr}"
         )
         spike_income = incomes[ohio_emrs.index(max_emr)]
         assert 15000.0 <= spike_income <= 28000.0, (

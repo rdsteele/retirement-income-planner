@@ -11,7 +11,8 @@ from services.aca import calculate_aca_subsidy, get_aptc_schedule_magis
 from services.emr import EMRPoint, EMRResult, SweepMode, calculate_emr
 
 _ZERO = Decimal("0")
-_EMR_COMPUTE_STEP = Decimal("1000")
+_EMR_COMPUTE_STEP = Decimal("500")
+_ACA_LOSS_UNIT = Decimal("1000")  # ACA service reports loss per $1,000 of MAGI
 
 
 @dataclass
@@ -259,7 +260,7 @@ def calculate_total_cost(
             tax_year=tax_year,
             baseline_magi=floor_aca_magi,
         )
-        emr_aca = aca_result.marginal_subsidy_loss / _EMR_COMPUTE_STEP
+        emr_aca = aca_result.marginal_subsidy_loss / _ACA_LOSS_UNIT
         tc_points.append(TotalCostPoint(
             income=p.income,
             total_tax=p.total_tax,

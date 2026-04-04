@@ -21,7 +21,7 @@ from services.social_security import calculate_social_security_taxability
 
 _ZERO = Decimal("0")
 _HALF = Decimal("0.50")
-_EMR_COMPUTE_STEP = Decimal("1000")  # larger step reduces whole-dollar rounding noise
+_EMR_COMPUTE_STEP = Decimal("500")  # smooths whole-dollar rounding noise while preserving bracket-edge precision
 
 
 class SweepMode(Enum):
