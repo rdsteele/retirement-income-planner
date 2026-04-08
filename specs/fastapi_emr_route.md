@@ -121,11 +121,12 @@ All numeric values are `float`. No `Decimal`, no Python-specific types.
   },
   "irmaa_thresholds": [106000.0, 133000.0, 167000.0, 200000.0, 500000.0],
   "planning_signals": {
-    "ltcg_0pct_remaining":  26350.0,
-    "torpedo_active":       false,
-    "ss_fully_taxable":     false,
-    "distance_to_22pct":    19350.0,
-    "distance_to_24pct":    null
+    "ltcg_0pct_remaining":        26350.0,
+    "ltcg_0pct_ordinary_runway":  42100.0,
+    "torpedo_active":             false,
+    "ss_fully_taxable":           false,
+    "distance_to_22pct":          19350.0,
+    "distance_to_24pct":          null
   }
 }
 ```
@@ -137,16 +138,17 @@ This shape is directly consumable by Plotly without any frontend transformation.
 
 ### Planning Signals
 
-Derived from the points array by the route after the service returns. All
+Computed by `compute_planning_signals()` in `services/emr.py`. All
 distances are relative to the current `sweep_floor`.
 
-| Signal                  | Type            | Description                                                  |
-|-------------------------|-----------------|--------------------------------------------------------------|
-| `ltcg_0pct_remaining`   | `float \| null` | Income remaining before LTCG enters 15% bracket. `null` if already past threshold or `sweep_mode = "ordinary"` with no preferential income |
-| `torpedo_active`        | `bool`          | True if any point in the sweep has `emr_ss_torpedo > 0`      |
-| `ss_fully_taxable`      | `bool`          | True if SS inclusion rate has reached 85% at `sweep_floor`   |
-| `distance_to_22pct`     | `float \| null` | Income remaining before ordinary EMR reaches 22%. `null` if already at or above 22% at `sweep_floor` |
-| `distance_to_24pct`     | `float \| null` | Income remaining before ordinary EMR reaches 24%. `null` if already at or above 24% at `sweep_floor` |
+| Signal                        | Type            | Description                                                  |
+|-------------------------------|-----------------|--------------------------------------------------------------|
+| `ltcg_0pct_remaining`         | `float \| null` | Additional LTCG income that fits in the 0% bracket. `null` if already past threshold or `sweep_mode = "ordinary"` with no preferential income |
+| `ltcg_0pct_ordinary_runway`   | `float \| null` | Additional ordinary income before existing LTCG enters the 15% bracket. Accounts for the standard deduction cushion. `null` under the same conditions as `ltcg_0pct_remaining` |
+| `torpedo_active`              | `bool`          | True if any point in the sweep has `emr_ss_torpedo > 0`      |
+| `ss_fully_taxable`            | `bool`          | True if SS inclusion rate has reached 85% at `sweep_floor`   |
+| `distance_to_22pct`           | `float \| null` | Income remaining before ordinary EMR reaches 22%. `null` if already at or above 22% at `sweep_floor` |
+| `distance_to_24pct`           | `float \| null` | Income remaining before ordinary EMR reaches 24%. `null` if already at or above 24% at `sweep_floor` |
 
 ---
 

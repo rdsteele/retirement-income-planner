@@ -14,7 +14,13 @@ from unittest.mock import patch
 import pytest
 
 from services.common import round_rate, round_tax
-from services.emr import EMRResult, SweepMode, _get_default_sweep_ceiling, calculate_emr
+from services.emr import (
+    EMRResult,
+    SweepMode,
+    _get_default_sweep_ceiling,
+    calculate_emr,
+    compute_planning_signals,
+)
 from services.federal_tax import FederalTaxResult
 from services.ohio_tax import OhioTaxResult
 from services.social_security import SocialSecurityResult
@@ -1125,3 +1131,161 @@ class TestPreferentialSweepWithOhio:
     def test_emr_ohio_positive(self):
         # Ohio tax is positive for any non-trivial income
         assert any(pt.emr_ohio > _ZERO for pt in self.result.points)
+
+
+# ---------------------------------------------------------------------------
+# Planning signals — compute_planning_signals service function
+# ---------------------------------------------------------------------------
+
+class TestPlanningSignalsOrdinaryWithLTCG:
+    """Ordinary sweep with fixed LTCG — tests ltcg_0pct_remaining and ordinary_runway."""
+
+    def setup_method(self):
+        self.fed_patcher = patch(_PATCH_FED, side_effect=_mock_federal_single)
+        self.ss_patcher = patch(_PATCH_SS, side_effect=_mock_ss_single)
+        self.ohio_patcher = patch(_PATCH_OHIO)
+        self.fed_patcher.start()
+        self.ss_patcher.start()
+        self.ohio_patcher.start()
+
+        # pension=20000, interest=2000 → fixed_ordinary=22000
+        # std_deduction=15750 (2025 single), so taxable_ordinary at floor = 6250
+        # qualified_dividends=5000, fixed_ltcg=10000 → ltcg_already_used=15000
+        # 0% pref ceiling = 48350 (2025 single)
+        # ltcg_0pct_remaining = 48350 - 6250 - 15000 = 27100
+        # zero_ordinary_space = max(0, 15750 - 22000 - 0) = 0
+        # ordinary_runway = 48350 - 15000 + 15750 - 22000 - 0 = 27100
+        self.result = calculate_emr(
+            pension=dec("20000"), interest=dec("2000"),
+            ordinary_dividends=dec("0"), ira_distributions=dec("0"),
+            ss_benefit=dec("0"), qualified_dividends=dec("5000"),
+            fixed_ltcg=dec("10000"), tax_exempt_interest=dec("0"),
+            sweep_mode=SweepMode.ORDINARY,
+            filing_status="single", tax_year=2025,
+            sweep_step=dec("100"), sweep_ceiling=dec("50000"),
+        )
+        self.signals = compute_planning_signals(
+            self.result,
+            fixed_ordinary=dec("22000"),
+            variable_ordinary=dec("0"),
+            qualified_dividends=dec("5000"),
+            fixed_ltcg=dec("10000"),
+            above_the_line_adjustments=dec("0"),
+            additional_deductions=dec("0"),
+        )
+
+    def teardown_method(self):
+        self.fed_patcher.stop()
+        self.ss_patcher.stop()
+        self.ohio_patcher.stop()
+
+    def test_ltcg_0pct_remaining(self):
+        assert self.signals.ltcg_0pct_remaining == dec("27100")
+
+    def test_ltcg_0pct_ordinary_runway(self):
+        # No deduction cushion (fixed_ordinary > std_deduction), so runway = remaining
+        assert self.signals.ltcg_0pct_ordinary_runway == dec("27100")
+
+    def test_zero_ordinary_space(self):
+        assert self.signals.zero_ordinary_space == _ZERO
+
+    def test_torpedo_inactive(self):
+        assert self.signals.torpedo_active is False
+
+
+class TestPlanningSignalsOrdinaryWithDeductionCushion:
+    """When fixed_ordinary < std_deduction, runway exceeds remaining."""
+
+    def setup_method(self):
+        self.fed_patcher = patch(_PATCH_FED, side_effect=_mock_federal_single)
+        self.ss_patcher = patch(_PATCH_SS, side_effect=_mock_ss_single)
+        self.ohio_patcher = patch(_PATCH_OHIO)
+        self.fed_patcher.start()
+        self.ss_patcher.start()
+        self.ohio_patcher.start()
+
+        # pension=5000 → fixed_ordinary=5000
+        # std_deduction=15750 → taxable_ordinary at floor = 0
+        # qualified_dividends=3000, fixed_ltcg=10000 → ltcg_already_used=13000
+        # 0% pref ceiling = 48350
+        # ltcg_0pct_remaining = 48350 - 0 - 13000 = 35350
+        # zero_ordinary_space = max(0, 15750 - 5000 - 0) = 10750
+        # ordinary_runway = 48350 - 13000 + 15750 - 5000 - 0 = 46100
+        self.result = calculate_emr(
+            pension=dec("5000"), interest=dec("0"),
+            ordinary_dividends=dec("0"), ira_distributions=dec("0"),
+            ss_benefit=dec("0"), qualified_dividends=dec("3000"),
+            fixed_ltcg=dec("10000"), tax_exempt_interest=dec("0"),
+            sweep_mode=SweepMode.ORDINARY,
+            filing_status="single", tax_year=2025,
+            sweep_step=dec("100"), sweep_ceiling=dec("60000"),
+        )
+        self.signals = compute_planning_signals(
+            self.result,
+            fixed_ordinary=dec("5000"),
+            variable_ordinary=dec("0"),
+            qualified_dividends=dec("3000"),
+            fixed_ltcg=dec("10000"),
+            above_the_line_adjustments=dec("0"),
+            additional_deductions=dec("0"),
+        )
+
+    def teardown_method(self):
+        self.fed_patcher.stop()
+        self.ss_patcher.stop()
+        self.ohio_patcher.stop()
+
+    def test_ltcg_0pct_remaining(self):
+        assert self.signals.ltcg_0pct_remaining == dec("35350")
+
+    def test_ltcg_0pct_ordinary_runway(self):
+        assert self.signals.ltcg_0pct_ordinary_runway == dec("46100")
+
+    def test_runway_equals_remaining_plus_deduction_cushion(self):
+        assert (self.signals.ltcg_0pct_ordinary_runway
+                == self.signals.ltcg_0pct_remaining + self.signals.zero_ordinary_space)
+
+    def test_zero_ordinary_space(self):
+        assert self.signals.zero_ordinary_space == dec("10750")
+
+
+class TestPlanningSignalsNoLTCG:
+    """Ordinary sweep with no LTCG — signals return None."""
+
+    def setup_method(self):
+        self.fed_patcher = patch(_PATCH_FED, side_effect=_mock_federal_single)
+        self.ss_patcher = patch(_PATCH_SS, side_effect=_mock_ss_single)
+        self.ohio_patcher = patch(_PATCH_OHIO)
+        self.fed_patcher.start()
+        self.ss_patcher.start()
+        self.ohio_patcher.start()
+
+        self.result = calculate_emr(
+            pension=dec("20000"), interest=dec("0"),
+            ordinary_dividends=dec("0"), ira_distributions=dec("0"),
+            ss_benefit=dec("0"), qualified_dividends=dec("0"),
+            fixed_ltcg=dec("0"), tax_exempt_interest=dec("0"),
+            sweep_mode=SweepMode.ORDINARY,
+            filing_status="single", tax_year=2025,
+            sweep_step=dec("1000"), sweep_ceiling=dec("50000"),
+        )
+        self.signals = compute_planning_signals(
+            self.result,
+            fixed_ordinary=dec("20000"),
+            variable_ordinary=dec("0"),
+            qualified_dividends=dec("0"),
+            fixed_ltcg=dec("0"),
+            above_the_line_adjustments=dec("0"),
+            additional_deductions=dec("0"),
+        )
+
+    def teardown_method(self):
+        self.fed_patcher.stop()
+        self.ss_patcher.stop()
+        self.ohio_patcher.stop()
+
+    def test_ltcg_0pct_remaining_none(self):
+        assert self.signals.ltcg_0pct_remaining is None
+
+    def test_ltcg_0pct_ordinary_runway_none(self):
+        assert self.signals.ltcg_0pct_ordinary_runway is None

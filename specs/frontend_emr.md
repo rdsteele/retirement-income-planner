@@ -186,6 +186,8 @@ Displayed as a horizontal row of signal badges.
 | `ss_fully_taxable = true` | "SS: Fully Taxable (85%)" | amber |
 | `ltcg_0pct_remaining` (not null) | "0% LTCG Space: $X,XXX" | green |
 | `ltcg_0pct_remaining = null` | "0% LTCG Space: None" | gray |
+| `ltcg_0pct_ordinary_runway` (not null) | "LTCG Bump Ordinary Runway: $X,XXX" | green |
+| `ltcg_0pct_ordinary_runway = null` and `ltcg_0pct_remaining` not null | "LTCG Bump Ordinary Runway: None" | gray |
 | `distance_to_22pct` (not null) | "To 22%: $X,XXX" | blue |
 | `distance_to_22pct = null` | "At 22%+" | gray |
 | `distance_to_24pct` (not null) | "To 24%: $X,XXX" | blue |

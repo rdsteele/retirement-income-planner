@@ -12,18 +12,14 @@ from api.models.emr import (
     EMRResponse,
     PlanningSignals,
 )
-from services.data_loader import load_federal_data
 from services.emr import EMRResult, SweepMode, calculate_emr
+from services.emr import compute_planning_signals as _compute_service_signals
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 _D = Decimal
-_ZERO = 0.0
-_INCLUSION_85 = 0.85
-_EMR_22 = 0.22
-_EMR_24 = 0.24
 
 
 def _to_decimal(value: float) -> Decimal:
@@ -56,93 +52,31 @@ def _build_points(result: EMRResult) -> EMRPoints:
     )
 
 
-def _get_ltcg_0pct_ceiling(tax_year: int, filing_status: str) -> float:
-    data = load_federal_data(tax_year)
-    return float(data["preferential"][filing_status][0]["to"])
-
-
-def _get_standard_deduction(tax_year: int, filing_status: str) -> float:
-    data = load_federal_data(tax_year)
-    return float(data["standard_deduction"][filing_status])
-
-
-def _compute_ltcg_0pct_remaining(
-    result: EMRResult,
-    request: EMRRequest,
-) -> float | None:
-    pts = result.points
-    if not pts:  # pragma: no cover — calculate_emr always produces ≥1 point
-        return None
-    ltcg_already_used = request.fixed_ltcg + request.qualified_dividends
-    # Ordinary sweep with no fixed preferential income — nothing to report
-    if result.sweep_mode == SweepMode.ORDINARY and ltcg_already_used == _ZERO:
-        return None
-    ceiling = _get_ltcg_0pct_ceiling(request.tax_year, request.filing_status)
-    taxable_ordinary_at_floor = float(pts[0].taxable_ordinary)
-    remaining = ceiling - taxable_ordinary_at_floor - ltcg_already_used
-    return remaining if remaining > _ZERO else None
+def _to_float_or_none(value: Decimal | None) -> float | None:
+    return float(value) if value is not None else None
 
 
 def _compute_planning_signals(result: EMRResult, request: EMRRequest) -> PlanningSignals:
-    pts = result.points
-    floor_income = float(pts[0].income) if pts else _ZERO
-
-    ltcg_0pct_remaining = _compute_ltcg_0pct_remaining(result, request)
-
-    # torpedo_active
-    torpedo_active = any(float(p.emr_ss_torpedo) > _ZERO for p in pts)
-
-    # ss_fully_taxable: check first point
-    ss_fully_taxable = (
-        float(pts[0].ss_inclusion_rate) >= _INCLUSION_85 if pts else False
+    signals = _compute_service_signals(
+        result,
+        fixed_ordinary=_to_decimal(
+            request.pension + request.interest
+            + request.ordinary_dividends + request.ira_distributions,
+        ),
+        variable_ordinary=_to_decimal(request.variable_ordinary),
+        qualified_dividends=_to_decimal(request.qualified_dividends),
+        fixed_ltcg=_to_decimal(request.fixed_ltcg),
+        above_the_line_adjustments=_to_decimal(request.above_the_line_adjustments),
+        additional_deductions=_to_decimal(request.additional_deductions),
     )
-
-    # distance_to_22pct and 24pct: first point where emr_ordinary >= threshold
-    distance_to_22pct = None
-    distance_to_24pct = None
-    if pts:
-        first_ordinary = float(pts[0].emr_ordinary)
-        if first_ordinary < _EMR_22:
-            for p in pts:
-                if float(p.emr_ordinary) >= _EMR_22:
-                    distance_to_22pct = float(p.income) - floor_income
-                    break
-        if first_ordinary < _EMR_24:
-            for p in pts:
-                if float(p.emr_ordinary) >= _EMR_24:
-                    distance_to_24pct = float(p.income) - floor_income
-                    break
-
-    # zero_ordinary_space: direct formula — no finite-difference artifact.
-    # Mirrors the taxable_ordinary formula: max(0, std_ded + atl + add_ded − fixed_ord − ss).
-    std_ded = _get_standard_deduction(request.tax_year, request.filing_status)
-    fixed_ordinary = (
-        request.pension + request.interest
-        + request.ordinary_dividends + request.ira_distributions
-    )
-    if result.sweep_mode == SweepMode.PREFERENTIAL:
-        fixed_ordinary += request.variable_ordinary
-    ss_taxable_at_floor = float(pts[0].ss_taxable) if pts else _ZERO
-    zero_ordinary_space: float | None = (
-        max(
-            _ZERO,
-            std_ded
-            + request.above_the_line_adjustments
-            + request.additional_deductions
-            - fixed_ordinary
-            - ss_taxable_at_floor,
-        )
-        if pts is not None
-        else None
-    )
-
     return PlanningSignals(
-        zero_ordinary_space=zero_ordinary_space,
-        ltcg_0pct_remaining=ltcg_0pct_remaining,
-        torpedo_active=torpedo_active,
-        ss_fully_taxable=ss_fully_taxable,
-        distance_to_22pct=distance_to_22pct,
-        distance_to_24pct=distance_to_24pct,
+        zero_ordinary_space=_to_float_or_none(signals.zero_ordinary_space),
+        ltcg_0pct_remaining=_to_float_or_none(signals.ltcg_0pct_remaining),
+        ltcg_0pct_ordinary_runway=_to_float_or_none(signals.ltcg_0pct_ordinary_runway),
+        torpedo_active=signals.torpedo_active,
+        ss_fully_taxable=signals.ss_fully_taxable,
+        distance_to_22pct=_to_float_or_none(signals.distance_to_22pct),
+        distance_to_24pct=_to_float_or_none(signals.distance_to_24pct),
     )
 
 

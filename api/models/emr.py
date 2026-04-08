@@ -53,6 +53,7 @@ class EMRPoints(BaseModel):
 class PlanningSignals(BaseModel):
     zero_ordinary_space: float | None
     ltcg_0pct_remaining: float | None
+    ltcg_0pct_ordinary_runway: float | None
     torpedo_active: bool
     ss_fully_taxable: bool
     distance_to_22pct: float | None

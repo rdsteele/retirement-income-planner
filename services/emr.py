@@ -701,3 +701,165 @@ def calculate_emr(
         tax_year=tax_year,
         filing_status=filing_status,
     )
+
+
+# ---------------------------------------------------------------------------
+# Planning signals — computed from EMR results + input parameters
+# ---------------------------------------------------------------------------
+
+_INCLUSION_85 = Decimal("0.85")
+_EMR_22 = Decimal("0.22")
+_EMR_24 = Decimal("0.24")
+
+
+@dataclass
+class PlanningSignals:
+    zero_ordinary_space: Decimal | None
+    ltcg_0pct_remaining: Decimal | None
+    ltcg_0pct_ordinary_runway: Decimal | None
+    torpedo_active: bool
+    ss_fully_taxable: bool
+    distance_to_22pct: Decimal | None
+    distance_to_24pct: Decimal | None
+
+
+def _get_ltcg_0pct_ceiling(filing_status: str, tax_year: int) -> Decimal:
+    data = load_federal_data(tax_year)
+    return Decimal(data["preferential"][filing_status][0]["to"])
+
+
+def _compute_ltcg_0pct_remaining(
+    points: list[EMRPoint],
+    sweep_mode: SweepMode,
+    ltcg_already_used: Decimal,
+    filing_status: str,
+    tax_year: int,
+) -> Decimal | None:
+    if not points:
+        return None
+    if sweep_mode == SweepMode.ORDINARY and ltcg_already_used == _ZERO:
+        return None
+    ceiling = _get_ltcg_0pct_ceiling(filing_status, tax_year)
+    taxable_ordinary_at_floor = points[0].taxable_ordinary
+    remaining = ceiling - taxable_ordinary_at_floor - ltcg_already_used
+    return remaining if remaining > _ZERO else None
+
+
+def _compute_ltcg_0pct_ordinary_runway(
+    points: list[EMRPoint],
+    sweep_mode: SweepMode,
+    ltcg_already_used: Decimal,
+    fixed_ordinary: Decimal,
+    ss_taxable_at_floor: Decimal,
+    std_deduction: Decimal,
+    above_the_line_adjustments: Decimal,
+    additional_deductions: Decimal,
+    filing_status: str,
+    tax_year: int,
+) -> Decimal | None:
+    """Additional ordinary income before existing LTCG enters the 15% bracket."""
+    if not points:
+        return None
+    if sweep_mode == SweepMode.ORDINARY and ltcg_already_used == _ZERO:
+        return None
+    ceiling = _get_ltcg_0pct_ceiling(filing_status, tax_year)
+    runway = (
+        ceiling - ltcg_already_used
+        + std_deduction + above_the_line_adjustments + additional_deductions
+        - fixed_ordinary - ss_taxable_at_floor
+    )
+    return runway if runway > _ZERO else None
+
+
+def _compute_zero_ordinary_space(
+    points: list[EMRPoint],
+    sweep_mode: SweepMode,
+    fixed_ordinary: Decimal,
+    variable_ordinary: Decimal,
+    ss_taxable_at_floor: Decimal,
+    std_deduction: Decimal,
+    above_the_line_adjustments: Decimal,
+    additional_deductions: Decimal,
+) -> Decimal | None:
+    if not points:
+        return None
+    effective_fixed = fixed_ordinary
+    if sweep_mode == SweepMode.PREFERENTIAL:
+        effective_fixed += variable_ordinary
+    return max(
+        _ZERO,
+        std_deduction + above_the_line_adjustments + additional_deductions
+        - effective_fixed - ss_taxable_at_floor,
+    )
+
+
+def _compute_bracket_distances(
+    points: list[EMRPoint],
+) -> tuple[Decimal | None, Decimal | None]:
+    if not points:
+        return None, None
+    floor_income = points[0].income
+    first_ordinary = points[0].emr_ordinary
+    distance_to_22pct = None
+    distance_to_24pct = None
+    if first_ordinary < _EMR_22:
+        for p in points:
+            if p.emr_ordinary >= _EMR_22:
+                distance_to_22pct = p.income - floor_income
+                break
+    if first_ordinary < _EMR_24:
+        for p in points:
+            if p.emr_ordinary >= _EMR_24:
+                distance_to_24pct = p.income - floor_income
+                break
+    return distance_to_22pct, distance_to_24pct
+
+
+def compute_planning_signals(
+    result: EMRResult,
+    *,
+    fixed_ordinary: Decimal,
+    variable_ordinary: Decimal,
+    qualified_dividends: Decimal,
+    fixed_ltcg: Decimal,
+    above_the_line_adjustments: Decimal,
+    additional_deductions: Decimal,
+) -> PlanningSignals:
+    """Compute planning signals from an EMR result and its input parameters."""
+    pts = result.points
+    std_deduction = _get_standard_deduction(result.filing_status, result.tax_year)
+    ltcg_already_used = qualified_dividends + fixed_ltcg
+    ss_taxable_at_floor = pts[0].ss_taxable if pts else _ZERO
+
+    zero_ordinary_space = _compute_zero_ordinary_space(
+        pts, result.sweep_mode, fixed_ordinary, variable_ordinary,
+        ss_taxable_at_floor, std_deduction,
+        above_the_line_adjustments, additional_deductions,
+    )
+
+    ltcg_0pct_remaining = _compute_ltcg_0pct_remaining(
+        pts, result.sweep_mode, ltcg_already_used,
+        result.filing_status, result.tax_year,
+    )
+
+    ltcg_0pct_ordinary_runway = _compute_ltcg_0pct_ordinary_runway(
+        pts, result.sweep_mode, ltcg_already_used,
+        fixed_ordinary, ss_taxable_at_floor, std_deduction,
+        above_the_line_adjustments, additional_deductions,
+        result.filing_status, result.tax_year,
+    )
+
+    torpedo_active = any(p.emr_ss_torpedo > _ZERO for p in pts)
+    ss_fully_taxable = pts[0].ss_inclusion_rate >= _INCLUSION_85 if pts else False
+
+    distance_to_22pct, distance_to_24pct = _compute_bracket_distances(pts)
+
+    return PlanningSignals(
+        zero_ordinary_space=zero_ordinary_space,
+        ltcg_0pct_remaining=ltcg_0pct_remaining,
+        ltcg_0pct_ordinary_runway=ltcg_0pct_ordinary_runway,
+        torpedo_active=torpedo_active,
+        ss_fully_taxable=ss_fully_taxable,
+        distance_to_22pct=distance_to_22pct,
+        distance_to_24pct=distance_to_24pct,
+    )

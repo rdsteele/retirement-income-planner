@@ -756,6 +756,13 @@
       badges.push({ cls: 'badge-gray', text: '0% LTCG Space: None' });
     }
 
+    // LTCG 0% ordinary runway
+    if (s.ltcg_0pct_ordinary_runway !== null) {
+      badges.push({ cls: 'badge-green', text: 'LTCG Bump Ordinary Runway: ' + fmt$(s.ltcg_0pct_ordinary_runway) });
+    } else if (s.ltcg_0pct_remaining !== null) {
+      badges.push({ cls: 'badge-gray', text: 'LTCG Bump Ordinary Runway: None' });
+    }
+
     // Distance to 22%
     if (s.distance_to_22pct !== null) {
       badges.push({ cls: 'badge-blue', text: 'To 22%: ' + fmt$(s.distance_to_22pct) });

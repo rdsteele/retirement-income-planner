@@ -144,11 +144,12 @@ All numeric values are `float`. No `Decimal`, no Python-specific types.
       {"sweep_value": 12225.0, "rate": 0.12, "notes": "12% bracket"},
       {"sweep_value": 47150.0, "rate": 0.22, "notes": "22% bracket"}
     ],
-    "ltcg_0pct_remaining":  26350.0,
-    "torpedo_active":       false,
-    "ss_fully_taxable":     false,
-    "distance_to_22pct":    19350.0,
-    "distance_to_24pct":    null
+    "ltcg_0pct_remaining":        26350.0,
+    "ltcg_0pct_ordinary_runway":  42100.0,
+    "torpedo_active":             false,
+    "ss_fully_taxable":           false,
+    "distance_to_22pct":          19350.0,
+    "distance_to_24pct":          null
   }
 }
 ```
@@ -160,14 +161,17 @@ The `aca` component array is all zeros when `include_aca = false`.
 
 ### Planning Signals
 
-Derived from the points array by the route after the service returns.
+Shared signals are computed by `compute_planning_signals()` in `services/emr.py`.
+Route-specific signals (`zero_rate_threshold`, `aca_cliff_sweep_value`,
+`bracket_boundaries`) are computed in the total-cost route.
 
 | Signal | Type | Description |
 |---|---|---|
 | `zero_rate_threshold` | `float \| null` | Sweep value where `emr_ordinary` first becomes > 0 (standard deduction exhausted) |
 | `aca_cliff_sweep_value` | `float \| null` | Sweep value where `aca_subsidy_loss` first becomes > 0. `null` if `include_aca = false` |
 | `bracket_boundaries` | `list` | Each entry where `emr_ordinary` changes: `{sweep_value, rate, notes}` |
-| `ltcg_0pct_remaining` | `float \| null` | Income remaining before LTCG enters 15% bracket. `null` if already past threshold or sweep_mode is ORDINARY with no preferential income |
+| `ltcg_0pct_remaining` | `float \| null` | Additional LTCG income that fits in the 0% bracket. `null` if already past threshold or sweep_mode is ORDINARY with no preferential income |
+| `ltcg_0pct_ordinary_runway` | `float \| null` | Additional ordinary income before existing LTCG enters the 15% bracket. Accounts for the standard deduction cushion. `null` under the same conditions as `ltcg_0pct_remaining` |
 | `torpedo_active` | `bool` | True if any point has `emr_ss_torpedo > 0` |
 | `ss_fully_taxable` | `bool` | True if SS inclusion rate has reached 85% at `sweep_floor` |
 | `distance_to_22pct` | `float \| null` | Income remaining before ordinary EMR reaches 22%. `null` if already at or above 22% at `sweep_floor` |

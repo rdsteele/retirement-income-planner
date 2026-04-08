@@ -73,6 +73,7 @@ class TotalCostPlanningSignals(BaseModel):
     aca_cliff_sweep_value: float | None
     bracket_boundaries: list[BracketBoundary]
     ltcg_0pct_remaining: float | None
+    ltcg_0pct_ordinary_runway: float | None
     torpedo_active: bool
     ss_fully_taxable: bool
     distance_to_22pct: float | None
