@@ -60,8 +60,10 @@ def _compute_planning_signals(result: EMRResult, request: EMRRequest) -> Plannin
     signals = _compute_service_signals(
         result,
         fixed_ordinary=_to_decimal(
-            request.pension + request.interest
-            + request.ordinary_dividends + request.ira_distributions,
+            request.pension
+            + request.interest
+            + request.ordinary_dividends
+            + request.ira_distributions,
         ),
         variable_ordinary=_to_decimal(request.variable_ordinary),
         qualified_dividends=_to_decimal(request.qualified_dividends),
@@ -88,7 +90,7 @@ def post_emr(request: EMRRequest):
         raise HTTPException(
             status_code=422,
             detail=f"Invalid sweep_mode: {request.sweep_mode!r}. "
-                   f"Must be 'ordinary' or 'preferential'.",
+            f"Must be 'ordinary' or 'preferential'.",
         )
 
     try:
@@ -111,9 +113,9 @@ def post_emr(request: EMRRequest):
             include_ohio=request.include_ohio,
             ohio_medical_deduction=_to_decimal(request.ohio_medical_deduction),
             ohio_qualifying_retirement_income=_to_decimal(
-                request.ohio_qualifying_retirement_income),
-            above_the_line_adjustments=_to_decimal(
-                request.above_the_line_adjustments),
+                request.ohio_qualifying_retirement_income
+            ),
+            above_the_line_adjustments=_to_decimal(request.above_the_line_adjustments),
             additional_deductions=_to_decimal(request.additional_deductions),
         )
     except ValueError as exc:

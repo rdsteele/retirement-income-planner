@@ -44,16 +44,12 @@ def _account_to_response(a: svc.AccountOut) -> AccountOut:
             float(a.annual_contribution) if a.annual_contribution is not None else None
         ),
         holdings=(
-            [_holding_to_response(h) for h in a.holdings]
-            if a.holdings is not None
-            else None
+            [_holding_to_response(h) for h in a.holdings] if a.holdings is not None else None
         ),
         total_basis=float(a.total_basis) if a.total_basis is not None else None,
         total_value=float(a.total_value) if a.total_value is not None else None,
         total_unrealized_gain=(
-            float(a.total_unrealized_gain)
-            if a.total_unrealized_gain is not None
-            else None
+            float(a.total_unrealized_gain) if a.total_unrealized_gain is not None else None
         ),
     )
 
@@ -111,9 +107,7 @@ def get_account(account_id: str):
 @router.put("/accounts/{account_id}", response_model=AccountOut)
 def update_account(account_id: str, request: AccountIn):
     try:
-        return _account_to_response(
-            svc.update_account(account_id, _to_account_in(request))
-        )
+        return _account_to_response(svc.update_account(account_id, _to_account_in(request)))
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 
@@ -130,9 +124,7 @@ def delete_account(account_id: str):
 @router.post("/accounts/{account_id}/holdings", response_model=AccountOut, status_code=201)
 def create_holding(account_id: str, request: HoldingIn):
     try:
-        return _account_to_response(
-            svc.create_holding(account_id, _to_holding_in(request))
-        )
+        return _account_to_response(svc.create_holding(account_id, _to_holding_in(request)))
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 
@@ -150,8 +142,6 @@ def update_holding(account_id: str, holding_id: str, request: HoldingIn):
 @router.delete("/accounts/{account_id}/holdings/{holding_id}", response_model=AccountOut)
 def delete_holding(account_id: str, holding_id: str):
     try:
-        return _account_to_response(
-            svc.delete_holding(account_id, holding_id)
-        )
+        return _account_to_response(svc.delete_holding(account_id, holding_id))
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))

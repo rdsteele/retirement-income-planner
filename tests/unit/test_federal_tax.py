@@ -20,6 +20,7 @@ def dec(s: str) -> Decimal:
 #             Preferential income fully in the 15% LTCG bracket
 # ---------------------------------------------------------------------------
 
+
 class TestExample1SingleOrdinaryMultiBrackets:
     def setup_method(self):
         self.result = calculate_federal_tax(
@@ -70,6 +71,7 @@ class TestExample1SingleOrdinaryMultiBrackets:
 # Example 2 — MFJ, ordinary income spans multiple brackets
 # ---------------------------------------------------------------------------
 
+
 class TestExample2MFJOrdinaryMultiBrackets:
     def setup_method(self):
         self.result = calculate_federal_tax(
@@ -99,12 +101,13 @@ class TestExample2MFJOrdinaryMultiBrackets:
         assert len(bd) == 3
         assert bd[0] == BracketDetail(dec("0.10"), dec("23850"), dec("2385"))
         assert bd[1] == BracketDetail(dec("0.12"), dec("73100"), dec("8772"))
-        assert bd[2] == BracketDetail(dec("0.22"), dec("3050"),  dec("671"))
+        assert bd[2] == BracketDetail(dec("0.22"), dec("3050"), dec("671"))
 
 
 # ---------------------------------------------------------------------------
 # Example 3 — Single, preferential income straddles the 0%/15% LTCG boundary
 # ---------------------------------------------------------------------------
+
 
 class TestExample3PreferentialStraddlesBoundary:
     def setup_method(self):
@@ -140,6 +143,7 @@ class TestExample3PreferentialStraddlesBoundary:
 # ---------------------------------------------------------------------------
 # Edge cases
 # ---------------------------------------------------------------------------
+
 
 class TestEdgeCases:
     def test_zero_ordinary_income_defaults_marginal_rate(self):
@@ -191,10 +195,12 @@ class TestEdgeCases:
 #   Ordinary bracket 10%/12% crossover: $12,225
 # ---------------------------------------------------------------------------
 
+
 class TestFederal2026Data:
     def test_standard_deduction_single(self):
         import json
         from pathlib import Path
+
         path = Path(__file__).parent.parent.parent / "data/brackets/federal_2026.json"
         data = json.loads(path.read_text())
         assert data["standard_deduction"]["single"] == "16100"

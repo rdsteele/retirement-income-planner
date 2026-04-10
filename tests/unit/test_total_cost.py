@@ -69,6 +69,7 @@ _CLIFF_MAGI = D("62600")
 # 1. include_aca=False — identical to calculate_emr()
 # ---------------------------------------------------------------------------
 
+
 class TestNoAca:
     def setup_method(self):
         self.tc = calculate_total_cost(**_BASE, include_aca=False)
@@ -128,12 +129,15 @@ class TestNoAca:
 # 2. ACA MAGI computed correctly at each sweep point (ORDINARY mode)
 # ---------------------------------------------------------------------------
 
+
 class TestAcaMagi:
     def setup_method(self):
         self.tc = calculate_total_cost(**_BASE, include_aca=True)
         self.fixed_ordinary = (
-            _BASE["pension"] + _BASE["interest"]
-            + _BASE["ordinary_dividends"] + _BASE["ira_distributions"]
+            _BASE["pension"]
+            + _BASE["interest"]
+            + _BASE["ordinary_dividends"]
+            + _BASE["ira_distributions"]
         )
 
     def test_aca_magi_formula_ordinary_mode(self):
@@ -160,6 +164,7 @@ class TestAcaMagi:
 # 3. emr_aca=0 below cliff, spike at cliff, 0 above cliff
 # ---------------------------------------------------------------------------
 
+
 class TestEmrAca:
     def setup_method(self):
         self.tc = calculate_total_cost(**_BASE, include_aca=True)
@@ -170,14 +175,18 @@ class TestEmrAca:
         # below the cliff; it is never negative.
         for p in self.tc.points:
             if p.aca_magi < self.cliff_magi:
-                assert p.emr_aca >= D("0"), f"Negative emr_aca at income={p.income}, magi={p.aca_magi}"
+                assert p.emr_aca >= D("0"), (
+                    f"Negative emr_aca at income={p.income}, magi={p.aca_magi}"
+                )
 
     def test_emr_aca_spike_at_cliff(self):
         cliff_points = [p for p in self.tc.points if p.aca_magi == self.cliff_magi]
         assert cliff_points, "No point found exactly at cliff MAGI"
         for p in cliff_points:
             expected_spike = _APTC_ANNUAL / D("1000")
-            assert p.emr_aca == expected_spike, f"Expected {expected_spike} at cliff, got {p.emr_aca}"
+            assert p.emr_aca == expected_spike, (
+                f"Expected {expected_spike} at cliff, got {p.emr_aca}"
+            )
 
     def test_emr_aca_zero_above_cliff(self):
         for p in self.tc.points:
@@ -193,12 +202,15 @@ class TestEmrAca:
         # Schedule-based APTC varies by MAGI below cliff; zero at and above cliff.
         for p in self.tc.points:
             if p.aca_magi >= self.cliff_magi:
-                assert p.aptc_annual == D("0"), f"Expected 0 at/above cliff, got {p.aptc_annual} at magi={p.aca_magi}"
+                assert p.aptc_annual == D("0"), (
+                    f"Expected 0 at/above cliff, got {p.aptc_annual} at magi={p.aca_magi}"
+                )
 
 
 # ---------------------------------------------------------------------------
 # 4. total_cost_emr = emr + emr_aca at all points
 # ---------------------------------------------------------------------------
+
 
 class TestTotalCostEmr:
     def setup_method(self):
@@ -214,6 +226,7 @@ class TestTotalCostEmr:
 # ---------------------------------------------------------------------------
 # 5. Cliff boundary point inserted at correct sweep_value
 # ---------------------------------------------------------------------------
+
 
 class TestCliffBoundaryInsertion:
     def setup_method(self):
@@ -254,6 +267,7 @@ class TestCliffBoundaryInsertion:
 # 6. PREFERENTIAL mode cliff boundary computed correctly
 # ---------------------------------------------------------------------------
 
+
 class TestPreferentialMode:
     def setup_method(self):
         self.tc = calculate_total_cost(
@@ -291,12 +305,12 @@ class TestPreferentialMode:
         for p in self.tc.points:
             expected = (
                 fixed_ordinary
-                + D("3000")   # qualified_dividends
+                + D("3000")  # qualified_dividends
                 + D("10000")  # fixed_ltcg
-                + p.income    # sweep_value (preferential)
+                + p.income  # sweep_value (preferential)
                 + p.ss_taxable
-                - D("5000")   # above_the_line_adjustments
-                + D("0")      # tax_exempt_interest
+                - D("5000")  # above_the_line_adjustments
+                + D("0")  # tax_exempt_interest
             )
             assert p.aca_magi == expected, f"MAGI mismatch at income={p.income}"
 
@@ -309,6 +323,7 @@ class TestPreferentialMode:
 # 7. cliff_sweep_value formula — fixed_ltcg and qualified_dividends subtracted
 #    in both ORDINARY and PREFERENTIAL modes
 # ---------------------------------------------------------------------------
+
 
 class TestCliffSweepValueFormula:
     """Verify cliff_sweep_value = cliff_magi - fixed_ordinary - qd - ltcg

@@ -3,7 +3,6 @@
 Uses FastAPI TestClient with real bracket data — no mocks.
 """
 
-
 from unittest.mock import patch
 
 import pytest
@@ -52,6 +51,7 @@ _BASE_PREFERENTIAL = {
 
 
 # ── Happy path: ordinary sweep ───────────────────────────────────────────
+
 
 class TestOrdinarySweep:
     def setup_method(self):
@@ -118,6 +118,7 @@ class TestOrdinarySweep:
 
 # ── Happy path: preferential sweep ───────────────────────────────────────
 
+
 class TestPreferentialSweep:
     def setup_method(self):
         self.resp = client.post("/api/emr", json=_BASE_PREFERENTIAL)
@@ -133,8 +134,14 @@ class TestPreferentialSweep:
         pts = self.body["points"]
         n = len(pts["income"])
         assert n > 0
-        for key in ("total_tax", "emr", "ss_taxable", "ss_inclusion_rate",
-                     "taxable_ordinary", "ohio_tax"):
+        for key in (
+            "total_tax",
+            "emr",
+            "ss_taxable",
+            "ss_inclusion_rate",
+            "taxable_ordinary",
+            "ohio_tax",
+        ):
             assert len(pts[key]) == n
 
     def test_ltcg_0pct_remaining_present(self):
@@ -152,6 +159,7 @@ class TestPreferentialSweep:
 
 
 # ── Happy path: with Ohio ────────────────────────────────────────────────
+
 
 class TestWithOhio:
     def setup_method(self):
@@ -173,6 +181,7 @@ class TestWithOhio:
 
 # ── Happy path: without Ohio ─────────────────────────────────────────────
 
+
 class TestWithoutOhio:
     def setup_method(self):
         payload = {**_BASE_ORDINARY, "include_ohio": False}
@@ -187,6 +196,7 @@ class TestWithoutOhio:
 
 
 # ── Float → Decimal → float round-trip ───────────────────────────────────
+
 
 class TestRoundTrip:
     def test_income_values_match_sweep(self):
@@ -204,10 +214,13 @@ class TestRoundTrip:
 
     def test_decimal_precision_preserved(self):
         # Verify that 0.1 doesn't become 0.1000000000000000055511151231257827021181583404541015625
-        resp = client.post("/api/emr", json={
-            **_BASE_ORDINARY,
-            "pension": 10000.1,
-        })
+        resp = client.post(
+            "/api/emr",
+            json={
+                **_BASE_ORDINARY,
+                "pension": 10000.1,
+            },
+        )
         assert resp.status_code == 200
         # The key test: the response should be valid JSON with normal floats
         body = resp.json()
@@ -215,6 +228,7 @@ class TestRoundTrip:
 
 
 # ── Planning signals ─────────────────────────────────────────────────────
+
 
 class TestPlanningSignals:
     def test_distance_to_22pct(self):
@@ -259,14 +273,20 @@ class TestPlanningSignals:
 
 # ── above_the_line_adjustments and additional_deductions ─────────────────
 
+
 class TestAdjustmentFields:
     def test_above_the_line_reduces_ss_taxable(self):
         # With ss_benefit and high pension, HSA adjustment reduces SS taxable amount.
-        base = {**_BASE_ORDINARY, "ss_benefit": 20000.0, "pension": 30000.0,
-                "sweep_ceiling": 1000.0}
+        base = {
+            **_BASE_ORDINARY,
+            "ss_benefit": 20000.0,
+            "pension": 30000.0,
+            "sweep_ceiling": 1000.0,
+        }
         resp_no_adj = client.post("/api/emr", json=base)
-        resp_with_adj = client.post("/api/emr", json={**base,
-                                    "above_the_line_adjustments": 10000.0})
+        resp_with_adj = client.post(
+            "/api/emr", json={**base, "above_the_line_adjustments": 10000.0}
+        )
         assert resp_no_adj.status_code == 200
         assert resp_with_adj.status_code == 200
         ss_no = resp_no_adj.json()["points"]["ss_taxable"][0]
@@ -276,8 +296,7 @@ class TestAdjustmentFields:
     def test_additional_deductions_reduces_taxable_ordinary(self):
         base = {**_BASE_ORDINARY, "sweep_ceiling": 1000.0}
         resp_no_ded = client.post("/api/emr", json=base)
-        resp_with_ded = client.post("/api/emr", json={**base,
-                                    "additional_deductions": 5000.0})
+        resp_with_ded = client.post("/api/emr", json={**base, "additional_deductions": 5000.0})
         assert resp_no_ded.status_code == 200
         assert resp_with_ded.status_code == 200
         ord_no = resp_no_ded.json()["points"]["taxable_ordinary"][0]
@@ -288,11 +307,14 @@ class TestAdjustmentFields:
         # Omitting both fields should give same result as passing zero.
         base = {**_BASE_ORDINARY, "sweep_ceiling": 1000.0}
         resp_omit = client.post("/api/emr", json=base)
-        resp_zero = client.post("/api/emr", json={**base,
-                                "above_the_line_adjustments": 0.0,
-                                "additional_deductions": 0.0})
-        assert resp_omit.json()["points"]["taxable_ordinary"] == \
-               resp_zero.json()["points"]["taxable_ordinary"]
+        resp_zero = client.post(
+            "/api/emr",
+            json={**base, "above_the_line_adjustments": 0.0, "additional_deductions": 0.0},
+        )
+        assert (
+            resp_omit.json()["points"]["taxable_ordinary"]
+            == resp_zero.json()["points"]["taxable_ordinary"]
+        )
 
     def test_negative_above_the_line_rejected(self):
         payload = {**_BASE_ORDINARY, "above_the_line_adjustments": -100.0}
@@ -306,6 +328,7 @@ class TestAdjustmentFields:
 
 
 # ── Validation errors (422) ──────────────────────────────────────────────
+
 
 class TestValidationErrors:
     def test_invalid_filing_status(self):
@@ -440,9 +463,7 @@ class TestOhioFunctional:
         ohio_emrs = body["points"]["components"]["ohio"]
 
         max_emr = max(ohio_emrs)
-        assert max_emr > 0.05, (
-            f"expected MAGI boundary spike > 0.05, got max emr_ohio={max_emr}"
-        )
+        assert max_emr > 0.05, f"expected MAGI boundary spike > 0.05, got max emr_ohio={max_emr}"
         spike_income = incomes[ohio_emrs.index(max_emr)]
         assert 15000.0 <= spike_income <= 28000.0, (
             f"spike at income={spike_income}, expected near MAGI boundary (~21,900)"
@@ -483,6 +504,7 @@ class TestOhioFunctional:
 #
 # Test 3: above_the_line=6,000, pension=10,000.
 #   space = max(0, 15750 + 6000 − 10000) = 11,750 > 5,750.
+
 
 class TestZeroOrdinarySpaceSignal:
     def test_space_available_when_sweep_floor_below_standard_deduction(self):
@@ -607,6 +629,7 @@ class TestLtcg0pctRemainingSignal:
 
 # ── sweep_ceiling=null uses service default ───────────────────────────────
 
+
 class TestSweepCeilingNull:
     def test_null_sweep_ceiling_accepted(self):
         # sweep_ceiling=None triggers _to_decimal_or_none None path in router
@@ -618,6 +641,7 @@ class TestSweepCeilingNull:
 
 
 # ── Unexpected exception → 500 ────────────────────────────────────────────
+
 
 class TestUnexpectedError:
     def test_returns_500_on_unexpected_exception(self):

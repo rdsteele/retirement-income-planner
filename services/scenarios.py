@@ -43,11 +43,13 @@ def list_scenarios(
         try:
             data = json.loads(path.read_text())
             saved_at = datetime.fromisoformat(data["saved_at"])
-            results.append(ScenarioMeta(
-                name=data["name"],
-                saved_at=saved_at,
-                filename=path.name,
-            ))
+            results.append(
+                ScenarioMeta(
+                    name=data["name"],
+                    saved_at=saved_at,
+                    filename=path.name,
+                )
+            )
         except Exception:
             continue
     results.sort(key=lambda m: m.saved_at, reverse=True)

@@ -34,44 +34,43 @@ from services.ohio_tax import calculate_ohio_tax
 
 
 class TestScenarioOhioSingleFiler2025Proxy:
-
     @pytest.fixture
     def result(self):
         return calculate_ohio_tax(
-            federal_agi=Decimal('45370'),
-            gross_medical_expenses=Decimal('6557'),
-            qualifying_retirement_income=Decimal('47089'),
-            ss_taxable_federal=Decimal('0'),
+            federal_agi=Decimal("45370"),
+            gross_medical_expenses=Decimal("6557"),
+            qualifying_retirement_income=Decimal("47089"),
+            ss_taxable_federal=Decimal("0"),
             tax_year=2025,
         )
 
     def test_ohio_agi(self, result):
-        assert result.ohio_agi == Decimal('45370')
+        assert result.ohio_agi == Decimal("45370")
 
     def test_personal_exemption(self, result):
-        assert result.personal_exemption == Decimal('2150')
+        assert result.personal_exemption == Decimal("2150")
 
     def test_medical_deduction(self, result):
         # Back-calculated to reproduce 2024 Schedule of Adjustments deduction
-        assert result.medical_deduction == Decimal('3154')
+        assert result.medical_deduction == Decimal("3154")
 
     def test_ohio_tax_base(self, result):
-        assert result.ohio_tax_base == Decimal('40066')
+        assert result.ohio_tax_base == Decimal("40066")
 
     def test_tax_before_credits(self, result):
-        assert result.tax_before_credits == Decimal('727')
+        assert result.tax_before_credits == Decimal("727")
 
     def test_retirement_income_credit(self, result):
         # Qualifying income $47,089 > $8,000 → maximum $200 credit
-        assert result.retirement_income_credit == Decimal('200')
+        assert result.retirement_income_credit == Decimal("200")
 
     def test_ohio_tax(self, result):
-        assert result.ohio_tax == Decimal('527')
+        assert result.ohio_tax == Decimal("527")
 
     def test_effective_rate(self, result):
-        assert result.effective_rate == Decimal('0.0116')
+        assert result.effective_rate == Decimal("0.0116")
 
     def test_credit_eligibility_magi_under_threshold(self, result):
         # Ohio AGI $45,370 − exemption $2,150 = $43,220 — well under $100,000
         # Verifies that the MAGI threshold check passes for this income profile
-        assert result.retirement_income_credit > Decimal('0')
+        assert result.retirement_income_credit > Decimal("0")

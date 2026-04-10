@@ -53,12 +53,12 @@ _SINGLE_PREF_BRACKETS = [
 # Mock side-effect helpers
 # ---------------------------------------------------------------------------
 
+
 def _round2(amount: Decimal) -> Decimal:
     return amount.quantize(_TWO_PLACES, rounding=ROUND_HALF_UP)
 
 
-def _mock_federal_single(ordinary_income, preferential_income,
-                         filing_status, tax_year):
+def _mock_federal_single(ordinary_income, preferential_income, filing_status, tax_year):
     """Simplified single-filer bracket computation matching 2025 data."""
     ord_tax = _ZERO
     remaining = ordinary_income
@@ -108,8 +108,7 @@ def _mock_federal_single(ordinary_income, preferential_income,
     )
 
 
-def _mock_ss_single(ss_benefit, agi_excluding_ss, tax_exempt_interest,
-                    filing_status):
+def _mock_ss_single(ss_benefit, agi_excluding_ss, tax_exempt_interest, filing_status):
     """Simplified single-filer SS taxability matching IRS formula."""
     half_ss = _round2(ss_benefit * dec("0.50"))
     provisional = agi_excluding_ss + tax_exempt_interest + half_ss
@@ -141,13 +140,21 @@ def _mock_ss_single(ss_benefit, agi_excluding_ss, tax_exempt_interest,
     return SocialSecurityResult(provisional, taxable, inc, "eighty_five_percent")
 
 
-def _mock_ohio(federal_agi, gross_medical_expenses,
-               qualifying_retirement_income, ss_taxable_federal, tax_year,
-               filing_status="single"):
+def _mock_ohio(
+    federal_agi,
+    gross_medical_expenses,
+    qualifying_retirement_income,
+    ss_taxable_federal,
+    tax_year,
+    filing_status="single",
+):
     """Simplified Ohio tax returning a fixed-rate result for EMR testing."""
     ohio_agi = federal_agi - ss_taxable_federal
-    pe = dec("2400") if ohio_agi <= dec("40000") else (
-        dec("2150") if ohio_agi <= dec("80000") else dec("1900"))
+    pe = (
+        dec("2400")
+        if ohio_agi <= dec("40000")
+        else (dec("2150") if ohio_agi <= dec("80000") else dec("1900"))
+    )
 
     medical_floor = round_tax(ohio_agi * dec("0.075"))
     med_ded = max(_ZERO, gross_medical_expenses - medical_floor)
@@ -193,6 +200,7 @@ def _mock_ohio(federal_agi, gross_medical_expenses,
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _find_point(result: EMRResult, income: Decimal):
     """Return the EMRPoint at exactly the given income, or None."""
     for pt in result.points:
@@ -203,12 +211,12 @@ def _find_point(result: EMRResult, income: Decimal):
 
 def _assert_component_sum(pt, tolerance=_COMPONENT_TOLERANCE):
     """Assert EMR component breakdown sums to emr within tolerance."""
-    component_sum = (pt.emr_ordinary + pt.emr_ss_torpedo
-                     + pt.emr_pref_stacking + pt.emr_niit + pt.emr_ohio)
+    component_sum = (
+        pt.emr_ordinary + pt.emr_ss_torpedo + pt.emr_pref_stacking + pt.emr_niit + pt.emr_ohio
+    )
     diff = abs(pt.emr - component_sum)
     assert diff <= tolerance, (
-        f"At income={pt.income}: emr={pt.emr}, component_sum={component_sum}, "
-        f"diff={diff}"
+        f"At income={pt.income}: emr={pt.emr}, component_sum={component_sum}, diff={diff}"
     )
 
 
@@ -222,6 +230,7 @@ _PATCH_OHIO = "services.emr.calculate_ohio_tax"
 # Pension/interest income in 10%/12% brackets. Preferential stacking at ~27100.
 # ---------------------------------------------------------------------------
 
+
 class TestExampleAOrdinarySweepNoSS:
     def setup_method(self):
         self.fed_patcher = patch(_PATCH_FED, side_effect=_mock_federal_single)
@@ -232,13 +241,19 @@ class TestExampleAOrdinarySweepNoSS:
         self.mock_ohio = self.ohio_patcher.start()
 
         self.result = calculate_emr(
-            pension=dec("20000"), interest=dec("2000"),
-            ordinary_dividends=dec("0"), ira_distributions=dec("0"),
-            ss_benefit=dec("0"), qualified_dividends=dec("5000"),
-            fixed_ltcg=dec("10000"), tax_exempt_interest=dec("0"),
+            pension=dec("20000"),
+            interest=dec("2000"),
+            ordinary_dividends=dec("0"),
+            ira_distributions=dec("0"),
+            ss_benefit=dec("0"),
+            qualified_dividends=dec("5000"),
+            fixed_ltcg=dec("10000"),
+            tax_exempt_interest=dec("0"),
             sweep_mode=SweepMode.ORDINARY,
-            filing_status="single", tax_year=2025,
-            sweep_step=dec("100"), sweep_ceiling=dec("110000"),
+            filing_status="single",
+            tax_year=2025,
+            sweep_step=dec("100"),
+            sweep_ceiling=dec("110000"),
         )
 
     def teardown_method(self):
@@ -304,6 +319,7 @@ class TestExampleAOrdinarySweepNoSS:
 # exhausted at variable ~10000.
 # ---------------------------------------------------------------------------
 
+
 class TestExampleBSSTorpedo:
     def setup_method(self):
         self.fed_patcher = patch(_PATCH_FED, side_effect=_mock_federal_single)
@@ -314,13 +330,19 @@ class TestExampleBSSTorpedo:
         self.mock_ohio = self.ohio_patcher.start()
 
         self.result = calculate_emr(
-            pension=dec("15000"), interest=dec("0"),
-            ordinary_dividends=dec("0"), ira_distributions=dec("8000"),
-            ss_benefit=dec("24000"), qualified_dividends=dec("3000"),
-            fixed_ltcg=dec("5000"), tax_exempt_interest=dec("0"),
+            pension=dec("15000"),
+            interest=dec("0"),
+            ordinary_dividends=dec("0"),
+            ira_distributions=dec("8000"),
+            ss_benefit=dec("24000"),
+            qualified_dividends=dec("3000"),
+            fixed_ltcg=dec("5000"),
+            tax_exempt_interest=dec("0"),
             sweep_mode=SweepMode.ORDINARY,
-            filing_status="single", tax_year=2025,
-            sweep_step=dec("100"), sweep_ceiling=dec("90000"),
+            filing_status="single",
+            tax_year=2025,
+            sweep_step=dec("100"),
+            sweep_ceiling=dec("90000"),
         )
 
     def teardown_method(self):
@@ -391,11 +413,11 @@ class TestExampleBSSTorpedo:
             _assert_component_sum(pt)
 
 
-
 # ---------------------------------------------------------------------------
 # Example C — Preferential Sweep (LTCG Harvesting)
 # Ordinary income fixed. Sweep LTCG to find 0%/15% transition at 26350.
 # ---------------------------------------------------------------------------
+
 
 class TestExampleCPreferentialSweep:
     def setup_method(self):
@@ -407,14 +429,20 @@ class TestExampleCPreferentialSweep:
         self.mock_ohio = self.ohio_patcher.start()
 
         self.result = calculate_emr(
-            pension=dec("20000"), interest=dec("0"),
-            ordinary_dividends=dec("0"), ira_distributions=dec("15000"),
-            ss_benefit=dec("0"), qualified_dividends=dec("2000"),
-            fixed_ltcg=dec("0"), tax_exempt_interest=dec("0"),
+            pension=dec("20000"),
+            interest=dec("0"),
+            ordinary_dividends=dec("0"),
+            ira_distributions=dec("15000"),
+            ss_benefit=dec("0"),
+            qualified_dividends=dec("2000"),
+            fixed_ltcg=dec("0"),
+            tax_exempt_interest=dec("0"),
             variable_ordinary=dec("0"),
             sweep_mode=SweepMode.PREFERENTIAL,
-            filing_status="single", tax_year=2025,
-            sweep_step=dec("100"), sweep_ceiling=dec("60000"),
+            filing_status="single",
+            tax_year=2025,
+            sweep_step=dec("100"),
+            sweep_ceiling=dec("60000"),
         )
 
     def teardown_method(self):
@@ -467,6 +495,7 @@ class TestExampleCPreferentialSweep:
 # Ohio inclusion — include_ohio=True
 # ---------------------------------------------------------------------------
 
+
 class TestIncludeOhioTrue:
     def setup_method(self):
         self.fed_patcher = patch(_PATCH_FED, side_effect=_mock_federal_single)
@@ -477,13 +506,19 @@ class TestIncludeOhioTrue:
         self.mock_ohio = self.ohio_patcher.start()
 
         self.result = calculate_emr(
-            pension=dec("20000"), interest=dec("2000"),
-            ordinary_dividends=dec("0"), ira_distributions=dec("0"),
-            ss_benefit=dec("0"), qualified_dividends=dec("0"),
-            fixed_ltcg=dec("0"), tax_exempt_interest=dec("0"),
+            pension=dec("20000"),
+            interest=dec("2000"),
+            ordinary_dividends=dec("0"),
+            ira_distributions=dec("0"),
+            ss_benefit=dec("0"),
+            qualified_dividends=dec("0"),
+            fixed_ltcg=dec("0"),
+            tax_exempt_interest=dec("0"),
             sweep_mode=SweepMode.ORDINARY,
-            filing_status="single", tax_year=2025,
-            sweep_step=dec("1000"), sweep_ceiling=dec("50000"),
+            filing_status="single",
+            tax_year=2025,
+            sweep_step=dec("1000"),
+            sweep_ceiling=dec("50000"),
             include_ohio=True,
         )
 
@@ -515,10 +550,10 @@ class TestIncludeOhioTrue:
             _assert_component_sum(pt)
 
 
-
 # ---------------------------------------------------------------------------
 # Ohio exclusion — include_ohio=False
 # ---------------------------------------------------------------------------
+
 
 class TestIncludeOhioFalse:
     def setup_method(self):
@@ -530,13 +565,19 @@ class TestIncludeOhioFalse:
         self.mock_ohio = self.ohio_patcher.start()
 
         self.result = calculate_emr(
-            pension=dec("20000"), interest=dec("2000"),
-            ordinary_dividends=dec("0"), ira_distributions=dec("0"),
-            ss_benefit=dec("0"), qualified_dividends=dec("0"),
-            fixed_ltcg=dec("0"), tax_exempt_interest=dec("0"),
+            pension=dec("20000"),
+            interest=dec("2000"),
+            ordinary_dividends=dec("0"),
+            ira_distributions=dec("0"),
+            ss_benefit=dec("0"),
+            qualified_dividends=dec("0"),
+            fixed_ltcg=dec("0"),
+            tax_exempt_interest=dec("0"),
             sweep_mode=SweepMode.ORDINARY,
-            filing_status="single", tax_year=2025,
-            sweep_step=dec("1000"), sweep_ceiling=dec("50000"),
+            filing_status="single",
+            tax_year=2025,
+            sweep_step=dec("1000"),
+            sweep_ceiling=dec("50000"),
             include_ohio=False,
         )
 
@@ -550,21 +591,18 @@ class TestIncludeOhioFalse:
 
     def test_emr_ohio_zero_all_points(self):
         for pt in self.result.points:
-            assert pt.emr_ohio == _ZERO, (
-                f"emr_ohio non-zero at income={pt.income}: {pt.emr_ohio}"
-            )
+            assert pt.emr_ohio == _ZERO, f"emr_ohio non-zero at income={pt.income}: {pt.emr_ohio}"
 
     def test_ohio_tax_zero_all_points(self):
         for pt in self.result.points:
-            assert pt.ohio_tax == _ZERO, (
-                f"ohio_tax non-zero at income={pt.income}: {pt.ohio_tax}"
-            )
+            assert pt.ohio_tax == _ZERO, f"ohio_tax non-zero at income={pt.income}: {pt.ohio_tax}"
 
 
 # ---------------------------------------------------------------------------
 # NIIT trigger — ordinary sweep where AGI exceeds $200,000 threshold
 # Lines 207-208: niit_base and round_tax branch exercised.
 # ---------------------------------------------------------------------------
+
 
 class TestNIITTrigger:
     def setup_method(self):
@@ -578,14 +616,20 @@ class TestNIITTrigger:
         # fixed_ordinary=50000.  At variable=150000 → agi=210000 (>200k threshold)
         # qualified_dividends=10000 provides the NIIT base.
         self.result = calculate_emr(
-            pension=dec("50000"), interest=dec("0"),
-            ordinary_dividends=dec("0"), ira_distributions=dec("0"),
-            ss_benefit=dec("0"), qualified_dividends=dec("10000"),
-            fixed_ltcg=dec("0"), tax_exempt_interest=dec("0"),
+            pension=dec("50000"),
+            interest=dec("0"),
+            ordinary_dividends=dec("0"),
+            ira_distributions=dec("0"),
+            ss_benefit=dec("0"),
+            qualified_dividends=dec("10000"),
+            fixed_ltcg=dec("0"),
+            tax_exempt_interest=dec("0"),
             sweep_mode=SweepMode.ORDINARY,
-            filing_status="single", tax_year=2025,
+            filing_status="single",
+            tax_year=2025,
             sweep_step=dec("1000"),
-            sweep_floor=dec("140000"), sweep_ceiling=dec("170000"),
+            sweep_floor=dec("140000"),
+            sweep_ceiling=dec("170000"),
             include_ohio=True,
         )
 
@@ -624,6 +668,7 @@ class TestNIITTrigger:
 # Lines 452-469: SS tier boundaries appear as exact sweep points.
 # ---------------------------------------------------------------------------
 
+
 class TestSSTorpedoBoundaryInsertionPreferential:
     def setup_method(self):
         self.fed_patcher = patch(_PATCH_FED, side_effect=_mock_federal_single)
@@ -639,15 +684,21 @@ class TestSSTorpedoBoundaryInsertionPreferential:
         # tier_2 boundary: 34000 - 20000 = 14000
         # ss_max boundary: 34000 + (17000-4500)/0.85 - 20000 ≈ 28706
         self.result = calculate_emr(
-            pension=dec("10000"), interest=dec("0"),
-            ordinary_dividends=dec("0"), ira_distributions=dec("0"),
-            ss_benefit=dec("20000"), qualified_dividends=dec("0"),
-            fixed_ltcg=dec("0"), tax_exempt_interest=dec("0"),
+            pension=dec("10000"),
+            interest=dec("0"),
+            ordinary_dividends=dec("0"),
+            ira_distributions=dec("0"),
+            ss_benefit=dec("20000"),
+            qualified_dividends=dec("0"),
+            fixed_ltcg=dec("0"),
+            tax_exempt_interest=dec("0"),
             variable_ordinary=dec("0"),
             sweep_mode=SweepMode.PREFERENTIAL,
-            filing_status="single", tax_year=2025,
+            filing_status="single",
+            tax_year=2025,
             sweep_step=dec("1000"),
-            sweep_floor=dec("0"), sweep_ceiling=dec("50000"),
+            sweep_floor=dec("0"),
+            sweep_ceiling=dec("50000"),
         )
         self.incomes = [pt.income for pt in self.result.points]
 
@@ -657,14 +708,10 @@ class TestSSTorpedoBoundaryInsertionPreferential:
         self.ohio_patcher.stop()
 
     def test_tier_1_boundary_present(self):
-        assert dec("5000") in self.incomes, (
-            "SS tier-1 boundary 5000 missing from sweep output"
-        )
+        assert dec("5000") in self.incomes, "SS tier-1 boundary 5000 missing from sweep output"
 
     def test_tier_2_boundary_present(self):
-        assert dec("14000") in self.incomes, (
-            "SS tier-2 boundary 14000 missing from sweep output"
-        )
+        assert dec("14000") in self.incomes, "SS tier-2 boundary 14000 missing from sweep output"
 
     def test_ss_max_boundary_present(self):
         # max_tier_1 = min(0.50*20000, 0.50*9000) = 4500
@@ -684,6 +731,7 @@ class TestSSTorpedoBoundaryInsertionPreferential:
 # Lines 115-117: _get_irmaa_thresholds exercised and propagated to result.
 # ---------------------------------------------------------------------------
 
+
 class TestIRMAAThresholds:
     def setup_method(self):
         self.fed_patcher = patch(_PATCH_FED, side_effect=_mock_federal_single)
@@ -694,13 +742,19 @@ class TestIRMAAThresholds:
         self.mock_ohio = self.ohio_patcher.start()
 
         self.result = calculate_emr(
-            pension=dec("0"), interest=dec("0"),
-            ordinary_dividends=dec("0"), ira_distributions=dec("0"),
-            ss_benefit=dec("0"), qualified_dividends=dec("0"),
-            fixed_ltcg=dec("0"), tax_exempt_interest=dec("0"),
+            pension=dec("0"),
+            interest=dec("0"),
+            ordinary_dividends=dec("0"),
+            ira_distributions=dec("0"),
+            ss_benefit=dec("0"),
+            qualified_dividends=dec("0"),
+            fixed_ltcg=dec("0"),
+            tax_exempt_interest=dec("0"),
             sweep_mode=SweepMode.ORDINARY,
-            filing_status="single", tax_year=2025,
-            sweep_step=dec("10000"), sweep_ceiling=dec("10000"),
+            filing_status="single",
+            tax_year=2025,
+            sweep_step=dec("10000"),
+            sweep_ceiling=dec("10000"),
         )
 
     def teardown_method(self):
@@ -730,6 +784,7 @@ class TestIRMAAThresholds:
 # discontinuities when include_ohio=True.
 # ---------------------------------------------------------------------------
 
+
 class TestOhioBoundaryInsertion:
     """Verify Ohio discontinuity boundary points are present in sweep output."""
 
@@ -746,15 +801,21 @@ class TestOhioBoundaryInsertion:
         # MAGI credit boundary: ohio_agi - exemption = 100000 → ohio_agi = 101900
         # sweep_step=10000 ensures neither boundary falls on a regular point.
         self.result = calculate_emr(
-            pension=dec("0"), interest=dec("0"),
-            ordinary_dividends=dec("0"), ira_distributions=dec("0"),
-            ss_benefit=dec("0"), qualified_dividends=dec("0"),
-            fixed_ltcg=dec("0"), tax_exempt_interest=dec("0"),
+            pension=dec("0"),
+            interest=dec("0"),
+            ordinary_dividends=dec("0"),
+            ira_distributions=dec("0"),
+            ss_benefit=dec("0"),
+            qualified_dividends=dec("0"),
+            fixed_ltcg=dec("0"),
+            tax_exempt_interest=dec("0"),
             ohio_qualifying_retirement_income=dec("10000"),
             sweep_mode=SweepMode.ORDINARY,
-            filing_status="single", tax_year=2025,
+            filing_status="single",
+            tax_year=2025,
             sweep_step=dec("10000"),
-            sweep_floor=dec("0"), sweep_ceiling=dec("150000"),
+            sweep_floor=dec("0"),
+            sweep_ceiling=dec("150000"),
             include_ohio=True,
         )
         self.incomes = [pt.income for pt in self.result.points]
@@ -785,14 +846,20 @@ class TestOhioBoundaryInsertion:
         # When include_ohio=False the Ohio-specific boundary points must not be inserted
         # (they are unused and would only add sweep overhead).
         result_no_ohio = calculate_emr(
-            pension=dec("0"), interest=dec("0"),
-            ordinary_dividends=dec("0"), ira_distributions=dec("0"),
-            ss_benefit=dec("0"), qualified_dividends=dec("0"),
-            fixed_ltcg=dec("0"), tax_exempt_interest=dec("0"),
+            pension=dec("0"),
+            interest=dec("0"),
+            ordinary_dividends=dec("0"),
+            ira_distributions=dec("0"),
+            ss_benefit=dec("0"),
+            qualified_dividends=dec("0"),
+            fixed_ltcg=dec("0"),
+            tax_exempt_interest=dec("0"),
             sweep_mode=SweepMode.ORDINARY,
-            filing_status="single", tax_year=2025,
+            filing_status="single",
+            tax_year=2025,
             sweep_step=dec("10000"),
-            sweep_floor=dec("0"), sweep_ceiling=dec("150000"),
+            sweep_floor=dec("0"),
+            sweep_ceiling=dec("150000"),
             include_ohio=False,
         )
         incomes_no_ohio = [pt.income for pt in result_no_ohio.points]
@@ -807,6 +874,7 @@ class TestOhioBoundaryInsertion:
 # ---------------------------------------------------------------------------
 # above_the_line_adjustments — reduces provisional income → lowers SS taxability
 # ---------------------------------------------------------------------------
+
 
 class TestAboveTheLineAdjustments:
     """HSA-style adjustments reduce agi_excluding_ss and therefore ss_taxable."""
@@ -823,22 +891,36 @@ class TestAboveTheLineAdjustments:
         # Without adjustment: agi_excl=30000, prov=30000+10000=40000 → 85% tier
         # With adjustment=10000: agi_excl=20000, prov=20000+10000=30000 → 50% tier
         self.result_no_adj = calculate_emr(
-            pension=dec("30000"), interest=dec("0"),
-            ordinary_dividends=dec("0"), ira_distributions=dec("0"),
-            ss_benefit=dec("20000"), qualified_dividends=dec("0"),
-            fixed_ltcg=dec("0"), tax_exempt_interest=dec("0"),
+            pension=dec("30000"),
+            interest=dec("0"),
+            ordinary_dividends=dec("0"),
+            ira_distributions=dec("0"),
+            ss_benefit=dec("20000"),
+            qualified_dividends=dec("0"),
+            fixed_ltcg=dec("0"),
+            tax_exempt_interest=dec("0"),
             sweep_mode=SweepMode.ORDINARY,
-            filing_status="single", tax_year=2025,
-            sweep_floor=dec("0"), sweep_ceiling=dec("0"), sweep_step=dec("100"),
+            filing_status="single",
+            tax_year=2025,
+            sweep_floor=dec("0"),
+            sweep_ceiling=dec("0"),
+            sweep_step=dec("100"),
         )
         self.result_with_adj = calculate_emr(
-            pension=dec("30000"), interest=dec("0"),
-            ordinary_dividends=dec("0"), ira_distributions=dec("0"),
-            ss_benefit=dec("20000"), qualified_dividends=dec("0"),
-            fixed_ltcg=dec("0"), tax_exempt_interest=dec("0"),
+            pension=dec("30000"),
+            interest=dec("0"),
+            ordinary_dividends=dec("0"),
+            ira_distributions=dec("0"),
+            ss_benefit=dec("20000"),
+            qualified_dividends=dec("0"),
+            fixed_ltcg=dec("0"),
+            tax_exempt_interest=dec("0"),
             sweep_mode=SweepMode.ORDINARY,
-            filing_status="single", tax_year=2025,
-            sweep_floor=dec("0"), sweep_ceiling=dec("0"), sweep_step=dec("100"),
+            filing_status="single",
+            tax_year=2025,
+            sweep_floor=dec("0"),
+            sweep_ceiling=dec("0"),
+            sweep_step=dec("100"),
             above_the_line_adjustments=dec("10000"),
         )
 
@@ -862,6 +944,7 @@ class TestAboveTheLineAdjustments:
 # additional_deductions — reduces taxable_ordinary below standard deduction
 # ---------------------------------------------------------------------------
 
+
 class TestAdditionalDeductions:
     """QBI / excess itemized deductions reduce taxable_ordinary further."""
 
@@ -876,22 +959,36 @@ class TestAdditionalDeductions:
         # pension=20000 → taxable_ordinary = 20000-15750=4250 without extra deduction
         # With additional_deductions=4000: taxable_ordinary = 4250-4000=250
         self.result_no_ded = calculate_emr(
-            pension=dec("20000"), interest=dec("0"),
-            ordinary_dividends=dec("0"), ira_distributions=dec("0"),
-            ss_benefit=dec("0"), qualified_dividends=dec("0"),
-            fixed_ltcg=dec("0"), tax_exempt_interest=dec("0"),
+            pension=dec("20000"),
+            interest=dec("0"),
+            ordinary_dividends=dec("0"),
+            ira_distributions=dec("0"),
+            ss_benefit=dec("0"),
+            qualified_dividends=dec("0"),
+            fixed_ltcg=dec("0"),
+            tax_exempt_interest=dec("0"),
             sweep_mode=SweepMode.ORDINARY,
-            filing_status="single", tax_year=2025,
-            sweep_floor=dec("0"), sweep_ceiling=dec("0"), sweep_step=dec("100"),
+            filing_status="single",
+            tax_year=2025,
+            sweep_floor=dec("0"),
+            sweep_ceiling=dec("0"),
+            sweep_step=dec("100"),
         )
         self.result_with_ded = calculate_emr(
-            pension=dec("20000"), interest=dec("0"),
-            ordinary_dividends=dec("0"), ira_distributions=dec("0"),
-            ss_benefit=dec("0"), qualified_dividends=dec("0"),
-            fixed_ltcg=dec("0"), tax_exempt_interest=dec("0"),
+            pension=dec("20000"),
+            interest=dec("0"),
+            ordinary_dividends=dec("0"),
+            ira_distributions=dec("0"),
+            ss_benefit=dec("0"),
+            qualified_dividends=dec("0"),
+            fixed_ltcg=dec("0"),
+            tax_exempt_interest=dec("0"),
             sweep_mode=SweepMode.ORDINARY,
-            filing_status="single", tax_year=2025,
-            sweep_floor=dec("0"), sweep_ceiling=dec("0"), sweep_step=dec("100"),
+            filing_status="single",
+            tax_year=2025,
+            sweep_floor=dec("0"),
+            sweep_ceiling=dec("0"),
+            sweep_step=dec("100"),
             additional_deductions=dec("4000"),
         )
 
@@ -917,27 +1014,38 @@ class TestAdditionalDeductions:
 # Error handling
 # ---------------------------------------------------------------------------
 
+
 class TestErrorHandling:
     def test_unsupported_filing_status(self):
         with pytest.raises(ValueError, match="Unsupported filing status"):
             calculate_emr(
-                pension=dec("0"), interest=dec("0"),
-                ordinary_dividends=dec("0"), ira_distributions=dec("0"),
-                ss_benefit=dec("0"), qualified_dividends=dec("0"),
-                fixed_ltcg=dec("0"), tax_exempt_interest=dec("0"),
+                pension=dec("0"),
+                interest=dec("0"),
+                ordinary_dividends=dec("0"),
+                ira_distributions=dec("0"),
+                ss_benefit=dec("0"),
+                qualified_dividends=dec("0"),
+                fixed_ltcg=dec("0"),
+                tax_exempt_interest=dec("0"),
                 sweep_mode=SweepMode.ORDINARY,
-                filing_status="hoh", tax_year=2025,
+                filing_status="hoh",
+                tax_year=2025,
             )
 
     def test_unsupported_tax_year(self):
         with pytest.raises(ValueError, match="Unsupported tax year"):
             calculate_emr(
-                pension=dec("0"), interest=dec("0"),
-                ordinary_dividends=dec("0"), ira_distributions=dec("0"),
-                ss_benefit=dec("0"), qualified_dividends=dec("0"),
-                fixed_ltcg=dec("0"), tax_exempt_interest=dec("0"),
+                pension=dec("0"),
+                interest=dec("0"),
+                ordinary_dividends=dec("0"),
+                ira_distributions=dec("0"),
+                ss_benefit=dec("0"),
+                qualified_dividends=dec("0"),
+                fixed_ltcg=dec("0"),
+                tax_exempt_interest=dec("0"),
                 sweep_mode=SweepMode.ORDINARY,
-                filing_status="single", tax_year=2099,
+                filing_status="single",
+                tax_year=2099,
             )
 
 
@@ -952,6 +1060,7 @@ class TestErrorHandling:
 # These tests use fixed_ordinary=0, no SS, no preferential so that the only
 # source of emr_ordinary is the sweep variable itself.
 # ---------------------------------------------------------------------------
+
 
 class TestEmrOrdinaryAttribution:
     def setup_method(self):
@@ -972,13 +1081,20 @@ class TestEmrOrdinaryAttribution:
         # (up to 15,000) below the $15,750 standard deduction.  ordinary_tax is
         # $0 at both snapshots for every point, so emr_ordinary must be 0.
         result = calculate_emr(
-            pension=dec("0"), interest=dec("0"),
-            ordinary_dividends=dec("0"), ira_distributions=dec("0"),
-            ss_benefit=dec("0"), qualified_dividends=dec("0"),
-            fixed_ltcg=dec("0"), tax_exempt_interest=dec("0"),
+            pension=dec("0"),
+            interest=dec("0"),
+            ordinary_dividends=dec("0"),
+            ira_distributions=dec("0"),
+            ss_benefit=dec("0"),
+            qualified_dividends=dec("0"),
+            fixed_ltcg=dec("0"),
+            tax_exempt_interest=dec("0"),
             sweep_mode=SweepMode.ORDINARY,
-            filing_status="single", tax_year=2025,
-            sweep_floor=dec("0"), sweep_ceiling=dec("14000"), sweep_step=dec("1000"),
+            filing_status="single",
+            tax_year=2025,
+            sweep_floor=dec("0"),
+            sweep_ceiling=dec("14000"),
+            sweep_step=dec("1000"),
         )
         for pt in result.points:
             assert pt.taxable_ordinary == _ZERO, (
@@ -995,13 +1111,20 @@ class TestEmrOrdinaryAttribution:
         # (taxable=11,925).  For all points strictly above the deduction, emr_ordinary
         # must match the marginal bracket rate at that sweep point.
         result = calculate_emr(
-            pension=dec("0"), interest=dec("0"),
-            ordinary_dividends=dec("0"), ira_distributions=dec("0"),
-            ss_benefit=dec("0"), qualified_dividends=dec("0"),
-            fixed_ltcg=dec("0"), tax_exempt_interest=dec("0"),
+            pension=dec("0"),
+            interest=dec("0"),
+            ordinary_dividends=dec("0"),
+            ira_distributions=dec("0"),
+            ss_benefit=dec("0"),
+            qualified_dividends=dec("0"),
+            fixed_ltcg=dec("0"),
+            tax_exempt_interest=dec("0"),
             sweep_mode=SweepMode.ORDINARY,
-            filing_status="single", tax_year=2025,
-            sweep_floor=dec("17000"), sweep_ceiling=dec("50000"), sweep_step=dec("1000"),
+            filing_status="single",
+            tax_year=2025,
+            sweep_floor=dec("17000"),
+            sweep_ceiling=dec("50000"),
+            sweep_step=dec("1000"),
         )
         saw_10pct = saw_12pct = False
         for pt in result.points:
@@ -1031,6 +1154,7 @@ class TestEmrOrdinaryAttribution:
 # Lines 92-95 (_get_default_sweep_ceiling body) and line 608 exercised.
 # ---------------------------------------------------------------------------
 
+
 class TestSweepCeilingDefault:
     """When sweep_ceiling=None, calculate_emr resolves it via _get_default_sweep_ceiling."""
 
@@ -1043,12 +1167,17 @@ class TestSweepCeilingDefault:
         self.mock_ohio = self.ohio_patcher.start()
 
         self.result = calculate_emr(
-            pension=dec("20000"), interest=dec("0"),
-            ordinary_dividends=dec("0"), ira_distributions=dec("0"),
-            ss_benefit=dec("0"), qualified_dividends=dec("0"),
-            fixed_ltcg=dec("0"), tax_exempt_interest=dec("0"),
+            pension=dec("20000"),
+            interest=dec("0"),
+            ordinary_dividends=dec("0"),
+            ira_distributions=dec("0"),
+            ss_benefit=dec("0"),
+            qualified_dividends=dec("0"),
+            fixed_ltcg=dec("0"),
+            tax_exempt_interest=dec("0"),
             sweep_mode=SweepMode.ORDINARY,
-            filing_status="single", tax_year=2025,
+            filing_status="single",
+            tax_year=2025,
             sweep_step=dec("10000"),
             sweep_ceiling=None,
         )
@@ -1075,7 +1204,13 @@ def test_get_default_sweep_ceiling_missing_bracket():
         "ordinary": {
             "single": [
                 {"rate": "0.10", "from": "0", "to": "10000", "excess_over": "0", "base": "0"},
-                {"rate": "0.12", "from": "10000", "to": "50000", "excess_over": "10000", "base": "1000"},
+                {
+                    "rate": "0.12",
+                    "from": "10000",
+                    "to": "50000",
+                    "excess_over": "10000",
+                    "base": "1000",
+                },
             ]
         },
         "preferential": {"single": []},
@@ -1094,6 +1229,7 @@ def test_get_default_sweep_ceiling_missing_bracket():
 # Ohio branch (lines 539-542) when sweep_mode=PREFERENTIAL and include_ohio=True.
 # ---------------------------------------------------------------------------
 
+
 class TestPreferentialSweepWithOhio:
     """Preferential sweep + include_ohio=True exercises Ohio boundaries in preferential mode."""
 
@@ -1106,13 +1242,19 @@ class TestPreferentialSweepWithOhio:
         self.mock_ohio = self.ohio_patcher.start()
 
         self.result = calculate_emr(
-            pension=dec("20000"), interest=dec("0"),
-            ordinary_dividends=dec("0"), ira_distributions=dec("0"),
-            ss_benefit=dec("0"), qualified_dividends=dec("0"),
-            fixed_ltcg=dec("0"), tax_exempt_interest=dec("0"),
+            pension=dec("20000"),
+            interest=dec("0"),
+            ordinary_dividends=dec("0"),
+            ira_distributions=dec("0"),
+            ss_benefit=dec("0"),
+            qualified_dividends=dec("0"),
+            fixed_ltcg=dec("0"),
+            tax_exempt_interest=dec("0"),
             sweep_mode=SweepMode.PREFERENTIAL,
-            filing_status="single", tax_year=2025,
-            sweep_step=dec("5000"), sweep_ceiling=dec("60000"),
+            filing_status="single",
+            tax_year=2025,
+            sweep_step=dec("5000"),
+            sweep_ceiling=dec("60000"),
             include_ohio=True,
             ohio_qualifying_retirement_income=dec("5000"),
         )
@@ -1137,6 +1279,7 @@ class TestPreferentialSweepWithOhio:
 # Planning signals — compute_planning_signals service function
 # ---------------------------------------------------------------------------
 
+
 class TestPlanningSignalsOrdinaryWithLTCG:
     """Ordinary sweep with fixed LTCG — tests ltcg_0pct_remaining and ordinary_runway."""
 
@@ -1156,13 +1299,19 @@ class TestPlanningSignalsOrdinaryWithLTCG:
         # zero_ordinary_space = max(0, 15750 - 22000 - 0) = 0
         # ordinary_runway = 48350 - 15000 + 15750 - 22000 - 0 = 27100
         self.result = calculate_emr(
-            pension=dec("20000"), interest=dec("2000"),
-            ordinary_dividends=dec("0"), ira_distributions=dec("0"),
-            ss_benefit=dec("0"), qualified_dividends=dec("5000"),
-            fixed_ltcg=dec("10000"), tax_exempt_interest=dec("0"),
+            pension=dec("20000"),
+            interest=dec("2000"),
+            ordinary_dividends=dec("0"),
+            ira_distributions=dec("0"),
+            ss_benefit=dec("0"),
+            qualified_dividends=dec("5000"),
+            fixed_ltcg=dec("10000"),
+            tax_exempt_interest=dec("0"),
             sweep_mode=SweepMode.ORDINARY,
-            filing_status="single", tax_year=2025,
-            sweep_step=dec("100"), sweep_ceiling=dec("50000"),
+            filing_status="single",
+            tax_year=2025,
+            sweep_step=dec("100"),
+            sweep_ceiling=dec("50000"),
         )
         self.signals = compute_planning_signals(
             self.result,
@@ -1212,13 +1361,19 @@ class TestPlanningSignalsOrdinaryWithDeductionCushion:
         # zero_ordinary_space = max(0, 15750 - 5000 - 0) = 10750
         # ordinary_runway = 48350 - 13000 + 15750 - 5000 - 0 = 46100
         self.result = calculate_emr(
-            pension=dec("5000"), interest=dec("0"),
-            ordinary_dividends=dec("0"), ira_distributions=dec("0"),
-            ss_benefit=dec("0"), qualified_dividends=dec("3000"),
-            fixed_ltcg=dec("10000"), tax_exempt_interest=dec("0"),
+            pension=dec("5000"),
+            interest=dec("0"),
+            ordinary_dividends=dec("0"),
+            ira_distributions=dec("0"),
+            ss_benefit=dec("0"),
+            qualified_dividends=dec("3000"),
+            fixed_ltcg=dec("10000"),
+            tax_exempt_interest=dec("0"),
             sweep_mode=SweepMode.ORDINARY,
-            filing_status="single", tax_year=2025,
-            sweep_step=dec("100"), sweep_ceiling=dec("60000"),
+            filing_status="single",
+            tax_year=2025,
+            sweep_step=dec("100"),
+            sweep_ceiling=dec("60000"),
         )
         self.signals = compute_planning_signals(
             self.result,
@@ -1242,8 +1397,10 @@ class TestPlanningSignalsOrdinaryWithDeductionCushion:
         assert self.signals.ltcg_0pct_ordinary_runway == dec("46100")
 
     def test_runway_equals_remaining_plus_deduction_cushion(self):
-        assert (self.signals.ltcg_0pct_ordinary_runway
-                == self.signals.ltcg_0pct_remaining + self.signals.zero_ordinary_space)
+        assert (
+            self.signals.ltcg_0pct_ordinary_runway
+            == self.signals.ltcg_0pct_remaining + self.signals.zero_ordinary_space
+        )
 
     def test_zero_ordinary_space(self):
         assert self.signals.zero_ordinary_space == dec("10750")
@@ -1261,13 +1418,19 @@ class TestPlanningSignalsNoLTCG:
         self.ohio_patcher.start()
 
         self.result = calculate_emr(
-            pension=dec("20000"), interest=dec("0"),
-            ordinary_dividends=dec("0"), ira_distributions=dec("0"),
-            ss_benefit=dec("0"), qualified_dividends=dec("0"),
-            fixed_ltcg=dec("0"), tax_exempt_interest=dec("0"),
+            pension=dec("20000"),
+            interest=dec("0"),
+            ordinary_dividends=dec("0"),
+            ira_distributions=dec("0"),
+            ss_benefit=dec("0"),
+            qualified_dividends=dec("0"),
+            fixed_ltcg=dec("0"),
+            tax_exempt_interest=dec("0"),
             sweep_mode=SweepMode.ORDINARY,
-            filing_status="single", tax_year=2025,
-            sweep_step=dec("1000"), sweep_ceiling=dec("50000"),
+            filing_status="single",
+            tax_year=2025,
+            sweep_step=dec("1000"),
+            sweep_ceiling=dec("50000"),
         )
         self.signals = compute_planning_signals(
             self.result,

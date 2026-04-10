@@ -20,6 +20,7 @@ def dec(s: str) -> Decimal:
 #             IRA + pension qualifying retirement income, 2.75% bracket
 # ---------------------------------------------------------------------------
 
+
 class TestExample1IncomeProfileProxy:
     def setup_method(self):
         self.result = calculate_ohio_tax(
@@ -58,6 +59,7 @@ class TestExample1IncomeProfileProxy:
 # ---------------------------------------------------------------------------
 # Example 2 — Clean round numbers, 2.75% bracket
 # ---------------------------------------------------------------------------
+
 
 class TestExample2CleanRoundNumbers:
     def setup_method(self):
@@ -98,6 +100,7 @@ class TestExample2CleanRoundNumbers:
 # Example 3 — Income below $26,050 threshold, zero tax
 #             Credit computed but nonrefundable — ohio_tax floored at zero
 # ---------------------------------------------------------------------------
+
 
 class TestExample3BelowZeroBracket:
     def setup_method(self):
@@ -141,6 +144,7 @@ class TestExample3BelowZeroBracket:
 #             Medical deduction eliminates most taxable income
 # ---------------------------------------------------------------------------
 
+
 class TestExample4HighMedicalExpenses:
     def setup_method(self):
         self.result = calculate_ohio_tax(
@@ -182,6 +186,7 @@ class TestExample4HighMedicalExpenses:
 #             MAGI less exemption exceeds $100,000
 # ---------------------------------------------------------------------------
 
+
 class TestExample5HighIncomeNoCreditEligibility:
     def setup_method(self):
         self.result = calculate_ohio_tax(
@@ -222,6 +227,7 @@ class TestExample5HighIncomeNoCreditEligibility:
 # ---------------------------------------------------------------------------
 # Edge cases
 # ---------------------------------------------------------------------------
+
 
 class TestEdgeCases:
     def test_zero_agi_all_outputs_zero(self):
@@ -290,6 +296,7 @@ class TestEdgeCases:
 # federal_agi=151900 → ohio_agi=151900 → exemption=$1,900 (agi > 80K)
 #   → ohio_tax_base = 151,900 − 1,900 = 150,000
 
+
 class TestOhio2026FlatRate:
     def setup_method(self):
         self.result_50k = calculate_ohio_tax(
@@ -338,31 +345,36 @@ class TestOhio2026FlatRate:
 # MFJ filing status — personal exemption and retirement income credit
 # ---------------------------------------------------------------------------
 
+
 class TestMFJExemptionTiers:
     """MFJ exemption is the doubled per-person amount stored in personal_exemption_mfj."""
 
     def test_mfj_tier_40k_or_less(self):
         # AGI = $30,000 → MFJ tier ≤ $40,000 → exemption = $4,800
-        result = calculate_ohio_tax(dec("30000"), dec("0"), dec("0"), dec("0"), 2025,
-                                    filing_status="mfj")
+        result = calculate_ohio_tax(
+            dec("30000"), dec("0"), dec("0"), dec("0"), 2025, filing_status="mfj"
+        )
         assert result.personal_exemption == dec("4800")
 
     def test_mfj_tier_40k_to_80k(self):
         # AGI = $60,000 → MFJ tier $40,001–$80,000 → exemption = $4,300
-        result = calculate_ohio_tax(dec("60000"), dec("0"), dec("0"), dec("0"), 2025,
-                                    filing_status="mfj")
+        result = calculate_ohio_tax(
+            dec("60000"), dec("0"), dec("0"), dec("0"), 2025, filing_status="mfj"
+        )
         assert result.personal_exemption == dec("4300")
 
     def test_mfj_tier_80k_to_749k(self):
         # AGI = $90,000 → MFJ tier $80,001–$749,999 → exemption = $3,800
-        result = calculate_ohio_tax(dec("90000"), dec("0"), dec("0"), dec("0"), 2025,
-                                    filing_status="mfj")
+        result = calculate_ohio_tax(
+            dec("90000"), dec("0"), dec("0"), dec("0"), 2025, filing_status="mfj"
+        )
         assert result.personal_exemption == dec("3800")
 
     def test_mfj_tier_750k_plus(self):
         # AGI = $800,000 → MFJ tier ≥ $750,000 → exemption = $0
-        result = calculate_ohio_tax(dec("800000"), dec("0"), dec("0"), dec("0"), 2025,
-                                    filing_status="mfj")
+        result = calculate_ohio_tax(
+            dec("800000"), dec("0"), dec("0"), dec("0"), 2025, filing_status="mfj"
+        )
         assert result.personal_exemption == dec("0")
 
 
@@ -373,14 +385,16 @@ class TestMFJRetirementCreditEligibility:
         # AGI = $103,800 → MFJ exemption = $3,800 → MAGI−exemption = $100,000
         # < $100,000 is False → disqualified
         # AGI = $103,799 → 103,799−3,800 = 99,999 < $100,000 → eligible
-        result = calculate_ohio_tax(dec("103799"), dec("0"), dec("50000"), dec("0"), 2025,
-                                    filing_status="mfj")
+        result = calculate_ohio_tax(
+            dec("103799"), dec("0"), dec("50000"), dec("0"), 2025, filing_status="mfj"
+        )
         assert result.retirement_income_credit == dec("200")
 
     def test_mfj_credit_disqualified_combined_threshold(self):
         # AGI = $103,800 → 103,800−3,800 = 100,000 → NOT < 100,000 → disqualified
-        result = calculate_ohio_tax(dec("103800"), dec("0"), dec("50000"), dec("0"), 2025,
-                                    filing_status="mfj")
+        result = calculate_ohio_tax(
+            dec("103800"), dec("0"), dec("50000"), dec("0"), 2025, filing_status="mfj"
+        )
         assert result.retirement_income_credit == dec("0")
 
 
@@ -429,19 +443,22 @@ class TestMFJWithSS:
     """MFJ with SS income: ohio_agi = federal_agi - ss_taxable (same as single)."""
 
     def test_mfj_ss_reduces_ohio_agi(self):
-        result = calculate_ohio_tax(dec("70000"), dec("0"), dec("0"), dec("10000"), 2025,
-                                    filing_status="mfj")
+        result = calculate_ohio_tax(
+            dec("70000"), dec("0"), dec("0"), dec("10000"), 2025, filing_status="mfj"
+        )
         assert result.ohio_agi == dec("60000")
 
     def test_mfj_ss_uses_mfj_exemption_on_reduced_agi(self):
         # ohio_agi = 70000 − 10000 = 60000 → MFJ $40,001–$80,000 tier → $4,300
-        result = calculate_ohio_tax(dec("70000"), dec("0"), dec("0"), dec("10000"), 2025,
-                                    filing_status="mfj")
+        result = calculate_ohio_tax(
+            dec("70000"), dec("0"), dec("0"), dec("10000"), 2025, filing_status="mfj"
+        )
         assert result.personal_exemption == dec("4300")
 
 
 class TestUnsupportedFilingStatus:
     def test_raises_value_error(self):
         with pytest.raises(ValueError, match="Unsupported filing status"):
-            calculate_ohio_tax(dec("50000"), dec("0"), dec("0"), dec("0"), 2025,
-                               filing_status="mfs")
+            calculate_ohio_tax(
+                dec("50000"), dec("0"), dec("0"), dec("0"), 2025, filing_status="mfs"
+            )

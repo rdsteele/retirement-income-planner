@@ -26,7 +26,6 @@ from services.federal_tax import calculate_federal_tax
 
 
 class TestScenarioSingleFiler2025ActualReturn:
-
     @pytest.fixture
     def result(self):
         # Taxable ordinary income — net of all deductions and adjustments
@@ -41,55 +40,55 @@ class TestScenarioSingleFiler2025ActualReturn:
         #   Less standard deduction:   ($15,750)
         #   Less QBI deduction:        ($23)
         #   Taxable ordinary income:   $29,597
-        ordinary_income = Decimal('29597')
+        ordinary_income = Decimal("29597")
 
         # Preferential income: qualified dividends + LTCG
-        preferential_income = Decimal('24413')
+        preferential_income = Decimal("24413")
 
         return calculate_federal_tax(
             ordinary_income=ordinary_income,
             preferential_income=preferential_income,
-            filing_status='single',
-            tax_year=2025
+            filing_status="single",
+            tax_year=2025,
         )
 
     def test_ordinary_income_tax(self, result):
-        assert result.ordinary_income_tax == Decimal('3314')
+        assert result.ordinary_income_tax == Decimal("3314")
 
     def test_preferential_income_tax(self, result):
-        assert result.preferential_income_tax == Decimal('849')
+        assert result.preferential_income_tax == Decimal("849")
 
     def test_total_tax(self, result):
-        assert result.total_tax == Decimal('4163')
+        assert result.total_tax == Decimal("4163")
 
     def test_effective_rate(self, result):
-        assert result.effective_rate == Decimal('0.0771')
+        assert result.effective_rate == Decimal("0.0771")
 
     def test_marginal_bracket_rate(self, result):
-        assert result.marginal_bracket_rate == Decimal('0.12')
+        assert result.marginal_bracket_rate == Decimal("0.12")
 
     def test_bracket_breakdown_10_percent(self, result):
         bracket = result.bracket_breakdown[0]
-        assert bracket.rate == Decimal('0.10')
-        assert bracket.income_taxed == Decimal('11925')
-        assert bracket.tax_amount == Decimal('1193')
+        assert bracket.rate == Decimal("0.10")
+        assert bracket.income_taxed == Decimal("11925")
+        assert bracket.tax_amount == Decimal("1193")
 
     def test_bracket_breakdown_12_percent(self, result):
         bracket = result.bracket_breakdown[1]
-        assert bracket.rate == Decimal('0.12')
-        assert bracket.income_taxed == Decimal('17672')
-        assert bracket.tax_amount == Decimal('2121')
+        assert bracket.rate == Decimal("0.12")
+        assert bracket.income_taxed == Decimal("17672")
+        assert bracket.tax_amount == Decimal("2121")
 
     def test_bracket_breakdown_higher_brackets_empty(self, result):
         # All brackets above 12% should have zero income taxed
         for bracket in result.bracket_breakdown[2:]:
-            assert bracket.income_taxed == Decimal('0')
-            assert bracket.tax_amount == Decimal('0')
+            assert bracket.income_taxed == Decimal("0")
+            assert bracket.tax_amount == Decimal("0")
 
     def test_preferential_straddles_zero_and_fifteen_percent(self, result):
         # Preferential income stacks above ordinary income ($29,597)
         # 0% LTCG bracket extends to $48,350 — so $18,753 taxed at 0%
         # Remaining $5,660 spills into 15% bracket
         # This verifies the stacking boundary logic is correct
-        assert result.ordinary_income_tax == Decimal('3314')
-        assert result.preferential_income_tax == Decimal('849')
+        assert result.ordinary_income_tax == Decimal("3314")
+        assert result.preferential_income_tax == Decimal("849")

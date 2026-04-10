@@ -21,6 +21,7 @@ def dec(s: str) -> Decimal:
 # Single, ss=20000, agi_excl=15000, tei=0 → PI=25000 (exactly at threshold)
 # ---------------------------------------------------------------------------
 
+
 class TestExample1BelowThreshold:
     def setup_method(self):
         self.result = calculate_social_security_taxability(
@@ -47,6 +48,7 @@ class TestExample1BelowThreshold:
 # Example 2 — In 50% tier, partial inclusion
 # Single, ss=20000, agi_excl=20000, tei=0 → PI=30000
 # ---------------------------------------------------------------------------
+
 
 class TestExample2FiftyPercentPartial:
     def setup_method(self):
@@ -75,6 +77,7 @@ class TestExample2FiftyPercentPartial:
 # Single, ss=20000, agi_excl=30000, tei=0 → PI=40000
 # ---------------------------------------------------------------------------
 
+
 class TestExample3EightyFivePercentTierEntry:
     def setup_method(self):
         self.result = calculate_social_security_taxability(
@@ -101,6 +104,7 @@ class TestExample3EightyFivePercentTierEntry:
 # Example 4 — In 85% tier, partial inclusion
 # Single, ss=20000, agi_excl=35000, tei=0 → PI=45000
 # ---------------------------------------------------------------------------
+
 
 class TestExample4EightyFivePercentPartial:
     def setup_method(self):
@@ -129,6 +133,7 @@ class TestExample4EightyFivePercentPartial:
 # Single, ss=20000, agi_excl=50000, tei=0 → PI=60000
 # ---------------------------------------------------------------------------
 
+
 class TestExample5MaximumEightyFive:
     def setup_method(self):
         self.result = calculate_social_security_taxability(
@@ -156,6 +161,7 @@ class TestExample5MaximumEightyFive:
 # Single, ss=20000, agi_excl=18000, tei=5000 → PI=33000
 # ---------------------------------------------------------------------------
 
+
 class TestExample6TaxExemptInterest:
     def setup_method(self):
         self.result = calculate_social_security_taxability(
@@ -181,6 +187,7 @@ class TestExample6TaxExemptInterest:
 # ---------------------------------------------------------------------------
 # Example 7 — Zero SS benefit
 # ---------------------------------------------------------------------------
+
 
 class TestExample7ZeroSSBenefit:
     def setup_method(self):
@@ -208,17 +215,22 @@ class TestExample7ZeroSSBenefit:
 # Edge cases
 # ---------------------------------------------------------------------------
 
+
 class TestEdgeCases:
     def test_pi_exactly_at_tier_1_threshold_is_none(self):
         # PI = 25000 exactly → taxable_ss = 0, tier = "none"
-        result = calculate_social_security_taxability(dec("20000"), dec("15000"), dec("0"), "single")
+        result = calculate_social_security_taxability(
+            dec("20000"), dec("15000"), dec("0"), "single"
+        )
         assert result.taxable_ss == dec("0")
         assert result.tier == "none"
 
     def test_pi_exactly_at_tier_2_threshold_uses_eighty_five_tier(self):
         # PI = 34000 exactly → 85% tier formula applies
         # agi_excl=22000, ss=24000 → PI=22000+0+12000=34000
-        result = calculate_social_security_taxability(dec("24000"), dec("22000"), dec("0"), "single")
+        result = calculate_social_security_taxability(
+            dec("24000"), dec("22000"), dec("0"), "single"
+        )
         assert result.provisional_income == dec("34000")
         assert result.tier == "eighty_five_percent"
         # tier_2_amount = 0.85*(34000-34000)=0; max_tier_1=min(12000,4500)=4500; taxable=4500
@@ -246,7 +258,9 @@ class TestEdgeCases:
 
     def test_high_income_taxable_ss_capped_at_eighty_five_pct(self):
         # Very high income — taxable_ss must not exceed 0.85 * ss_benefit
-        result = calculate_social_security_taxability(dec("20000"), dec("200000"), dec("0"), "single")
+        result = calculate_social_security_taxability(
+            dec("20000"), dec("200000"), dec("0"), "single"
+        )
         assert result.taxable_ss == dec("17000")
         assert result.inclusion_rate == dec("0.8500")
 
@@ -256,6 +270,7 @@ class TestEdgeCases:
 # Selected rows to validate the torpedo progression without duplicating
 # rows already covered by examples above.
 # ---------------------------------------------------------------------------
+
 
 class TestTaxTorpedoTable:
     SS = dec("24000")

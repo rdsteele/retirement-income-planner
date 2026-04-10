@@ -37,6 +37,7 @@ def _db(tmp_path: Path) -> Path:
 # Account CRUD — all four types
 # ---------------------------------------------------------------------------
 
+
 class TestCreateAccount:
     def test_creates_taxable(self, tmp_path):
         result = create_account(
@@ -134,7 +135,9 @@ class TestUpdateAccount:
     def test_preserves_holdings_on_taxable_rename(self, tmp_path):
         db = _db(tmp_path)
         acct = create_account(AccountIn(name="Brokerage", account_type="taxable"), _path=db)
-        create_holding(acct.id, HoldingIn(ticker="AAPL", basis=dec("1000"), value=dec("1500")), _path=db)
+        create_holding(
+            acct.id, HoldingIn(ticker="AAPL", basis=dec("1000"), value=dec("1500")), _path=db
+        )
         updated = update_account(
             acct.id,
             AccountIn(name="Renamed Brokerage", account_type="taxable"),
@@ -154,7 +157,9 @@ class TestUpdateAccount:
 class TestDeleteAccount:
     def test_deletes_account(self, tmp_path):
         db = _db(tmp_path)
-        acct = create_account(AccountIn(name="Del", account_type="roth", balance=dec("1")), _path=db)
+        acct = create_account(
+            AccountIn(name="Del", account_type="roth", balance=dec("1")), _path=db
+        )
         delete_account(acct.id, _path=db)
         assert load_accounts(_path=db) == []
 
@@ -166,6 +171,7 @@ class TestDeleteAccount:
 # ---------------------------------------------------------------------------
 # Holding derived values
 # ---------------------------------------------------------------------------
+
 
 class TestHoldingDerivedValues:
     def test_unrealized_gain_positive(self, tmp_path):
@@ -215,11 +221,14 @@ class TestHoldingDerivedValues:
 # Account derived totals (taxable)
 # ---------------------------------------------------------------------------
 
+
 class TestAccountDerivedTotals:
     def test_totals_sum_across_holdings(self, tmp_path):
         db = _db(tmp_path)
         acct = create_account(AccountIn(name="B", account_type="taxable"), _path=db)
-        create_holding(acct.id, HoldingIn(ticker="A", basis=dec("1000"), value=dec("2000")), _path=db)
+        create_holding(
+            acct.id, HoldingIn(ticker="A", basis=dec("1000"), value=dec("2000")), _path=db
+        )
         result = create_holding(
             acct.id, HoldingIn(ticker="B", basis=dec("3000"), value=dec("3500")), _path=db
         )
@@ -247,6 +256,7 @@ class TestAccountDerivedTotals:
 # ---------------------------------------------------------------------------
 # Holding CRUD
 # ---------------------------------------------------------------------------
+
 
 class TestHoldingCRUD:
     def test_create_holding_returns_updated_account(self, tmp_path):
@@ -289,17 +299,29 @@ class TestHoldingCRUD:
             AccountIn(name="IRA", account_type="traditional", balance=dec("50000")), _path=db
         )
         with pytest.raises(ValueError):
-            create_holding(acct.id, HoldingIn(ticker="VTI", basis=dec("100"), value=dec("110")), _path=db)
+            create_holding(
+                acct.id, HoldingIn(ticker="VTI", basis=dec("100"), value=dec("110")), _path=db
+            )
 
     def test_update_holding_wrong_account_raises(self, tmp_path):
         with pytest.raises(ValueError, match="Account not found"):
-            update_holding("bad-acct", "bad-hold", HoldingIn(ticker="X", basis=dec("1"), value=dec("1")), _path=_db(tmp_path))
+            update_holding(
+                "bad-acct",
+                "bad-hold",
+                HoldingIn(ticker="X", basis=dec("1"), value=dec("1")),
+                _path=_db(tmp_path),
+            )
 
     def test_update_holding_wrong_holding_raises(self, tmp_path):
         db = _db(tmp_path)
         acct = create_account(AccountIn(name="B", account_type="taxable"), _path=db)
         with pytest.raises(ValueError, match="Holding not found"):
-            update_holding(acct.id, "no-such-holding", HoldingIn(ticker="X", basis=dec("1"), value=dec("1")), _path=db)
+            update_holding(
+                acct.id,
+                "no-such-holding",
+                HoldingIn(ticker="X", basis=dec("1"), value=dec("1")),
+                _path=db,
+            )
 
     def test_delete_holding_wrong_holding_raises(self, tmp_path):
         db = _db(tmp_path)
@@ -311,6 +333,7 @@ class TestHoldingCRUD:
 # ---------------------------------------------------------------------------
 # Portfolio summary
 # ---------------------------------------------------------------------------
+
 
 class TestPortfolioSummary:
     def test_empty_portfolio(self, tmp_path):
@@ -324,10 +347,22 @@ class TestPortfolioSummary:
     def test_aggregates_all_types(self, tmp_path):
         db = _db(tmp_path)
         taxable = create_account(AccountIn(name="Brokerage", account_type="taxable"), _path=db)
-        create_holding(taxable.id, HoldingIn(ticker="VTI", basis=dec("10000"), value=dec("15000")), _path=db)
-        create_account(AccountIn(name="IRA", account_type="traditional", balance=dec("200000")), _path=db)
+        create_holding(
+            taxable.id, HoldingIn(ticker="VTI", basis=dec("10000"), value=dec("15000")), _path=db
+        )
+        create_account(
+            AccountIn(name="IRA", account_type="traditional", balance=dec("200000")), _path=db
+        )
         create_account(AccountIn(name="Roth", account_type="roth", balance=dec("80000")), _path=db)
-        create_account(AccountIn(name="HSA", account_type="hsa", balance=dec("20000"), annual_contribution=dec("4300")), _path=db)
+        create_account(
+            AccountIn(
+                name="HSA",
+                account_type="hsa",
+                balance=dec("20000"),
+                annual_contribution=dec("4300"),
+            ),
+            _path=db,
+        )
 
         summary = get_portfolio_summary(_path=db)
         assert summary.taxable_value == dec("15000")
@@ -343,7 +378,9 @@ class TestPortfolioSummary:
         db = _db(tmp_path)
         for name in ("Brokerage A", "Brokerage B"):
             acct = create_account(AccountIn(name=name, account_type="taxable"), _path=db)
-            create_holding(acct.id, HoldingIn(ticker="VTI", basis=dec("5000"), value=dec("8000")), _path=db)
+            create_holding(
+                acct.id, HoldingIn(ticker="VTI", basis=dec("5000"), value=dec("8000")), _path=db
+            )
         summary = get_portfolio_summary(_path=db)
         assert summary.taxable_value == dec("16000")
         assert summary.taxable_basis == dec("10000")
@@ -351,8 +388,12 @@ class TestPortfolioSummary:
     def test_total_portfolio_value_excludes_unrealized_gain_double_count(self, tmp_path):
         db = _db(tmp_path)
         acct = create_account(AccountIn(name="B", account_type="taxable"), _path=db)
-        create_holding(acct.id, HoldingIn(ticker="VTI", basis=dec("1000"), value=dec("2000")), _path=db)
-        create_account(AccountIn(name="IRA", account_type="traditional", balance=dec("3000")), _path=db)
+        create_holding(
+            acct.id, HoldingIn(ticker="VTI", basis=dec("1000"), value=dec("2000")), _path=db
+        )
+        create_account(
+            AccountIn(name="IRA", account_type="traditional", balance=dec("3000")), _path=db
+        )
         summary = get_portfolio_summary(_path=db)
         assert summary.total_portfolio_value == dec("5000")
 
@@ -361,11 +402,17 @@ class TestPortfolioSummary:
 # HSA annual_contribution
 # ---------------------------------------------------------------------------
 
+
 class TestHsaAnnualContribution:
     def test_hsa_contribution_stored_and_returned(self, tmp_path):
         db = _db(tmp_path)
         acct = create_account(
-            AccountIn(name="HSA", account_type="hsa", balance=dec("10000"), annual_contribution=dec("4300")),
+            AccountIn(
+                name="HSA",
+                account_type="hsa",
+                balance=dec("10000"),
+                annual_contribution=dec("4300"),
+            ),
             _path=db,
         )
         assert acct.annual_contribution == dec("4300")
@@ -381,8 +428,21 @@ class TestHsaAnnualContribution:
 
     def test_hsa_contribution_in_summary(self, tmp_path):
         db = _db(tmp_path)
-        create_account(AccountIn(name="HSA1", account_type="hsa", balance=dec("1000"), annual_contribution=dec("2000")), _path=db)
-        create_account(AccountIn(name="HSA2", account_type="hsa", balance=dec("500"), annual_contribution=dec("1000")), _path=db)
+        create_account(
+            AccountIn(
+                name="HSA1",
+                account_type="hsa",
+                balance=dec("1000"),
+                annual_contribution=dec("2000"),
+            ),
+            _path=db,
+        )
+        create_account(
+            AccountIn(
+                name="HSA2", account_type="hsa", balance=dec("500"), annual_contribution=dec("1000")
+            ),
+            _path=db,
+        )
         summary = get_portfolio_summary(_path=db)
         assert summary.hsa_annual_contribution == dec("3000")
 
@@ -391,12 +451,17 @@ class TestHsaAnnualContribution:
 # Multiple entries for same ticker handled independently
 # ---------------------------------------------------------------------------
 
+
 class TestDuplicateTicker:
     def test_same_ticker_two_independent_holdings(self, tmp_path):
         db = _db(tmp_path)
         acct = create_account(AccountIn(name="B", account_type="taxable"), _path=db)
-        create_holding(acct.id, HoldingIn(ticker="AAPL", basis=dec("1000"), value=dec("1500")), _path=db)
-        result = create_holding(acct.id, HoldingIn(ticker="AAPL", basis=dec("2000"), value=dec("2200")), _path=db)
+        create_holding(
+            acct.id, HoldingIn(ticker="AAPL", basis=dec("1000"), value=dec("1500")), _path=db
+        )
+        result = create_holding(
+            acct.id, HoldingIn(ticker="AAPL", basis=dec("2000"), value=dec("2200")), _path=db
+        )
         assert len(result.holdings) == 2
         ids = {h.id for h in result.holdings}
         assert len(ids) == 2  # distinct ids
@@ -404,9 +469,13 @@ class TestDuplicateTicker:
     def test_deleting_one_same_ticker_leaves_the_other(self, tmp_path):
         db = _db(tmp_path)
         acct = create_account(AccountIn(name="B", account_type="taxable"), _path=db)
-        h1_acct = create_holding(acct.id, HoldingIn(ticker="AAPL", basis=dec("1000"), value=dec("1500")), _path=db)
+        h1_acct = create_holding(
+            acct.id, HoldingIn(ticker="AAPL", basis=dec("1000"), value=dec("1500")), _path=db
+        )
         h1_id = h1_acct.holdings[0].id
-        create_holding(acct.id, HoldingIn(ticker="AAPL", basis=dec("2000"), value=dec("2200")), _path=db)
+        create_holding(
+            acct.id, HoldingIn(ticker="AAPL", basis=dec("2000"), value=dec("2200")), _path=db
+        )
         result = delete_holding(acct.id, h1_id, _path=db)
         assert len(result.holdings) == 1
         assert result.holdings[0].basis == dec("2000")
@@ -414,10 +483,16 @@ class TestDuplicateTicker:
     def test_updating_one_same_ticker_does_not_affect_other(self, tmp_path):
         db = _db(tmp_path)
         acct = create_account(AccountIn(name="B", account_type="taxable"), _path=db)
-        h1_acct = create_holding(acct.id, HoldingIn(ticker="AAPL", basis=dec("1000"), value=dec("1500")), _path=db)
+        h1_acct = create_holding(
+            acct.id, HoldingIn(ticker="AAPL", basis=dec("1000"), value=dec("1500")), _path=db
+        )
         h1_id = h1_acct.holdings[0].id
-        create_holding(acct.id, HoldingIn(ticker="AAPL", basis=dec("2000"), value=dec("2200")), _path=db)
-        result = update_holding(acct.id, h1_id, HoldingIn(ticker="AAPL", basis=dec("1000"), value=dec("9999")), _path=db)
+        create_holding(
+            acct.id, HoldingIn(ticker="AAPL", basis=dec("2000"), value=dec("2200")), _path=db
+        )
+        result = update_holding(
+            acct.id, h1_id, HoldingIn(ticker="AAPL", basis=dec("1000"), value=dec("9999")), _path=db
+        )
         values = {h.id: h.value for h in result.holdings}
         assert values[h1_id] == dec("9999")
         other_id = next(hid for hid in values if hid != h1_id)

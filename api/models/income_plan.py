@@ -4,13 +4,13 @@ from pydantic import BaseModel, Field
 
 
 class PlannedWithdrawalRequest(BaseModel):
-    account_type: str                  # 'taxable', 'traditional', 'roth', 'hsa'
+    account_type: str  # 'taxable', 'traditional', 'roth', 'hsa'
     amount: float = Field(default=0.0, ge=0)
     basis: float = Field(default=0.0, ge=0)
 
 
 class ExecutedWithdrawalRequest(BaseModel):
-    withdrawal_type: str               # 'ltcg', 'stcg', 'tax_deferred', 'tax_free_roth', 'tax_free_hsa'
+    withdrawal_type: str  # 'ltcg', 'stcg', 'tax_deferred', 'tax_free_roth', 'tax_free_hsa'
     amount: float = Field(default=0.0, ge=0)
     basis: float = Field(default=0.0, ge=0)
 
@@ -61,6 +61,7 @@ class IncomePlanRequest(BaseModel):
 
 # ── Summary response ──────────────────────────────────────────────────────
 
+
 class PlanSummaryResponse(BaseModel):
     magi: float
 
@@ -78,10 +79,10 @@ class PlanSummaryResponse(BaseModel):
     # Spending / shortfall
     total_spending: float
     total_income: float
-    shortfall: float | None          # None when no spending entered
+    shortfall: float | None  # None when no spending entered
 
     # ACA
-    aca_distance: float | None       # None when aca_cliff_magi is zero
+    aca_distance: float | None  # None when aca_cliff_magi is zero
     aca_cliff_magi: float
 
     # Withdrawal totals (combined planned + executed per account type)

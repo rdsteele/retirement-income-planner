@@ -261,25 +261,27 @@ def calculate_total_cost(
             baseline_magi=floor_aca_magi,
         )
         emr_aca = aca_result.marginal_subsidy_loss / _ACA_LOSS_UNIT
-        tc_points.append(TotalCostPoint(
-            income=p.income,
-            total_tax=p.total_tax,
-            emr=p.emr,
-            emr_ordinary=p.emr_ordinary,
-            emr_ss_torpedo=p.emr_ss_torpedo,
-            emr_pref_stacking=p.emr_pref_stacking,
-            emr_niit=p.emr_niit,
-            emr_ohio=p.emr_ohio,
-            ohio_tax=p.ohio_tax,
-            ss_taxable=p.ss_taxable,
-            ss_inclusion_rate=p.ss_inclusion_rate,
-            taxable_ordinary=p.taxable_ordinary,
-            aca_magi=aca_magi,
-            aptc_annual=aca_result.aptc_annual,
-            aca_subsidy_loss=aca_result.subsidy_loss,
-            emr_aca=emr_aca,
-            total_cost_emr=p.emr + emr_aca,
-        ))
+        tc_points.append(
+            TotalCostPoint(
+                income=p.income,
+                total_tax=p.total_tax,
+                emr=p.emr,
+                emr_ordinary=p.emr_ordinary,
+                emr_ss_torpedo=p.emr_ss_torpedo,
+                emr_pref_stacking=p.emr_pref_stacking,
+                emr_niit=p.emr_niit,
+                emr_ohio=p.emr_ohio,
+                ohio_tax=p.ohio_tax,
+                ss_taxable=p.ss_taxable,
+                ss_inclusion_rate=p.ss_inclusion_rate,
+                taxable_ordinary=p.taxable_ordinary,
+                aca_magi=aca_magi,
+                aptc_annual=aca_result.aptc_annual,
+                aca_subsidy_loss=aca_result.subsidy_loss,
+                emr_aca=emr_aca,
+                total_cost_emr=p.emr + emr_aca,
+            )
+        )
 
     return TotalCostResult(
         points=tc_points,

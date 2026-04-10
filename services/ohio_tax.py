@@ -75,9 +75,7 @@ def _is_retirement_credit_eligible(
     return (ohio_agi - personal_exemption) < magi_threshold
 
 
-def _lookup_retirement_income_credit(
-    qualifying_income: Decimal, tiers: list[dict]
-) -> Decimal:
+def _lookup_retirement_income_credit(qualifying_income: Decimal, tiers: list[dict]) -> Decimal:
     """Return the retirement income credit for the given qualifying income amount."""
     for tier in tiers:
         income_up_to = tier["income_up_to"]
@@ -107,7 +105,9 @@ def calculate_ohio_tax(
     data = load_ohio_data(tax_year)
 
     ohio_agi = _compute_ohio_agi(federal_agi, ss_taxable_federal)
-    exemption_key = "personal_exemption_mfj" if filing_status == "mfj" else "personal_exemption_single"
+    exemption_key = (
+        "personal_exemption_mfj" if filing_status == "mfj" else "personal_exemption_single"
+    )
     personal_exemption = _lookup_personal_exemption(ohio_agi, data[exemption_key])
     medical_deduction = _compute_medical_deduction(
         ohio_agi, gross_medical_expenses, Decimal(data["medical_expense_floor_rate"])

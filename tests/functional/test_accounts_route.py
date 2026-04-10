@@ -15,6 +15,7 @@ client = TestClient(app)
 
 # ── Isolation fixture ─────────────────────────────────────────────────────
 
+
 @pytest.fixture(autouse=True)
 def isolate_storage(tmp_path, monkeypatch):
     """Redirect every service function to a fresh temp file per test.
@@ -25,37 +26,47 @@ def isolate_storage(tmp_path, monkeypatch):
     """
     path = tmp_path / "accounts.json"
 
-    _load     = svc.load_accounts
-    _get      = svc.get_account
-    _create   = svc.create_account
-    _update   = svc.update_account
-    _delete   = svc.delete_account
+    _load = svc.load_accounts
+    _get = svc.get_account
+    _create = svc.create_account
+    _update = svc.update_account
+    _delete = svc.delete_account
     _create_h = svc.create_holding
     _update_h = svc.update_holding
     _delete_h = svc.delete_holding
-    _summary  = svc.get_portfolio_summary
+    _summary = svc.get_portfolio_summary
 
-    monkeypatch.setattr(svc, "load_accounts",
-        lambda _path=path: _load(_path))
-    monkeypatch.setattr(svc, "get_account",
-        lambda account_id, _path=path: _get(account_id, _path))
-    monkeypatch.setattr(svc, "create_account",
-        lambda data, _path=path: _create(data, _path))
-    monkeypatch.setattr(svc, "update_account",
-        lambda account_id, data, _path=path: _update(account_id, data, _path))
-    monkeypatch.setattr(svc, "delete_account",
-        lambda account_id, _path=path: _delete(account_id, _path))
-    monkeypatch.setattr(svc, "create_holding",
-        lambda account_id, data, _path=path: _create_h(account_id, data, _path))
-    monkeypatch.setattr(svc, "update_holding",
-        lambda account_id, holding_id, data, _path=path: _update_h(account_id, holding_id, data, _path))
-    monkeypatch.setattr(svc, "delete_holding",
-        lambda account_id, holding_id, _path=path: _delete_h(account_id, holding_id, _path))
-    monkeypatch.setattr(svc, "get_portfolio_summary",
-        lambda _path=path: _summary(_path))
+    monkeypatch.setattr(svc, "load_accounts", lambda _path=path: _load(_path))
+    monkeypatch.setattr(svc, "get_account", lambda account_id, _path=path: _get(account_id, _path))
+    monkeypatch.setattr(svc, "create_account", lambda data, _path=path: _create(data, _path))
+    monkeypatch.setattr(
+        svc, "update_account", lambda account_id, data, _path=path: _update(account_id, data, _path)
+    )
+    monkeypatch.setattr(
+        svc, "delete_account", lambda account_id, _path=path: _delete(account_id, _path)
+    )
+    monkeypatch.setattr(
+        svc,
+        "create_holding",
+        lambda account_id, data, _path=path: _create_h(account_id, data, _path),
+    )
+    monkeypatch.setattr(
+        svc,
+        "update_holding",
+        lambda account_id, holding_id, data, _path=path: _update_h(
+            account_id, holding_id, data, _path
+        ),
+    )
+    monkeypatch.setattr(
+        svc,
+        "delete_holding",
+        lambda account_id, holding_id, _path=path: _delete_h(account_id, holding_id, _path),
+    )
+    monkeypatch.setattr(svc, "get_portfolio_summary", lambda _path=path: _summary(_path))
 
 
 # ── Local helpers ─────────────────────────────────────────────────────────
+
 
 def _create_account(payload: dict) -> dict:
     resp = client.post("/api/accounts", json=payload)
@@ -73,6 +84,7 @@ def _add_holding(account_id: str, ticker: str, basis: float, value: float) -> di
 
 
 # ── Account CRUD ──────────────────────────────────────────────────────────
+
 
 def test_list_accounts_empty():
     resp = client.get("/api/accounts")
@@ -134,9 +146,7 @@ def test_create_hsa_account_with_annual_contribution():
 
 
 def test_get_account_returns_correct():
-    created = _create_account(
-        {"name": "My Roth", "account_type": "roth", "balance": 40000.0}
-    )
+    created = _create_account({"name": "My Roth", "account_type": "roth", "balance": 40000.0})
     resp = client.get(f"/api/accounts/{created['id']}")
     assert resp.status_code == 200
     body = resp.json()
@@ -174,9 +184,7 @@ def test_update_account_not_found():
 
 
 def test_delete_account_returns_204_and_removes():
-    created = _create_account(
-        {"name": "To Delete", "account_type": "roth", "balance": 5000.0}
-    )
+    created = _create_account({"name": "To Delete", "account_type": "roth", "balance": 5000.0})
     account_id = created["id"]
     assert client.delete(f"/api/accounts/{account_id}").status_code == 204
     assert client.get(f"/api/accounts/{account_id}").status_code == 404
@@ -188,6 +196,7 @@ def test_delete_account_not_found():
 
 
 # ── Holdings CRUD ─────────────────────────────────────────────────────────
+
 
 def test_add_holding_returns_201_with_unrealized_gain():
     acc = _create_account({"name": "Brokerage", "account_type": "taxable"})
@@ -260,6 +269,7 @@ def test_delete_holding_not_found():
 
 # ── Portfolio summary ─────────────────────────────────────────────────────
 
+
 def test_summary_zeros_when_no_accounts():
     resp = client.get("/api/accounts/summary")
     assert resp.status_code == 200
@@ -277,33 +287,38 @@ def test_summary_zeros_when_no_accounts():
 def test_summary_correct_aggregates():
     # Taxable: VTI basis=20k/value=25k, VXUS basis=10k/value=11k
     acc_t = _create_account({"name": "Brokerage", "account_type": "taxable"})
-    _add_holding(acc_t["id"], "VTI",  20000.0, 25000.0)
+    _add_holding(acc_t["id"], "VTI", 20000.0, 25000.0)
     _add_holding(acc_t["id"], "VXUS", 10000.0, 11000.0)
-    _create_account({"name": "401k",     "account_type": "traditional", "balance": 100000.0})
-    _create_account({"name": "Roth IRA", "account_type": "roth",        "balance": 50000.0})
-    _create_account({
-        "name": "HSA", "account_type": "hsa",
-        "balance": 10000.0, "annual_contribution": 4000.0,
-    })
+    _create_account({"name": "401k", "account_type": "traditional", "balance": 100000.0})
+    _create_account({"name": "Roth IRA", "account_type": "roth", "balance": 50000.0})
+    _create_account(
+        {
+            "name": "HSA",
+            "account_type": "hsa",
+            "balance": 10000.0,
+            "annual_contribution": 4000.0,
+        }
+    )
 
     body = client.get("/api/accounts/summary").json()
-    assert body["taxable_value"]           == 36000.0   # 25000 + 11000
-    assert body["taxable_basis"]           == 30000.0   # 20000 + 10000
-    assert body["taxable_unrealized_gain"] == 6000.0    # 5000  +  1000
-    assert body["traditional_balance"]     == 100000.0
-    assert body["roth_balance"]            == 50000.0
-    assert body["hsa_balance"]             == 10000.0
+    assert body["taxable_value"] == 36000.0  # 25000 + 11000
+    assert body["taxable_basis"] == 30000.0  # 20000 + 10000
+    assert body["taxable_unrealized_gain"] == 6000.0  # 5000  +  1000
+    assert body["traditional_balance"] == 100000.0
+    assert body["roth_balance"] == 50000.0
+    assert body["hsa_balance"] == 10000.0
     assert body["hsa_annual_contribution"] == 4000.0
-    assert body["total_portfolio_value"]   == 196000.0  # 36k+100k+50k+10k
+    assert body["total_portfolio_value"] == 196000.0  # 36k+100k+50k+10k
 
 
 # ── Derived fields ────────────────────────────────────────────────────────
+
 
 def test_unrealized_gain_correct_per_holding():
     acc = _create_account({"name": "Brokerage", "account_type": "taxable"})
     updated = _add_holding(acc["id"], "GOOGL", 5000.0, 8000.0)
     h = updated["holdings"][0]
-    assert h["unrealized_gain"] == 3000.0   # 8000 − 5000
+    assert h["unrealized_gain"] == 3000.0  # 8000 − 5000
 
 
 def test_taxable_account_derived_totals():
@@ -312,6 +327,6 @@ def test_taxable_account_derived_totals():
     _add_holding(acc["id"], "B", 2000.0, 2200.0)
 
     body = client.get(f"/api/accounts/{acc['id']}").json()
-    assert body["total_basis"]           == 3000.0   # 1000 + 2000
-    assert body["total_value"]           == 3700.0   # 1500 + 2200
-    assert body["total_unrealized_gain"] == 700.0    #  500 +  200
+    assert body["total_basis"] == 3000.0  # 1000 + 2000
+    assert body["total_value"] == 3700.0  # 1500 + 2200
+    assert body["total_unrealized_gain"] == 700.0  #  500 +  200

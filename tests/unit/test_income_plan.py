@@ -26,6 +26,7 @@ def d(s: str) -> Decimal:
 # classify_withdrawals
 # ---------------------------------------------------------------------------
 
+
 class TestClassifyWithdrawals:
     def test_empty(self):
         totals = classify_withdrawals([], [])
@@ -82,7 +83,9 @@ class TestClassifyWithdrawals:
         assert totals.exec_taxable_amount == d("5000")
 
     def test_executed_tax_deferred_is_fully_ordinary(self):
-        executed = [ExecutedWithdrawal(withdrawal_type="tax_deferred", amount=d("8000"), basis=d("0"))]
+        executed = [
+            ExecutedWithdrawal(withdrawal_type="tax_deferred", amount=d("8000"), basis=d("0"))
+        ]
         totals = classify_withdrawals([], executed)
         assert totals.exec_ordinary == d("8000")
         assert totals.exec_traditional == d("8000")
@@ -118,6 +121,7 @@ class TestClassifyWithdrawals:
 # ---------------------------------------------------------------------------
 # compute_plan_summary — basic MAGI and shortfall checks
 # ---------------------------------------------------------------------------
+
 
 def _base_summary(**overrides):
     """Build a minimal summary request with all defaults."""
@@ -161,7 +165,9 @@ class TestComputePlanSummaryBasic:
         assert s.forced_preferential == d("5000")
 
     def test_above_the_line_adjustments_reduce_magi(self):
-        s = _base_summary(pension=d("30000"), pension_taxable=d("30000"), above_the_line_adjustments=d("5000"))
+        s = _base_summary(
+            pension=d("30000"), pension_taxable=d("30000"), above_the_line_adjustments=d("5000")
+        )
         assert s.magi == d("25000")
 
     def test_planned_traditional_adds_to_ordinary(self):
@@ -172,9 +178,7 @@ class TestComputePlanSummaryBasic:
         assert s.withdrawal_ordinary == d("20000")
 
     def test_planned_roth_does_not_affect_magi(self):
-        s = _base_summary(
-            planned=[PlannedWithdrawal(account_type="roth", amount=d("10000"))]
-        )
+        s = _base_summary(planned=[PlannedWithdrawal(account_type="roth", amount=d("10000"))])
         assert s.magi == d("0")
         assert s.total_roth_withdrawals == d("10000")
 
@@ -273,6 +277,7 @@ class TestComputePlanSummarySSAccuracy:
 # ---------------------------------------------------------------------------
 # assemble_sweep_inputs
 # ---------------------------------------------------------------------------
+
 
 class TestComputePlanSummaryPensionSplit:
     """Verify pension gross vs taxable flows to the correct places."""
@@ -390,7 +395,9 @@ class TestAssembleSweepInputs:
 
     def test_executed_ltcg_added_to_fixed_ltcg(self):
         result = self._base(
-            executed=[ExecutedWithdrawal(withdrawal_type="ltcg", amount=d("10000"), basis=d("7000"))],
+            executed=[
+                ExecutedWithdrawal(withdrawal_type="ltcg", amount=d("10000"), basis=d("7000"))
+            ],
         )
         assert result["fixed_ltcg"] == d("3000")
 
@@ -407,9 +414,15 @@ class TestAssembleSweepInputs:
     def test_all_income_fields_present_in_output(self):
         result = self._base()
         required = {
-            "pension", "interest", "ordinary_dividends", "ira_distributions",
-            "ss_benefit", "qualified_dividends", "fixed_ltcg",
-            "above_the_line_adjustments", "tax_exempt_interest",
+            "pension",
+            "interest",
+            "ordinary_dividends",
+            "ira_distributions",
+            "ss_benefit",
+            "qualified_dividends",
+            "fixed_ltcg",
+            "above_the_line_adjustments",
+            "tax_exempt_interest",
         }
         assert required.issubset(result.keys())
 

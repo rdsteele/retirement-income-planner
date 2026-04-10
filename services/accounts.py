@@ -72,6 +72,7 @@ class PortfolioSummary:
 # JSON I/O
 # ---------------------------------------------------------------------------
 
+
 def _load_raw(path: Path) -> list[dict]:
     if not path.exists():
         return []
@@ -87,6 +88,7 @@ def _save_raw(accounts: list[dict], path: Path) -> None:
 # ---------------------------------------------------------------------------
 # Conversion helpers
 # ---------------------------------------------------------------------------
+
 
 def _holding_out_from_dict(d: dict) -> HoldingOut:
     basis = Decimal(str(d["basis"]))
@@ -123,9 +125,7 @@ def _account_out_from_dict(d: dict) -> AccountOut:
 
     balance = Decimal(str(d["balance"])) if d.get("balance") is not None else None
     annual_contribution = (
-        Decimal(str(d["annual_contribution"]))
-        if d.get("annual_contribution") is not None
-        else None
+        Decimal(str(d["annual_contribution"])) if d.get("annual_contribution") is not None else None
     )
 
     return AccountOut(
@@ -148,9 +148,7 @@ def _account_in_to_dict(data: AccountIn, account_id: str) -> dict:
         "account_type": data.account_type,
         "balance": float(data.balance) if data.balance is not None else None,
         "annual_contribution": (
-            float(data.annual_contribution)
-            if data.annual_contribution is not None
-            else None
+            float(data.annual_contribution) if data.annual_contribution is not None else None
         ),
         "holdings": [] if data.account_type == "taxable" else None,
     }
@@ -159,6 +157,7 @@ def _account_in_to_dict(data: AccountIn, account_id: str) -> dict:
 # ---------------------------------------------------------------------------
 # Service functions
 # ---------------------------------------------------------------------------
+
 
 def load_accounts(_path: Path = _DATA_PATH) -> list[AccountOut]:
     return [_account_out_from_dict(d) for d in _load_raw(_path)]
@@ -179,9 +178,7 @@ def create_account(data: AccountIn, _path: Path = _DATA_PATH) -> AccountOut:
     return _account_out_from_dict(account_dict)
 
 
-def update_account(
-    account_id: str, data: AccountIn, _path: Path = _DATA_PATH
-) -> AccountOut:
+def update_account(account_id: str, data: AccountIn, _path: Path = _DATA_PATH) -> AccountOut:
     accounts = _load_raw(_path)
     for i, d in enumerate(accounts):
         if d["id"] == account_id:
@@ -202,9 +199,7 @@ def delete_account(account_id: str, _path: Path = _DATA_PATH) -> None:
     _save_raw(new_accounts, _path)
 
 
-def create_holding(
-    account_id: str, data: HoldingIn, _path: Path = _DATA_PATH
-) -> AccountOut:
+def create_holding(account_id: str, data: HoldingIn, _path: Path = _DATA_PATH) -> AccountOut:
     accounts = _load_raw(_path)
     for i, d in enumerate(accounts):
         if d["id"] == account_id:
@@ -237,9 +232,7 @@ def update_holding(
     raise ValueError(f"Account not found: {account_id}")
 
 
-def delete_holding(
-    account_id: str, holding_id: str, _path: Path = _DATA_PATH
-) -> AccountOut:
+def delete_holding(account_id: str, holding_id: str, _path: Path = _DATA_PATH) -> AccountOut:
     accounts = _load_raw(_path)
     for i, d in enumerate(accounts):
         if d["id"] == account_id:

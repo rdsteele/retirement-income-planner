@@ -42,6 +42,7 @@ _BASE = {
 
 # ── /api/income-plan/summary ──────────────────────────────────────────────
 
+
 class TestSummaryHappyPath:
     def setup_method(self):
         self.resp = client.post("/api/income-plan/summary", json=_BASE)
@@ -52,15 +53,26 @@ class TestSummaryHappyPath:
 
     def test_all_fields_present(self):
         required = {
-            "magi", "forced_ordinary", "forced_preferential",
-            "withdrawal_ordinary", "withdrawal_preferential",
-            "executed_ordinary", "executed_preferential",
-            "ss_taxable", "provisional_income",
-            "total_spending", "total_income", "shortfall",
-            "aca_distance", "aca_cliff_magi",
-            "total_taxable_withdrawals", "total_traditional_withdrawals",
-            "total_roth_withdrawals", "total_hsa_withdrawals",
-            "total_pension_annuity", "total_ss_benefit",
+            "magi",
+            "forced_ordinary",
+            "forced_preferential",
+            "withdrawal_ordinary",
+            "withdrawal_preferential",
+            "executed_ordinary",
+            "executed_preferential",
+            "ss_taxable",
+            "provisional_income",
+            "total_spending",
+            "total_income",
+            "shortfall",
+            "aca_distance",
+            "aca_cliff_magi",
+            "total_taxable_withdrawals",
+            "total_traditional_withdrawals",
+            "total_roth_withdrawals",
+            "total_hsa_withdrawals",
+            "total_pension_annuity",
+            "total_ss_benefit",
             "total_all_withdrawals",
         }
         assert required.issubset(self.body.keys())
@@ -106,7 +118,13 @@ class TestSummarySSAccuracy:
 
     def test_mfj_uses_higher_thresholds(self):
         # MFJ tier_1 = 32000; PI = 20000 + 12000 = 32000 → no taxable SS
-        body = {**_BASE, "filing_status": "mfj", "ss_benefit": 24000.0, "pension": 20000.0, "pension_taxable": 20000.0}
+        body = {
+            **_BASE,
+            "filing_status": "mfj",
+            "ss_benefit": 24000.0,
+            "pension": 20000.0,
+            "pension_taxable": 20000.0,
+        }
         resp = client.post("/api/income-plan/summary", json=body)
         assert resp.status_code == 200
         data = resp.json()
@@ -129,9 +147,7 @@ class TestSummaryWithdrawals:
     def test_planned_roth_does_not_affect_magi(self):
         body = {
             **_BASE,
-            "planned_withdrawals": [
-                {"account_type": "roth", "amount": 15000.0, "basis": 0.0}
-            ],
+            "planned_withdrawals": [{"account_type": "roth", "amount": 15000.0, "basis": 0.0}],
         }
         resp = client.post("/api/income-plan/summary", json=body)
         assert resp.status_code == 200
@@ -166,13 +182,23 @@ class TestSummaryACADistance:
 
 class TestSummaryShortfall:
     def test_shortfall_positive_when_expenses_exceed_income(self):
-        body = {**_BASE, "pension": 20000.0, "pension_taxable": 20000.0, "essential_spending": 30000.0}
+        body = {
+            **_BASE,
+            "pension": 20000.0,
+            "pension_taxable": 20000.0,
+            "essential_spending": 30000.0,
+        }
         resp = client.post("/api/income-plan/summary", json=body)
         assert resp.status_code == 200
         assert resp.json()["shortfall"] > 0.0
 
     def test_surplus_when_income_exceeds_expenses(self):
-        body = {**_BASE, "pension": 50000.0, "pension_taxable": 50000.0, "essential_spending": 20000.0}
+        body = {
+            **_BASE,
+            "pension": 50000.0,
+            "pension_taxable": 50000.0,
+            "essential_spending": 20000.0,
+        }
         resp = client.post("/api/income-plan/summary", json=body)
         assert resp.status_code == 200
         assert resp.json()["shortfall"] < 0.0
@@ -198,7 +224,12 @@ class TestSummaryPensionGrossTaxableSplit:
         assert resp.json()["total_pension_annuity"] == 10000.0
 
     def test_shortfall_uses_gross(self):
-        body = {**_BASE, "pension": 10000.0, "pension_taxable": 7000.0, "essential_spending": 12000.0}
+        body = {
+            **_BASE,
+            "pension": 10000.0,
+            "pension_taxable": 7000.0,
+            "essential_spending": 12000.0,
+        }
         resp = client.post("/api/income-plan/summary", json=body)
         assert resp.json()["shortfall"] == pytest.approx(2000.0)
 
@@ -228,6 +259,7 @@ class TestSummaryValidation:
 
 
 # ── /api/income-plan/calculate ────────────────────────────────────────────
+
 
 class TestCalculateHappyPath:
     def setup_method(self):
@@ -286,9 +318,7 @@ class TestCalculateWithdrawalsAugmented:
         body_with_roth = {
             **_BASE,
             "sweep_ceiling": 1000.0,
-            "planned_withdrawals": [
-                {"account_type": "roth", "amount": 20000.0, "basis": 0.0}
-            ],
+            "planned_withdrawals": [{"account_type": "roth", "amount": 20000.0, "basis": 0.0}],
         }
         resp_no = client.post("/api/income-plan/calculate", json=body_no_roth)
         resp_w = client.post("/api/income-plan/calculate", json=body_with_roth)
@@ -302,10 +332,15 @@ class TestCalculatePlanningSignals:
         resp = client.post("/api/income-plan/calculate", json=_BASE)
         signals = resp.json()["planning_signals"]
         required = {
-            "zero_ordinary_space", "zero_rate_threshold",
-            "aca_cliff_sweep_value", "bracket_boundaries",
-            "ltcg_0pct_remaining", "torpedo_active", "ss_fully_taxable",
-            "distance_to_22pct", "distance_to_24pct",
+            "zero_ordinary_space",
+            "zero_rate_threshold",
+            "aca_cliff_sweep_value",
+            "bracket_boundaries",
+            "ltcg_0pct_remaining",
+            "torpedo_active",
+            "ss_fully_taxable",
+            "distance_to_22pct",
+            "distance_to_24pct",
         }
         assert required.issubset(signals.keys())
 

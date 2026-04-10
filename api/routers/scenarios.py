@@ -23,15 +23,13 @@ router = APIRouter()
 def get_scenarios() -> list[ScenarioMetaResponse]:
     try:
         metas = svc.list_scenarios()
-        return [
-            ScenarioMetaResponse(name=m.name, saved_at=m.saved_at.isoformat())
-            for m in metas
-        ]
+        return [ScenarioMetaResponse(name=m.name, saved_at=m.saved_at.isoformat()) for m in metas]
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 # /current routes MUST be defined before /{name}
+
 
 @router.get("/scenarios/current", response_model=CurrentScenarioResponse)
 def get_current_scenario() -> CurrentScenarioResponse:

@@ -346,6 +346,21 @@
     .holding-table td.td-left { text-align: left; font-weight: 500; }
     .holding-table tr:nth-child(even) td { background: #f8f9fa; }
     .holding-table .derived-cell { color: #495057; }
+    .sell-all-btn {
+      padding: 1px 5px;
+      margin-left: 3px;
+      font-size: 10px;
+      border: 1px solid #ced4da;
+      border-radius: 3px;
+      background: #f8f9fa;
+      color: #495057;
+      cursor: pointer;
+      vertical-align: middle;
+    }
+    .sell-all-btn:hover {
+      background: #e9ecef;
+      border-color: #adb5bd;
+    }
     .mix-input {
       width: 80px;
       padding: 3px 5px;
@@ -957,7 +972,7 @@
                 <td>${fmt$(h.basis)}${h.value > 0 ? ` <span style="color:#6c757d;font-size:11px;">(${(h.basis/h.value*100).toFixed(1)}%)</span>` : ''}</td>
                 <td>${fmt$(unrealGain)}</td>
                 <td><input type="number" id="withdraw_${escHtml(h.id)}" class="mix-input" min="0" step="1" placeholder="0"
-                           data-basis="${h.basis}" data-value="${h.value}"></td>
+                           data-basis="${h.basis}" data-value="${h.value}"><button type="button" class="sell-all-btn" id="sellall_${escHtml(h.id)}" title="Sell entire lot">All</button></td>
                 <td><input type="number" id="basis_${escHtml(h.id)}" class="mix-input" min="0" step="1" placeholder="0"
                            data-manual="false"></td>
                 <td class="derived-cell" id="gain_${escHtml(h.id)}">$0</td>
@@ -1041,6 +1056,19 @@
         const basisInput    = el(`basis_${h.id}`);
         if (!withdrawInput || !basisInput) continue;
         const basisRatio = h.value > 0 ? h.basis / h.value : 0;
+
+        const sellAllBtn = el(`sellall_${h.id}`);
+        if (sellAllBtn) {
+          sellAllBtn.addEventListener('click', () => {
+            withdrawInput.value = Math.round(h.value);
+            if (basisInput.dataset.manual === 'false') {
+              basisInput.value = Math.round(h.basis);
+            }
+            updateGainDisplay(h.id);
+            updateAccountSubtotals(acct.id);
+            updateMagi();
+          });
+        }
 
         withdrawInput.addEventListener('blur', () => {
           if (basisInput.dataset.manual === 'false') {
@@ -1628,6 +1656,11 @@
   }
 
   el('include_aca')?.addEventListener('change', updateAcaVisibility);
+
+  // ── Auto-select value on focus for number inputs ──────────────────────
+  document.addEventListener('focusin', e => {
+    if (e.target.matches('input[type="number"]')) e.target.select();
+  });
 
   // ── Update MAGI on blur of any input field ────────────────────────────
   document.addEventListener('focusout', updateMagi);

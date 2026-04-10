@@ -22,18 +22,21 @@ _D = Decimal
 # Input data structures
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class PlannedWithdrawal:
     """A planned withdrawal from a single holding or account."""
-    account_type: str          # 'taxable', 'traditional', 'roth', 'hsa'
+
+    account_type: str  # 'taxable', 'traditional', 'roth', 'hsa'
     amount: Decimal
-    basis: Decimal = _ZERO     # relevant for taxable holdings only
+    basis: Decimal = _ZERO  # relevant for taxable holdings only
 
 
 @dataclass
 class ExecutedWithdrawal:
     """A mid-year withdrawal already taken."""
-    withdrawal_type: str       # 'ltcg', 'stcg', 'tax_deferred', 'tax_free_roth', 'tax_free_hsa'
+
+    withdrawal_type: str  # 'ltcg', 'stcg', 'tax_deferred', 'tax_free_roth', 'tax_free_hsa'
     amount: Decimal
     basis: Decimal = _ZERO
 
@@ -41,42 +44,44 @@ class ExecutedWithdrawal:
 @dataclass
 class WithdrawalTotals:
     """Classified withdrawal totals used both by the summary and sweep assembly."""
-    taxable_gains: Decimal           # LTCG from planned taxable + LTCG/STCG gains from executed
-    taxable_basis: Decimal           # Basis portion of planned taxable withdrawals
-    traditional: Decimal             # Planned traditional IRA/401k distributions
-    roth: Decimal                    # Planned Roth withdrawals (MAGI-neutral)
-    hsa: Decimal                     # Planned HSA medical withdrawals (MAGI-neutral)
-    exec_ordinary: Decimal           # Executed withdrawals that are ordinary income
-    exec_preferential: Decimal       # Executed withdrawals that are preferential income
-    exec_taxable_amount: Decimal     # Gross executed taxable-account proceeds
-    exec_traditional: Decimal        # Executed tax-deferred distributions
-    exec_roth: Decimal               # Executed Roth withdrawals
-    exec_hsa: Decimal                # Executed HSA withdrawals
+
+    taxable_gains: Decimal  # LTCG from planned taxable + LTCG/STCG gains from executed
+    taxable_basis: Decimal  # Basis portion of planned taxable withdrawals
+    traditional: Decimal  # Planned traditional IRA/401k distributions
+    roth: Decimal  # Planned Roth withdrawals (MAGI-neutral)
+    hsa: Decimal  # Planned HSA medical withdrawals (MAGI-neutral)
+    exec_ordinary: Decimal  # Executed withdrawals that are ordinary income
+    exec_preferential: Decimal  # Executed withdrawals that are preferential income
+    exec_taxable_amount: Decimal  # Gross executed taxable-account proceeds
+    exec_traditional: Decimal  # Executed tax-deferred distributions
+    exec_roth: Decimal  # Executed Roth withdrawals
+    exec_hsa: Decimal  # Executed HSA withdrawals
 
 
 @dataclass
 class PlanSummary:
     """Live plan summary returned by compute_plan_summary."""
+
     magi: Decimal
 
     # Income breakdown
-    forced_ordinary: Decimal        # pension_taxable + interest + ord_div + IRA dist + ss_taxable
-    forced_preferential: Decimal    # qual_div + fixed_ltcg
-    withdrawal_ordinary: Decimal    # planned traditional distributions
+    forced_ordinary: Decimal  # pension_taxable + interest + ord_div + IRA dist + ss_taxable
+    forced_preferential: Decimal  # qual_div + fixed_ltcg
+    withdrawal_ordinary: Decimal  # planned traditional distributions
     withdrawal_preferential: Decimal  # planned taxable gains
-    executed_ordinary: Decimal      # executed ordinary-income withdrawals
+    executed_ordinary: Decimal  # executed ordinary-income withdrawals
     executed_preferential: Decimal  # executed preferential-income withdrawals
 
-    ss_taxable: Decimal             # computed by the real SS taxability service
+    ss_taxable: Decimal  # computed by the real SS taxability service
     provisional_income: Decimal
 
     # Spending / shortfall
     total_spending: Decimal
-    total_income: Decimal           # forced + withdrawal + executed (taxable portion)
-    shortfall: Decimal | None       # None when no spending entered
+    total_income: Decimal  # forced + withdrawal + executed (taxable portion)
+    shortfall: Decimal | None  # None when no spending entered
 
     # ACA
-    aca_distance: Decimal | None    # None when aca_cliff_magi is zero
+    aca_distance: Decimal | None  # None when aca_cliff_magi is zero
     aca_cliff_magi: Decimal
 
     # Withdrawal totals (combined planned + executed per account type)
@@ -92,6 +97,7 @@ class PlanSummary:
 # ---------------------------------------------------------------------------
 # 1. Classify withdrawals
 # ---------------------------------------------------------------------------
+
 
 def classify_withdrawals(
     planned: list[PlannedWithdrawal],
@@ -171,6 +177,7 @@ def classify_withdrawals(
 # ---------------------------------------------------------------------------
 # 2. Compute plan summary (live, no sweep)
 # ---------------------------------------------------------------------------
+
 
 def _compute_agi_excluding_ss(
     pension_taxable: Decimal,
@@ -277,8 +284,14 @@ def compute_plan_summary(
     totals = classify_withdrawals(planned, executed)
 
     agi_excl_ss = _compute_agi_excluding_ss(
-        pension_taxable, interest, ordinary_dividends, ira_distributions,
-        qualified_dividends, fixed_ltcg, above_the_line_adjustments, totals,
+        pension_taxable,
+        interest,
+        ordinary_dividends,
+        ira_distributions,
+        qualified_dividends,
+        fixed_ltcg,
+        above_the_line_adjustments,
+        totals,
     )
 
     ss_result = calculate_social_security_taxability(
@@ -289,9 +302,16 @@ def compute_plan_summary(
     )
 
     magi = _compute_magi(
-        pension_taxable, interest, ordinary_dividends, ira_distributions,
-        qualified_dividends, fixed_ltcg, above_the_line_adjustments,
-        ss_result.taxable_ss, totals, tax_exempt_interest,
+        pension_taxable,
+        interest,
+        ordinary_dividends,
+        ira_distributions,
+        qualified_dividends,
+        fixed_ltcg,
+        above_the_line_adjustments,
+        ss_result.taxable_ss,
+        totals,
+        tax_exempt_interest,
     )
 
     forced_ordinary = (
@@ -302,8 +322,13 @@ def compute_plan_summary(
     total_spending = essential_spending + discretionary_spending
 
     total_taxable_withdrawals = (
-        totals.taxable_basis + totals.taxable_gains + totals.exec_taxable_amount
-        + interest + ordinary_dividends + qualified_dividends + fixed_ltcg
+        totals.taxable_basis
+        + totals.taxable_gains
+        + totals.exec_taxable_amount
+        + interest
+        + ordinary_dividends
+        + qualified_dividends
+        + fixed_ltcg
         + tax_exempt_interest
     )
     total_traditional_withdrawals = totals.traditional + totals.exec_traditional + ira_distributions
@@ -326,7 +351,9 @@ def compute_plan_summary(
     total_income = forced_income + exec_income + withdrawal_income
 
     shortfall = _compute_shortfall(
-        total_spending, estimated_taxes, above_the_line_adjustments,
+        total_spending,
+        estimated_taxes,
+        above_the_line_adjustments,
         total_all_withdrawals,
     )
 
@@ -362,6 +389,7 @@ def compute_plan_summary(
 # ---------------------------------------------------------------------------
 # 3. Assemble sweep inputs for /api/total-cost
 # ---------------------------------------------------------------------------
+
 
 def assemble_sweep_inputs(
     *,

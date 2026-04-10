@@ -25,16 +25,16 @@ _THOUSAND = Decimal("1000")
 
 @dataclass
 class ACAResult:
-    magi: Decimal                   # input MAGI
-    aptc_annual: Decimal            # annual subsidy at this MAGI
-    aptc_monthly: Decimal           # monthly subsidy at this MAGI
-    subsidy_loss: Decimal           # subsidy lost vs baseline MAGI
-    cliff_magi: Decimal             # 400% FPL cliff for this filing status
-    distance_to_cliff: Decimal      # cliff_magi - magi (negative if over)
-    is_eligible: bool               # True if magi < cliff_magi and above schedule min
+    magi: Decimal  # input MAGI
+    aptc_annual: Decimal  # annual subsidy at this MAGI
+    aptc_monthly: Decimal  # monthly subsidy at this MAGI
+    subsidy_loss: Decimal  # subsidy lost vs baseline MAGI
+    cliff_magi: Decimal  # 400% FPL cliff for this filing status
+    distance_to_cliff: Decimal  # cliff_magi - magi (negative if over)
+    is_eligible: bool  # True if magi < cliff_magi and above schedule min
     marginal_subsidy_loss: Decimal  # annual APTC dollars lost per $1,000 of additional
-                                    # MAGI (consistent with emr_aca = this / 1000 in
-                                    # total_cost.py); spikes to full APTC at cliff crossing
+    # MAGI (consistent with emr_aca = this / 1000 in
+    # total_cost.py); spikes to full APTC at cliff crossing
 
 
 @lru_cache(maxsize=None)
@@ -206,7 +206,9 @@ def calculate_aca_subsidy(
             is_eligible = True
 
         if baseline_magi is not None:
-            baseline_aptc = _formula_aptc(baseline_magi, slcsp_annual_premium, applicable_percentage)
+            baseline_aptc = _formula_aptc(
+                baseline_magi, slcsp_annual_premium, applicable_percentage
+            )
         else:
             baseline_aptc = aptc_annual
         subsidy_loss = round_tax(max(_ZERO, baseline_aptc - aptc_annual))

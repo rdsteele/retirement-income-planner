@@ -35,14 +35,15 @@ from services.aca import (
 D = Decimal
 
 CLIFF_SINGLE = D("62600")
-CLIFF_MFJ    = D("85000")
-TAX_YEAR     = 2026
+CLIFF_MFJ = D("85000")
+TAX_YEAR = 2026
 
 
 # ---------------------------------------------------------------------------
 # 1. Schedule interpolation between two points
 #    Spec worked example: MAGI $35,346 between (35000, 820) and (40000, 751)
 # ---------------------------------------------------------------------------
+
 
 class TestScheduleInterpolation:
     """MAGI between two schedule points → linearly interpolated annual APTC."""
@@ -78,6 +79,7 @@ class TestScheduleInterpolation:
 # 2. Schedule exact match on a schedule point
 # ---------------------------------------------------------------------------
 
+
 class TestScheduleExactMatch:
     """MAGI exactly on a schedule point → uses that point's value directly."""
 
@@ -103,6 +105,7 @@ class TestScheduleExactMatch:
 # ---------------------------------------------------------------------------
 # 3. Below lowest schedule point → zero APTC, is_eligible=False (Medicaid)
 # ---------------------------------------------------------------------------
+
 
 class TestBelowScheduleMinimum:
     """MAGI below $22,000 (Medicaid territory) → ineligible, no APTC."""
@@ -130,6 +133,7 @@ class TestBelowScheduleMinimum:
 # ---------------------------------------------------------------------------
 # 4. At cliff MAGI → aptc=0, is_eligible=False, distance=0, marginal=spike
 # ---------------------------------------------------------------------------
+
 
 class TestAtCliff:
     """At exactly cliff MAGI: aptc drops to zero; marginal = full last APTC."""
@@ -159,6 +163,7 @@ class TestAtCliff:
 # ---------------------------------------------------------------------------
 # 5. One dollar over cliff → zero APTC, full subsidy_loss, marginal=0
 # ---------------------------------------------------------------------------
+
 
 class TestOneDollarOverCliff:
     """Crossing the cliff by $1 loses the full baseline APTC."""
@@ -193,6 +198,7 @@ class TestOneDollarOverCliff:
 # 6. Subsidy loss correct vs non-default baseline MAGI
 # ---------------------------------------------------------------------------
 
+
 class TestSubsidyLossVsBaseline:
     """subsidy_loss = max(0, baseline_aptc - current_aptc)."""
 
@@ -221,6 +227,7 @@ class TestSubsidyLossVsBaseline:
 # ---------------------------------------------------------------------------
 # 7. Marginal subsidy loss correct between schedule points (gradual slope)
 # ---------------------------------------------------------------------------
+
 
 class TestGradualSlope:
     """Below cliff, slope = (lower - upper) annual / (upper - lower) MAGI × 1000."""
@@ -260,6 +267,7 @@ class TestGradualSlope:
 # 8. Marginal subsidy loss spikes at cliff crossing
 # ---------------------------------------------------------------------------
 
+
 def test_marginal_spike_at_cliff():
     """At the cliff MAGI, marginal_subsidy_loss = last non-zero annual APTC."""
     result = calculate_aca_subsidy(
@@ -274,6 +282,7 @@ def test_marginal_spike_at_cliff():
 # ---------------------------------------------------------------------------
 # 9. MFJ schedule populated — interpolation at $50,000
 # ---------------------------------------------------------------------------
+
 
 def test_mfj_schedule_at_50k():
     """MFJ schedule is populated; $50,000 is an exact schedule point → $707/month."""
@@ -293,6 +302,7 @@ def test_mfj_schedule_at_50k():
 # ---------------------------------------------------------------------------
 # 10. MFJ cliff uses schedule-derived threshold ($85,000)
 # ---------------------------------------------------------------------------
+
 
 class TestMFJCliff:
     def test_cliff_is_mfj_threshold(self):
@@ -320,6 +330,7 @@ class TestMFJCliff:
 # ---------------------------------------------------------------------------
 # Error handling
 # ---------------------------------------------------------------------------
+
 
 def test_unsupported_tax_year_raises():
     with pytest.raises(ValueError, match="Unsupported tax year"):
@@ -438,6 +449,7 @@ class TestFormulaFallback:
 # Internal helper: _cliff_from_fpl
 # ---------------------------------------------------------------------------
 
+
 def test_cliff_from_fpl_multiplies_by_four():
     # Line 51: direct unit test of the helper
     assert _cliff_from_fpl(D("15650")) == D("62600")
@@ -468,6 +480,7 @@ def test_interpolate_above_last_point_returns_zero():
 # Internal helper: _last_nonzero_annual — all-zero schedule
 # ---------------------------------------------------------------------------
 
+
 def test_last_nonzero_annual_all_zero_schedule():
     # Line 88: no non-zero monthly_aptc entry → return _ZERO
     all_zero = [
@@ -481,6 +494,7 @@ def test_last_nonzero_annual_all_zero_schedule():
 # Internal helper: _marginal_loss_from_schedule — past-end return
 # ---------------------------------------------------------------------------
 
+
 def test_marginal_loss_above_last_interval_returns_zero():
     # Line 125: magi sits above all schedule intervals but below cliff.
     # Schedule only covers up to 35000; cliff is 62600; magi=50000 falls past
@@ -493,6 +507,7 @@ def test_marginal_loss_above_last_interval_returns_zero():
 # Internal helper: _last_nonzero_annual called from schedule path at cliff
 # when all monthly_aptc are zero — marginal = 0
 # ---------------------------------------------------------------------------
+
 
 def test_all_zero_schedule_marginal_zero_at_cliff():
     # Covers line 88 via the schedule path in calculate_aca_subsidy:
@@ -522,6 +537,7 @@ def test_all_zero_schedule_marginal_zero_at_cliff():
 # get_aptc_schedule_magis (lines 143-145)
 # ---------------------------------------------------------------------------
 
+
 def test_get_aptc_schedule_magis_single_2026():
     # Lines 143-145: loads schedule and returns magi list
     magis = get_aptc_schedule_magis("single", TAX_YEAR)
@@ -546,6 +562,7 @@ def test_get_aptc_schedule_magis_empty_when_no_schedule():
 # Baseline_magi below schedule minimum triggers _interpolate line 70
 # via the baseline calculation path in calculate_aca_subsidy
 # ---------------------------------------------------------------------------
+
 
 def test_baseline_below_schedule_minimum_yields_zero_baseline():
     # baseline_magi=10000 < 22000 (min_schedule_magi).

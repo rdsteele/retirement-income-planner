@@ -34,18 +34,18 @@ def _d(value: float) -> Decimal:
 
 
 def _bracket_row(bracket: dict, income_taxed: Decimal, tax_amount: Decimal) -> BracketRow:
-    return BracketRow.model_validate({
-        "from": float(_D(bracket["from"])),
-        "to": _NULL_TO if bracket["to"] is None else float(_D(bracket["to"])),
-        "rate": float(_D(bracket["rate"])),
-        "income_taxed": float(income_taxed),
-        "tax_amount": float(tax_amount),
-    })
+    return BracketRow.model_validate(
+        {
+            "from": float(_D(bracket["from"])),
+            "to": _NULL_TO if bracket["to"] is None else float(_D(bracket["to"])),
+            "rate": float(_D(bracket["rate"])),
+            "income_taxed": float(income_taxed),
+            "tax_amount": float(tax_amount),
+        }
+    )
 
 
-def _build_ordinary_breakdown(
-    taxable_ordinary: Decimal, brackets: list[dict]
-) -> list[BracketRow]:
+def _build_ordinary_breakdown(taxable_ordinary: Decimal, brackets: list[dict]) -> list[BracketRow]:
     rows: list[BracketRow] = []
     residual = taxable_ordinary
     for bracket in brackets:

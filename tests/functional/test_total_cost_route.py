@@ -47,6 +47,7 @@ _BASE_ACA = {
 
 # ── Test 1: Happy path — include_aca=False ───────────────────────────────
 
+
 class TestHappyPathNoACA:
     def setup_method(self):
         self.resp = client.post("/api/total-cost", json=_BASE)
@@ -111,6 +112,7 @@ class TestHappyPathNoACA:
 
 # ── Test 2: Happy path — include_aca=True ────────────────────────────────
 
+
 class TestHappyPathWithACA:
     def setup_method(self):
         self.resp = client.post("/api/total-cost", json=_BASE_ACA)
@@ -150,6 +152,7 @@ class TestHappyPathWithACA:
 
 # ── Test 3: aca_cliff_sweep_value matches cliff in points ────────────────
 
+
 class TestACACliffConsistency:
     def setup_method(self):
         self.resp = client.post("/api/total-cost", json=_BASE_ACA)
@@ -168,6 +171,7 @@ class TestACACliffConsistency:
 
 
 # ── Test 4: bracket_boundaries identifies rate transitions ───────────────
+
 
 class TestBracketBoundaries:
     def setup_method(self):
@@ -211,6 +215,7 @@ class TestBracketBoundaries:
 
 # ── Test 5: zero_rate_threshold ──────────────────────────────────────────
 
+
 class TestZeroRateThreshold:
     def setup_method(self):
         req = {**_BASE, "sweep_ceiling": 30000.0, "sweep_step": 1000.0}
@@ -236,6 +241,7 @@ class TestZeroRateThreshold:
 
 
 # ── Test 6: zero_ordinary_space ──────────────────────────────────────────
+
 
 class TestZeroOrdinarySpace:
     def test_no_fixed_income(self):
@@ -269,6 +275,7 @@ class TestZeroOrdinarySpace:
 
 # ── Test 7: Missing required field returns 422 ───────────────────────────
 
+
 class TestMissingRequiredField:
     def test_missing_sweep_mode(self):
         req = {k: v for k, v in _BASE.items() if k != "sweep_mode"}
@@ -288,6 +295,7 @@ class TestMissingRequiredField:
 
 # ── Test 8: Invalid sweep_mode returns 422 ───────────────────────────────
 
+
 class TestInvalidSweepMode:
     def test_bad_sweep_mode(self):
         req = {**_BASE, "sweep_mode": "capital_gains"}
@@ -302,6 +310,7 @@ class TestInvalidSweepMode:
 
 # ── Test 9: Unsupported tax_year returns 422 ─────────────────────────────
 
+
 class TestUnsupportedTaxYear:
     def test_unsupported_year(self):
         req = {**_BASE, "tax_year": 2019}
@@ -315,6 +324,7 @@ class TestUnsupportedTaxYear:
 
 
 # ── Test 10: Negative monetary field returns 422 ─────────────────────────
+
 
 class TestNegativeMonetaryField:
     def test_negative_pension(self):
@@ -336,6 +346,7 @@ class TestNegativeMonetaryField:
 # ── Test 11: sweep_ceiling=None → _to_decimal_or_none returns None ────────
 #  Covers line 37 (the None branch of _to_decimal_or_none).
 
+
 class TestSweepCeilingNone:
     def test_omitted_sweep_ceiling_returns_200(self):
         req = {k: v for k, v in _BASE.items() if k != "sweep_ceiling"}
@@ -351,6 +362,7 @@ class TestSweepCeilingNone:
 # ── Test 12: ORDINARY mode with fixed_ltcg > 0 → ltcg_0pct_remaining ─────
 #  Covers _get_ltcg_0pct_ceiling (lines 42-43) and _compute_ltcg_0pct_remaining
 #  lines 114-116 (remaining > 0 path).
+
 
 class TestLTCGRemainingPositive:
     def setup_method(self):
@@ -371,6 +383,7 @@ class TestLTCGRemainingPositive:
 # ── Test 13: ltcg_0pct_remaining=None when ltcg already exceeds ceiling ───
 #  Covers line 117 (remaining ≤ 0 → return None).
 
+
 class TestLTCGRemainingNone:
     def test_none_when_ltcg_exceeds_ceiling(self):
         # fixed_ltcg=200000 far exceeds the 0% LTCG ceiling → remaining ≤ 0 → None
@@ -384,6 +397,7 @@ class TestLTCGRemainingNone:
 # ── Test 14: PREFERENTIAL sweep mode ─────────────────────────────────────
 #  Covers line 91 (_compute_zero_ordinary_space PREFERENTIAL branch) and
 #  the PREFERENTIAL sweep path through _compute_ltcg_0pct_remaining.
+
 
 class TestPreferentialMode:
     def setup_method(self):
@@ -421,6 +435,7 @@ class TestPreferentialMode:
 #  With pension=80000 (puts us in 22% at floor) + sweep to 50000, total
 #  income reaches 130000 → taxable ~113900, well into the 24% bracket.
 
+
 class TestDistanceTo24Pct:
     def setup_method(self):
         req = {
@@ -450,6 +465,7 @@ class TestDistanceTo24Pct:
 # ── Test 16: unexpected exception in calculate_total_cost → HTTP 500 ──────
 #  Covers lines 231-233 (the bare except Exception handler).
 
+
 class TestUnexpectedError500:
     def test_unexpected_error_returns_500(self):
         with patch(
@@ -472,6 +488,7 @@ class TestUnexpectedError500:
 #  torpedo_active=True when any emr_ss_torpedo > 0.
 #  SS benefit=20000 enters the torpedo zone around $25K provisional income.
 
+
 class TestSSTorpedoActive:
     def test_torpedo_active_with_ss_income(self):
         req = {
@@ -488,6 +505,7 @@ class TestSSTorpedoActive:
 # ── Test 18: SS fully taxable at floor signal ─────────────────────────────
 #  ss_fully_taxable=True when pts[0].ss_inclusion_rate >= 0.85.
 #  Large pension pushes provisional income above the 85% threshold at floor.
+
 
 class TestSSFullyTaxableAtFloor:
     def test_ss_fully_taxable_at_floor(self):

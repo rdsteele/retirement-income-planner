@@ -22,6 +22,7 @@ _BASE = {
 
 # ── 1. Happy path — response shape ───────────────────────────────────────
 
+
 class TestResponseShape:
     def setup_method(self):
         self.resp = client.post("/api/tax", json=_BASE)
@@ -40,22 +41,34 @@ class TestResponseShape:
 
     def test_inputs_summary_fields_present(self):
         s = self.body["inputs_summary"]
-        for key in ("gross_ordinary_income", "ss_taxable", "above_the_line_adjustments",
-                    "agi", "standard_deduction", "additional_deductions",
-                    "taxable_ordinary", "taxable_preferential"):
+        for key in (
+            "gross_ordinary_income",
+            "ss_taxable",
+            "above_the_line_adjustments",
+            "agi",
+            "standard_deduction",
+            "additional_deductions",
+            "taxable_ordinary",
+            "taxable_preferential",
+        ):
             assert key in s, f"missing inputs_summary.{key}"
 
     def test_federal_fields_present(self):
         f = self.body["federal"]
-        for key in ("ordinary_income_tax", "preferential_income_tax", "total_tax",
-                    "effective_rate", "marginal_bracket_rate",
-                    "bracket_breakdown", "preferential_breakdown"):
+        for key in (
+            "ordinary_income_tax",
+            "preferential_income_tax",
+            "total_tax",
+            "effective_rate",
+            "marginal_bracket_rate",
+            "bracket_breakdown",
+            "preferential_breakdown",
+        ):
             assert key in f, f"missing federal.{key}"
 
     def test_summary_fields_present(self):
         s = self.body["summary"]
-        for key in ("total_federal_tax", "total_ohio_tax", "total_tax",
-                    "overall_effective_rate"):
+        for key in ("total_federal_tax", "total_ohio_tax", "total_tax", "overall_effective_rate"):
             assert key in s, f"missing summary.{key}"
 
     def test_bracket_breakdown_at_least_one_row(self):
@@ -71,6 +84,7 @@ class TestResponseShape:
 
 
 # ── 2. Ohio included ──────────────────────────────────────────────────────
+
 
 class TestOhioIncluded:
     def setup_method(self):
@@ -88,9 +102,16 @@ class TestOhioIncluded:
 
     def test_ohio_fields_populated(self):
         ohio = self.body["ohio"]
-        for key in ("ohio_agi", "personal_exemption", "medical_deduction",
-                    "ohio_tax_base", "tax_before_credits", "retirement_income_credit",
-                    "ohio_tax", "effective_rate"):
+        for key in (
+            "ohio_agi",
+            "personal_exemption",
+            "medical_deduction",
+            "ohio_tax_base",
+            "tax_before_credits",
+            "retirement_income_credit",
+            "ohio_tax",
+            "effective_rate",
+        ):
             assert ohio[key] is not None, f"ohio.{key} is None"
 
     def test_ohio_agi_correct(self):
@@ -106,6 +127,7 @@ class TestOhioIncluded:
 
 
 # ── 3. SS taxability ──────────────────────────────────────────────────────
+
 
 class TestSSTaxability:
     def setup_method(self):
@@ -135,6 +157,7 @@ class TestSSTaxability:
 
 # ── 4. inputs_summary correctness ────────────────────────────────────────
 
+
 class TestInputsSummary:
     def setup_method(self):
         # pension=40000, 2026 single, std_ded=16100
@@ -163,6 +186,7 @@ class TestInputsSummary:
 
 
 # ── 5. bracket_breakdown correctness ─────────────────────────────────────
+
 
 class TestBracketBreakdown:
     def setup_method(self):
@@ -199,6 +223,7 @@ class TestBracketBreakdown:
 
 
 # ── 6. preferential_breakdown straddles 0%/15% boundary ─────────────────
+
 
 class TestPrefBreakdown:
     def setup_method(self):
@@ -240,6 +265,7 @@ class TestPrefBreakdown:
 
 # ── 7. Missing filing_status → 422 ───────────────────────────────────────
 
+
 def test_missing_filing_status_returns_422():
     payload = {"pension": 40000.0, "tax_year": 2026}
     resp = client.post("/api/tax", json=payload)
@@ -247,6 +273,7 @@ def test_missing_filing_status_returns_422():
 
 
 # ── 8. Unsupported tax year → 422 ────────────────────────────────────────
+
 
 def test_unsupported_tax_year_returns_422():
     payload = {"pension": 40000.0, "filing_status": "single", "tax_year": 2099}
@@ -257,6 +284,7 @@ def test_unsupported_tax_year_returns_422():
 
 
 # ── 9. include_ohio=false → ohio.included=false only ─────────────────────
+
 
 def test_ohio_excluded_has_only_included_field():
     payload = {**_BASE, "include_ohio": False}
@@ -269,6 +297,7 @@ def test_ohio_excluded_has_only_included_field():
 
 
 # ── 10. All income zero → zero tax ───────────────────────────────────────
+
 
 def test_all_income_zero_returns_zero_tax():
     payload = {"filing_status": "single", "tax_year": 2026}
@@ -283,6 +312,7 @@ def test_all_income_zero_returns_zero_tax():
 
 # ── 11. Unexpected exception → 500 ───────────────────────────────────────
 
+
 def test_unexpected_error_returns_500():
     with patch("api.routers.tax.calculate_federal_tax", side_effect=RuntimeError("boom")):
         resp = client.post("/api/tax", json=_BASE)
@@ -296,6 +326,7 @@ def test_unexpected_error_returns_500():
 # taxable_ordinary = 700000 - 16100 = 683900
 # Top bracket 37% starts at 640600 (unbounded, to=null) → else branch fires
 # income_taxed in top bracket = 683900 - 640600 = 43300
+
 
 class TestTopOrdinaryBracket:
     def setup_method(self):
@@ -320,6 +351,7 @@ class TestTopOrdinaryBracket:
 # taxable_ordinary = 100000 - 16100 = 83900
 # 0% LTCG bracket ceiling = 49450; 83900 >= 49450 → bracket skipped
 # All 10000 of qualified_dividends land in the 15% bracket
+
 
 class TestPrefBracketSkipped:
     def setup_method(self):
@@ -353,6 +385,7 @@ class TestPrefBracketSkipped:
 # 20% LTCG bracket starts at 545500 (unbounded, to=null) → else branch fires
 # Both 0% and 15% brackets are skipped (ordinary fills past them)
 # All 50000 qualified_dividends fall in the 20% bracket
+
 
 class TestTopPrefBracket:
     def setup_method(self):

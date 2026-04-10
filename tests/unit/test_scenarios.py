@@ -22,6 +22,7 @@ from services.scenarios import (
 # 1. list_scenarios returns empty list when directory missing
 # ---------------------------------------------------------------------------
 
+
 def test_list_scenarios_empty_when_dir_missing(tmp_path: Path) -> None:
     missing_dir = tmp_path / "nonexistent"
     result = list_scenarios(_scenarios_dir=missing_dir)
@@ -31,6 +32,7 @@ def test_list_scenarios_empty_when_dir_missing(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 # 2. save_scenario creates file, load_scenario returns same data
 # ---------------------------------------------------------------------------
+
 
 def test_save_then_load_roundtrip(tmp_path: Path) -> None:
     scenarios_dir = tmp_path / "scenarios"
@@ -49,6 +51,7 @@ def test_save_then_load_roundtrip(tmp_path: Path) -> None:
 # 3. delete_scenario removes file
 # ---------------------------------------------------------------------------
 
+
 def test_delete_removes_file(tmp_path: Path) -> None:
     scenarios_dir = tmp_path / "scenarios"
     data = {"name": "Test", "saved_at": "2026-01-01T00:00:00", "version": "1.0"}
@@ -65,6 +68,7 @@ def test_delete_removes_file(tmp_path: Path) -> None:
 # 4. delete_scenario raises ValueError for missing scenario
 # ---------------------------------------------------------------------------
 
+
 def test_delete_raises_for_missing(tmp_path: Path) -> None:
     scenarios_dir = tmp_path / "scenarios"
     with pytest.raises(ValueError, match="not found"):
@@ -74,6 +78,7 @@ def test_delete_raises_for_missing(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 # 5. scenario_name_to_filename handles spaces and special characters
 # ---------------------------------------------------------------------------
+
 
 def test_scenario_name_to_filename_spaces() -> None:
     assert scenario_name_to_filename("2026 Base Plan") == "2026_Base_Plan.json"
@@ -88,6 +93,7 @@ def test_scenario_name_to_filename_special_chars() -> None:
 # 6. get_current_scenario returns None when file missing
 # ---------------------------------------------------------------------------
 
+
 def test_get_current_returns_none_when_missing(tmp_path: Path) -> None:
     current_file = tmp_path / "current_scenario.json"
     result = get_current_scenario(_current_file=current_file)
@@ -97,6 +103,7 @@ def test_get_current_returns_none_when_missing(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 # 7. set_current_scenario persists, get_current_scenario returns it
 # ---------------------------------------------------------------------------
+
 
 def test_set_then_get_current(tmp_path: Path) -> None:
     current_file = tmp_path / "current_scenario.json"
@@ -108,6 +115,7 @@ def test_set_then_get_current(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 # 8. set_current_scenario(None) clears current scenario
 # ---------------------------------------------------------------------------
+
 
 def test_set_current_none_clears(tmp_path: Path) -> None:
     current_file = tmp_path / "current_scenario.json"
@@ -121,13 +129,18 @@ def test_set_current_none_clears(tmp_path: Path) -> None:
 # 9. list_scenarios returns all scenarios sorted by saved_at descending
 # ---------------------------------------------------------------------------
 
+
 def test_list_scenarios_returns_sorted_by_date(tmp_path: Path) -> None:
     scenarios_dir = tmp_path / "scenarios"
-    save_scenario("Alpha", {"name": "Alpha", "saved_at": "2026-01-01T00:00:00"}, _scenarios_dir=scenarios_dir)
-    save_scenario("Beta", {"name": "Beta", "saved_at": "2026-03-01T00:00:00"}, _scenarios_dir=scenarios_dir)
+    save_scenario(
+        "Alpha", {"name": "Alpha", "saved_at": "2026-01-01T00:00:00"}, _scenarios_dir=scenarios_dir
+    )
+    save_scenario(
+        "Beta", {"name": "Beta", "saved_at": "2026-03-01T00:00:00"}, _scenarios_dir=scenarios_dir
+    )
     results = list_scenarios(_scenarios_dir=scenarios_dir)
     assert len(results) == 2
-    assert results[0].name == "Beta"   # more recent first
+    assert results[0].name == "Beta"  # more recent first
     assert results[1].name == "Alpha"
 
 
@@ -135,11 +148,14 @@ def test_list_scenarios_returns_sorted_by_date(tmp_path: Path) -> None:
 # 10. list_scenarios silently skips corrupt JSON files
 # ---------------------------------------------------------------------------
 
+
 def test_list_scenarios_skips_corrupt_file(tmp_path: Path) -> None:
     scenarios_dir = tmp_path / "scenarios"
     scenarios_dir.mkdir()
     (scenarios_dir / "corrupt.json").write_text("not valid json{{")
-    save_scenario("Good", {"name": "Good", "saved_at": "2026-01-01T00:00:00"}, _scenarios_dir=scenarios_dir)
+    save_scenario(
+        "Good", {"name": "Good", "saved_at": "2026-01-01T00:00:00"}, _scenarios_dir=scenarios_dir
+    )
     results = list_scenarios(_scenarios_dir=scenarios_dir)
     assert len(results) == 1
     assert results[0].name == "Good"
@@ -148,6 +164,7 @@ def test_list_scenarios_skips_corrupt_file(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 # 11. load_scenario raises ValueError when scenario does not exist
 # ---------------------------------------------------------------------------
+
 
 def test_load_scenario_raises_for_missing(tmp_path: Path) -> None:
     scenarios_dir = tmp_path / "scenarios"
@@ -158,6 +175,7 @@ def test_load_scenario_raises_for_missing(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 # 12. get_current_scenario returns None when file contains invalid JSON
 # ---------------------------------------------------------------------------
+
 
 def test_get_current_returns_none_for_corrupt_file(tmp_path: Path) -> None:
     current_file = tmp_path / "current_scenario.json"

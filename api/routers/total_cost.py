@@ -79,11 +79,13 @@ def _compute_bracket_boundaries(result: TotalCostResult) -> list[BracketBoundary
         rate = round(float(p.emr_ordinary), 4)
         if rate != prev_rate:
             pct = int(round(rate * 100))
-            boundaries.append(BracketBoundary(
-                sweep_value=float(p.income),
-                rate=rate,
-                notes=f"{pct}% bracket",
-            ))
+            boundaries.append(
+                BracketBoundary(
+                    sweep_value=float(p.income),
+                    rate=rate,
+                    notes=f"{pct}% bracket",
+                )
+            )
             prev_rate = rate
     return boundaries
 
@@ -96,6 +98,7 @@ def _compute_planning_signals(
     from typing import cast
 
     from services.emr import EMRPoint, EMRResult
+
     emr_result = EMRResult(
         sweep_mode=mode,
         points=cast(list[EMRPoint], result.points),
@@ -106,8 +109,10 @@ def _compute_planning_signals(
     shared = _compute_service_signals(
         emr_result,
         fixed_ordinary=_to_decimal(
-            request.pension + request.interest
-            + request.ordinary_dividends + request.ira_distributions,
+            request.pension
+            + request.interest
+            + request.ordinary_dividends
+            + request.ira_distributions,
         ),
         variable_ordinary=_to_decimal(request.variable_ordinary),
         qualified_dividends=_to_decimal(request.qualified_dividends),
@@ -145,7 +150,7 @@ def post_total_cost(request: TotalCostRequest):
         raise HTTPException(
             status_code=422,
             detail=f"Invalid sweep_mode: {request.sweep_mode!r}. "
-                   f"Must be 'ordinary' or 'preferential'.",
+            f"Must be 'ordinary' or 'preferential'.",
         )
 
     try:
@@ -170,7 +175,8 @@ def post_total_cost(request: TotalCostRequest):
             include_ohio=request.include_ohio,
             ohio_medical_deduction=_to_decimal(request.ohio_medical_deduction),
             ohio_qualifying_retirement_income=_to_decimal(
-                request.ohio_qualifying_retirement_income),
+                request.ohio_qualifying_retirement_income
+            ),
             include_aca=request.include_aca,
         )
     except ValueError as exc:
