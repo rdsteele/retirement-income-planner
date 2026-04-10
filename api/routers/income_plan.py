@@ -63,6 +63,7 @@ def post_income_plan_summary(request: IncomePlanRequest):
         summary = compute_plan_summary(
             filing_status=request.filing_status,
             pension=_D(str(request.pension)),
+            pension_taxable=_D(str(request.pension_taxable)),
             interest=_D(str(request.interest)),
             ordinary_dividends=_D(str(request.ordinary_dividends)),
             ira_distributions=_D(str(request.ira_distributions)),
@@ -100,6 +101,8 @@ def post_income_plan_summary(request: IncomePlanRequest):
         total_traditional_withdrawals=float(summary.total_traditional_withdrawals),
         total_roth_withdrawals=float(summary.total_roth_withdrawals),
         total_hsa_withdrawals=float(summary.total_hsa_withdrawals),
+        total_pension_annuity=float(summary.total_pension_annuity),
+        total_ss_benefit=float(summary.total_ss_benefit),
         total_all_withdrawals=float(summary.total_all_withdrawals),
     )
 
@@ -117,7 +120,7 @@ def post_income_plan_calculate(request: IncomePlanRequest):
     executed = _to_executed(request.executed_withdrawals)
 
     sweep_inputs = assemble_sweep_inputs(
-        pension=_D(str(request.pension)),
+        pension_taxable=_D(str(request.pension_taxable)),
         interest=_D(str(request.interest)),
         ordinary_dividends=_D(str(request.ordinary_dividends)),
         ira_distributions=_D(str(request.ira_distributions)),
@@ -155,22 +158,25 @@ def post_income_plan_calculate(request: IncomePlanRequest):
             detail="An unexpected error occurred. Please try again.",
         )
 
-    # Reconstruct a TotalCostRequest-like object for planning signals computation.
-    # We need the augmented income values (with withdrawals merged in) so that
-    # planning signal calculations that reference fixed income fields are correct.
-    class _AugmentedRequest:
-        pension = float(sweep_inputs["pension"])
-        interest = float(sweep_inputs["interest"])
-        ordinary_dividends = float(sweep_inputs["ordinary_dividends"])
-        ira_distributions = float(sweep_inputs["ira_distributions"])
-        qualified_dividends = float(sweep_inputs["qualified_dividends"])
-        fixed_ltcg = float(sweep_inputs["fixed_ltcg"])
-        above_the_line_adjustments = float(sweep_inputs["above_the_line_adjustments"])
-        additional_deductions = float(request.additional_deductions)
-        variable_ordinary = 0.0
-        include_aca = request.include_aca
-        tax_year = request.tax_year
-        filing_status = request.filing_status
+    # Build a TotalCostRequest with augmented income values (withdrawals merged in)
+    # so that planning signal calculations reference the correct fixed income fields.
+    from api.models.total_cost import TotalCostRequest
+
+    augmented_request = TotalCostRequest(
+        pension=float(sweep_inputs["pension"]),
+        interest=float(sweep_inputs["interest"]),
+        ordinary_dividends=float(sweep_inputs["ordinary_dividends"]),
+        ira_distributions=float(sweep_inputs["ira_distributions"]),
+        qualified_dividends=float(sweep_inputs["qualified_dividends"]),
+        fixed_ltcg=float(sweep_inputs["fixed_ltcg"]),
+        above_the_line_adjustments=float(sweep_inputs["above_the_line_adjustments"]),
+        additional_deductions=float(request.additional_deductions),
+        variable_ordinary=0.0,
+        include_aca=request.include_aca,
+        tax_year=request.tax_year,
+        filing_status=request.filing_status,
+        sweep_mode="ordinary",
+    )
 
     return TotalCostResponse(
         sweep_mode=mode.value,
@@ -181,5 +187,5 @@ def post_income_plan_calculate(request: IncomePlanRequest):
         aca_cliff_magi=float(result.aca_cliff_magi),
         aptc_annual_max=float(result.aptc_annual_max),
         cliff_sweep_value=float(result.cliff_sweep_value),
-        planning_signals=_compute_planning_signals(result, _AugmentedRequest, mode),
+        planning_signals=_compute_planning_signals(result, augmented_request, mode),
     )

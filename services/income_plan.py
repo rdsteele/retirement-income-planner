@@ -60,7 +60,7 @@ class PlanSummary:
     magi: Decimal
 
     # Income breakdown
-    forced_ordinary: Decimal        # pension + interest + ord_div + IRA dist + ss_taxable
+    forced_ordinary: Decimal        # pension_taxable + interest + ord_div + IRA dist + ss_taxable
     forced_preferential: Decimal    # qual_div + fixed_ltcg
     withdrawal_ordinary: Decimal    # planned traditional distributions
     withdrawal_preferential: Decimal  # planned taxable gains
@@ -84,6 +84,8 @@ class PlanSummary:
     total_traditional_withdrawals: Decimal
     total_roth_withdrawals: Decimal
     total_hsa_withdrawals: Decimal
+    total_pension_annuity: Decimal
+    total_ss_benefit: Decimal
     total_all_withdrawals: Decimal
 
 
@@ -171,7 +173,7 @@ def classify_withdrawals(
 # ---------------------------------------------------------------------------
 
 def _compute_agi_excluding_ss(
-    pension: Decimal,
+    pension_taxable: Decimal,
     interest: Decimal,
     ordinary_dividends: Decimal,
     ira_distributions: Decimal,
@@ -182,7 +184,7 @@ def _compute_agi_excluding_ss(
 ) -> Decimal:
     """AGI excluding Social Security — the input to the SS provisional income formula."""
     return (
-        pension
+        pension_taxable
         + interest
         + ordinary_dividends
         + ira_distributions
@@ -197,7 +199,7 @@ def _compute_agi_excluding_ss(
 
 
 def _compute_magi(
-    pension: Decimal,
+    pension_taxable: Decimal,
     interest: Decimal,
     ordinary_dividends: Decimal,
     ira_distributions: Decimal,
@@ -210,7 +212,7 @@ def _compute_magi(
 ) -> Decimal:
     """ACA MAGI = AGI + tax-exempt interest."""
     agi = (
-        pension
+        pension_taxable
         + interest
         + ordinary_dividends
         + ira_distributions
@@ -230,23 +232,27 @@ def _compute_shortfall(
     total_spending: Decimal,
     estimated_taxes: Decimal,
     above_the_line_adjustments: Decimal,
-    gross_forced_income: Decimal,
     total_all_withdrawals: Decimal,
 ) -> Decimal | None:
-    """Shortfall = expenses - forced income - all withdrawals.
+    """Shortfall = expenses - all payments and withdrawals.
+
+    ``total_all_withdrawals`` includes forced income (pension gross, SS, interest,
+    dividends, IRA distributions, LTCG) plus planned and executed withdrawals, so
+    there is no separate ``gross_forced_income`` term.
 
     Returns None when both spending and estimated taxes are zero (nothing entered yet).
     """
     if total_spending == _ZERO and estimated_taxes == _ZERO:
         return None
     total_expenses = total_spending + estimated_taxes + above_the_line_adjustments
-    return round_tax(total_expenses - gross_forced_income - total_all_withdrawals)
+    return round_tax(total_expenses - total_all_withdrawals)
 
 
 def compute_plan_summary(
     *,
     filing_status: str,
     pension: Decimal,
+    pension_taxable: Decimal,
     interest: Decimal,
     ordinary_dividends: Decimal,
     ira_distributions: Decimal,
@@ -271,7 +277,7 @@ def compute_plan_summary(
     totals = classify_withdrawals(planned, executed)
 
     agi_excl_ss = _compute_agi_excluding_ss(
-        pension, interest, ordinary_dividends, ira_distributions,
+        pension_taxable, interest, ordinary_dividends, ira_distributions,
         qualified_dividends, fixed_ltcg, above_the_line_adjustments, totals,
     )
 
@@ -283,31 +289,35 @@ def compute_plan_summary(
     )
 
     magi = _compute_magi(
-        pension, interest, ordinary_dividends, ira_distributions,
+        pension_taxable, interest, ordinary_dividends, ira_distributions,
         qualified_dividends, fixed_ltcg, above_the_line_adjustments,
         ss_result.taxable_ss, totals, tax_exempt_interest,
     )
 
     forced_ordinary = (
-        pension + interest + ordinary_dividends + ira_distributions + ss_result.taxable_ss
+        pension_taxable + interest + ordinary_dividends + ira_distributions + ss_result.taxable_ss
     )
     forced_preferential = qualified_dividends + fixed_ltcg
 
     total_spending = essential_spending + discretionary_spending
-    gross_forced_income = (
-        pension + interest + ordinary_dividends + ira_distributions
-        + qualified_dividends + fixed_ltcg + ss_benefit
-    )
 
-    total_taxable_withdrawals = totals.taxable_basis + totals.taxable_gains + totals.exec_taxable_amount
-    total_traditional_withdrawals = totals.traditional + totals.exec_traditional
+    total_taxable_withdrawals = (
+        totals.taxable_basis + totals.taxable_gains + totals.exec_taxable_amount
+        + interest + ordinary_dividends + qualified_dividends + fixed_ltcg
+        + tax_exempt_interest
+    )
+    total_traditional_withdrawals = totals.traditional + totals.exec_traditional + ira_distributions
     total_roth_withdrawals = totals.roth + totals.exec_roth
     total_hsa_withdrawals = totals.hsa + totals.exec_hsa
+    total_pension_annuity = pension
+    total_ss_benefit = ss_benefit
     total_all_withdrawals = (
         total_taxable_withdrawals
         + total_traditional_withdrawals
         + total_roth_withdrawals
         + total_hsa_withdrawals
+        + total_pension_annuity
+        + total_ss_benefit
     )
 
     forced_income = forced_ordinary + forced_preferential
@@ -317,7 +327,7 @@ def compute_plan_summary(
 
     shortfall = _compute_shortfall(
         total_spending, estimated_taxes, above_the_line_adjustments,
-        gross_forced_income, total_all_withdrawals,
+        total_all_withdrawals,
     )
 
     aca_distance: Decimal | None = None
@@ -343,6 +353,8 @@ def compute_plan_summary(
         total_traditional_withdrawals=round_tax(total_traditional_withdrawals),
         total_roth_withdrawals=round_tax(total_roth_withdrawals),
         total_hsa_withdrawals=round_tax(total_hsa_withdrawals),
+        total_pension_annuity=round_tax(total_pension_annuity),
+        total_ss_benefit=round_tax(total_ss_benefit),
         total_all_withdrawals=round_tax(total_all_withdrawals),
     )
 
@@ -353,7 +365,7 @@ def compute_plan_summary(
 
 def assemble_sweep_inputs(
     *,
-    pension: Decimal,
+    pension_taxable: Decimal,
     interest: Decimal,
     ordinary_dividends: Decimal,
     ira_distributions: Decimal,
@@ -371,11 +383,14 @@ def assemble_sweep_inputs(
     The traditional distribution total and executed ordinary income are added to
     ira_distributions; taxable gains and executed preferential income are added
     to fixed_ltcg.  This mirrors the payload-assembly logic previously in JS.
+
+    ``pension_taxable`` is passed as the ``pension`` key because the EMR sweep
+    only uses the taxable portion for tax computation.
     """
     totals = classify_withdrawals(planned, executed)
 
     return {
-        "pension": pension,
+        "pension": pension_taxable,
         "interest": interest,
         "ordinary_dividends": ordinary_dividends,
         "ira_distributions": ira_distributions + totals.traditional + totals.exec_ordinary,

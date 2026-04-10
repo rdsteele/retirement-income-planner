@@ -124,6 +124,7 @@ def _base_summary(**overrides):
     defaults = dict(
         filing_status="single",
         pension=d("0"),
+        pension_taxable=d("0"),
         interest=d("0"),
         ordinary_dividends=d("0"),
         ira_distributions=d("0"),
@@ -149,7 +150,7 @@ class TestComputePlanSummaryBasic:
         assert s.magi == d("0")
 
     def test_pension_is_ordinary_income(self):
-        s = _base_summary(pension=d("30000"))
+        s = _base_summary(pension=d("30000"), pension_taxable=d("30000"))
         assert s.magi == d("30000")
         assert s.forced_ordinary == d("30000")
         assert s.forced_preferential == d("0")
@@ -160,7 +161,7 @@ class TestComputePlanSummaryBasic:
         assert s.forced_preferential == d("5000")
 
     def test_above_the_line_adjustments_reduce_magi(self):
-        s = _base_summary(pension=d("30000"), above_the_line_adjustments=d("5000"))
+        s = _base_summary(pension=d("30000"), pension_taxable=d("30000"), above_the_line_adjustments=d("5000"))
         assert s.magi == d("25000")
 
     def test_planned_traditional_adds_to_ordinary(self):
@@ -185,12 +186,13 @@ class TestComputePlanSummaryBasic:
         assert s.magi == d("4000")
 
     def test_no_shortfall_when_no_spending(self):
-        s = _base_summary(pension=d("50000"))
+        s = _base_summary(pension=d("50000"), pension_taxable=d("50000"))
         assert s.shortfall is None
 
     def test_shortfall_when_expenses_exceed_income(self):
         s = _base_summary(
             pension=d("20000"),
+            pension_taxable=d("20000"),
             essential_spending=d("30000"),
         )
         assert s.shortfall is not None
@@ -199,21 +201,22 @@ class TestComputePlanSummaryBasic:
     def test_surplus_when_income_exceeds_expenses(self):
         s = _base_summary(
             pension=d("50000"),
+            pension_taxable=d("50000"),
             essential_spending=d("20000"),
         )
         assert s.shortfall is not None
         assert s.shortfall < d("0")
 
     def test_no_aca_distance_when_cliff_is_zero(self):
-        s = _base_summary(pension=d("30000"), aca_cliff_magi=d("0"))
+        s = _base_summary(pension=d("30000"), pension_taxable=d("30000"), aca_cliff_magi=d("0"))
         assert s.aca_distance is None
 
     def test_aca_distance_computed_when_cliff_provided(self):
-        s = _base_summary(pension=d("30000"), aca_cliff_magi=d("62600"))
+        s = _base_summary(pension=d("30000"), pension_taxable=d("30000"), aca_cliff_magi=d("62600"))
         assert s.aca_distance == d("32600")
 
     def test_aca_distance_negative_when_over_cliff(self):
-        s = _base_summary(pension=d("70000"), aca_cliff_magi=d("62600"))
+        s = _base_summary(pension=d("70000"), pension_taxable=d("70000"), aca_cliff_magi=d("62600"))
         assert s.aca_distance is not None
         assert s.aca_distance < d("0")
 
@@ -230,7 +233,8 @@ class TestComputePlanSummarySSAccuracy:
         s = _base_summary(
             filing_status="single",
             ss_benefit=d("20000"),
-            pension=d("15000"),  # AGI excl SS = 15000; PI = 15000+10000 = 25000
+            pension=d("15000"),
+            pension_taxable=d("15000"),  # AGI excl SS = 15000; PI = 15000+10000 = 25000
         )
         assert s.ss_taxable == d("0")
 
@@ -240,6 +244,7 @@ class TestComputePlanSummarySSAccuracy:
             filing_status="single",
             ss_benefit=d("20000"),
             pension=d("50000"),
+            pension_taxable=d("50000"),
         )
         assert s.ss_taxable == d("17000")  # 85% of 20000
 
@@ -249,6 +254,7 @@ class TestComputePlanSummarySSAccuracy:
             filing_status="mfj",
             ss_benefit=d("24000"),
             pension=d("20000"),
+            pension_taxable=d("20000"),
         )
         assert s.ss_taxable == d("0")
         assert s.provisional_income == d("32000")
@@ -259,6 +265,7 @@ class TestComputePlanSummarySSAccuracy:
             filing_status="mfj",
             ss_benefit=d("24000"),
             pension=d("25000"),
+            pension_taxable=d("25000"),
         )
         assert s.ss_taxable == d("2500")
 
@@ -267,10 +274,79 @@ class TestComputePlanSummarySSAccuracy:
 # assemble_sweep_inputs
 # ---------------------------------------------------------------------------
 
+class TestComputePlanSummaryPensionSplit:
+    """Verify pension gross vs taxable flows to the correct places."""
+
+    def test_magi_uses_taxable_not_gross(self):
+        s = _base_summary(pension=d("10000"), pension_taxable=d("7000"))
+        assert s.magi == d("7000")
+
+    def test_forced_ordinary_uses_taxable(self):
+        s = _base_summary(pension=d("10000"), pension_taxable=d("7000"))
+        assert s.forced_ordinary == d("7000")
+
+    def test_shortfall_uses_gross_pension(self):
+        s = _base_summary(
+            pension=d("10000"),
+            pension_taxable=d("7000"),
+            essential_spending=d("12000"),
+        )
+        # shortfall = 12000 - 10000 (gross pension) = 2000
+        assert s.shortfall == d("2000")
+
+    def test_pension_annuity_in_withdrawals(self):
+        s = _base_summary(pension=d("10000"), pension_taxable=d("7000"))
+        assert s.total_pension_annuity == d("10000")
+
+    def test_ss_benefit_in_withdrawals(self):
+        s = _base_summary(ss_benefit=d("24000"))
+        assert s.total_ss_benefit == d("24000")
+
+
+class TestComputePlanSummaryPaymentsTotals:
+    """Verify forced income merges into payments and withdrawals totals."""
+
+    def test_interest_in_taxable_withdrawals(self):
+        s = _base_summary(interest=d("5000"))
+        assert s.total_taxable_withdrawals == d("5000")
+
+    def test_dividends_in_taxable_withdrawals(self):
+        s = _base_summary(ordinary_dividends=d("2000"), qualified_dividends=d("3000"))
+        assert s.total_taxable_withdrawals == d("5000")
+
+    def test_fixed_ltcg_in_taxable_withdrawals(self):
+        s = _base_summary(fixed_ltcg=d("4000"))
+        assert s.total_taxable_withdrawals == d("4000")
+
+    def test_tax_exempt_interest_in_taxable_withdrawals(self):
+        s = _base_summary(tax_exempt_interest=d("1500"))
+        assert s.total_taxable_withdrawals == d("1500")
+
+    def test_ira_distributions_in_traditional_withdrawals(self):
+        s = _base_summary(ira_distributions=d("15000"))
+        assert s.total_traditional_withdrawals == d("15000")
+
+    def test_total_all_includes_forced_and_planned(self):
+        s = _base_summary(
+            pension=d("10000"),
+            pension_taxable=d("7000"),
+            interest=d("2000"),
+            ira_distributions=d("5000"),
+            ss_benefit=d("24000"),
+            planned=[PlannedWithdrawal(account_type="roth", amount=d("3000"))],
+        )
+        # taxable: 2000 (interest)
+        # traditional: 5000 (IRA dist)
+        # roth: 3000
+        # pension: 10000
+        # ss: 24000
+        assert s.total_all_withdrawals == d("44000")
+
+
 class TestAssembleSweepInputs:
     def _base(self, **overrides):
         defaults = dict(
-            pension=d("0"),
+            pension_taxable=d("0"),
             interest=d("0"),
             ordinary_dividends=d("0"),
             ira_distributions=d("0"),
@@ -286,8 +362,8 @@ class TestAssembleSweepInputs:
         return assemble_sweep_inputs(**defaults)
 
     def test_no_withdrawals_passthrough(self):
-        result = self._base(pension=d("30000"), ss_benefit=d("24000"))
-        assert result["pension"] == d("30000")
+        result = self._base(pension_taxable=d("30000"), ss_benefit=d("24000"))
+        assert result["pension"] == d("30000")  # pension_taxable passed as "pension"
         assert result["ss_benefit"] == d("24000")
         assert result["ira_distributions"] == d("0")
         assert result["fixed_ltcg"] == d("0")

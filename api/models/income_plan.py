@@ -22,6 +22,7 @@ class IncomePlanRequest(BaseModel):
 
     # Forced income streams
     pension: float = Field(default=0.0, ge=0)
+    pension_taxable: float = Field(default=0.0, ge=0)
     interest: float = Field(default=0.0, ge=0)
     ordinary_dividends: float = Field(default=0.0, ge=0)
     ira_distributions: float = Field(default=0.0, ge=0)
@@ -88,4 +89,6 @@ class PlanSummaryResponse(BaseModel):
     total_traditional_withdrawals: float
     total_roth_withdrawals: float
     total_hsa_withdrawals: float
+    total_pension_annuity: float
+    total_ss_benefit: float
     total_all_withdrawals: float

@@ -514,7 +514,8 @@
         <details open>
           <summary>Forced Income</summary>
           <div class="section-body">
-            <div class="field"><label>Pension / Annuity</label><input type="number" id="pension" min="0" step="1" placeholder="0"></div>
+            <div class="field"><label>Pension / Annuity (Gross)</label><input type="number" id="pension" min="0" step="1" placeholder="0"><span class="field-hint">Total payment received (1040 line 5a)</span></div>
+            <div class="field"><label>Pension / Annuity (Taxable)</label><input type="number" id="pension_taxable" min="0" step="1" placeholder="0"><span class="field-hint">Taxable portion (1040 line 5b)</span></div>
             <div class="field"><label>Taxable Interest</label><input type="number" id="interest" min="0" step="1" placeholder="0"></div>
             <div class="field"><label>Non-Qualified Dividends</label><input type="number" id="ordinary_dividends" min="0" step="1" placeholder="0"><span class="field-hint">Ordinary dividends minus qualified dividends (1040 line 3b minus 3a)</span></div>
             <div class="field"><label>Qualified Dividends</label><input type="number" id="qualified_dividends" min="0" step="1" placeholder="0"></div>
@@ -582,9 +583,9 @@
             <span class="magi-value" id="aptc-estimate-display">Run Calculate to estimate</span>
           </div>
         </details>
-        <!-- Withdrawals section -->
+        <!-- Payments and Withdrawals section -->
         <details>
-          <summary><span>Withdrawals</span><span class="section-summary-value" id="withdrawals-section-summary">$0</span></summary>
+          <summary><span>Payments and Withdrawals</span><span class="section-summary-value" id="withdrawals-section-summary">$0</span></summary>
           <div class="magi-row">
             <span class="magi-label">Taxable</span>
             <span class="magi-value" id="taxable-withdrawals-display">$0</span>
@@ -597,14 +598,22 @@
             <span class="magi-label">Tax-Free</span>
             <span class="magi-value" id="roth-withdrawals-display">$0</span>
           </div>
-          <div class="magi-row" style="padding-bottom:10px;">
+          <div class="magi-row">
             <span class="magi-label">HSA Medical</span>
             <span class="magi-value" id="hsa-withdrawals-display">$0</span>
           </div>
+          <div class="magi-row">
+            <span class="magi-label">Pension / Annuity</span>
+            <span class="magi-value" id="pension-withdrawals-display">$0</span>
+          </div>
+          <div class="magi-row" style="padding-bottom:10px;">
+            <span class="magi-label">Social Security</span>
+            <span class="magi-value" id="ss-withdrawals-display">$0</span>
+          </div>
         </details>
-        <!-- Income section -->
+        <!-- Taxable Income section -->
         <details>
-          <summary><span>Income</span><span class="section-summary-value" id="income-section-summary">$0</span></summary>
+          <summary><span>Taxable Income</span><span class="section-summary-value" id="income-section-summary">$0</span></summary>
           <div class="magi-row">
             <span class="magi-label" style="font-weight:600; color:#212529;">Total Forced Income</span>
             <span class="magi-value" id="forced-income-display">$0</span>
@@ -1148,11 +1157,13 @@
     }
 
     // Withdrawals section
-    el('taxable-withdrawals-display').textContent  = fmt$(data.total_taxable_withdrawals);
-    el('trad-withdrawals-display').textContent     = fmt$(data.total_traditional_withdrawals);
-    el('roth-withdrawals-display').textContent     = fmt$(data.total_roth_withdrawals);
-    el('hsa-withdrawals-display').textContent      = fmt$(data.total_hsa_withdrawals);
-    el('withdrawals-section-summary').textContent  = 'Total ' + fmt$(data.total_all_withdrawals);
+    el('taxable-withdrawals-display').textContent    = fmt$(data.total_taxable_withdrawals);
+    el('trad-withdrawals-display').textContent      = fmt$(data.total_traditional_withdrawals);
+    el('roth-withdrawals-display').textContent      = fmt$(data.total_roth_withdrawals);
+    el('hsa-withdrawals-display').textContent       = fmt$(data.total_hsa_withdrawals);
+    el('pension-withdrawals-display').textContent   = fmt$(data.total_pension_annuity);
+    el('ss-withdrawals-display').textContent        = fmt$(data.total_ss_benefit);
+    el('withdrawals-section-summary').textContent   = 'Total ' + fmt$(data.total_all_withdrawals);
 
     // Income section
     const forcedIncome = data.forced_ordinary + data.forced_preferential;
@@ -1204,6 +1215,7 @@
         filing_status:              el('filing_status')?.value || 'single',
         tax_year:                   parseInt(el('tax_year')?.value) || 2026,
         pension:                    fnum('pension'),
+        pension_taxable:            fnum('pension_taxable'),
         interest:                   fnum('interest'),
         ordinary_dividends:         fnum('ordinary_dividends'),
         ira_distributions:          fnum('ira_distributions'),
@@ -1254,6 +1266,7 @@
       filing_status:              el('filing_status')?.value || 'single',
       tax_year:                   parseInt(el('tax_year')?.value),
       pension:                    fnum('pension'),
+      pension_taxable:            fnum('pension_taxable'),
       interest:                   fnum('interest'),
       ordinary_dividends:         fnum('ordinary_dividends'),
       ira_distributions:          fnum('ira_distributions'),
@@ -1603,6 +1616,7 @@
         tax_year:                   parseInt(el('tax_year')?.value),
         filing_status:              el('filing_status')?.value || 'single',
         pension:                    fnum('pension'),
+        pension_taxable:            fnum('pension_taxable'),
         interest:                   fnum('interest'),
         ordinary_dividends:         fnum('ordinary_dividends'),
         qualified_dividends:        fnum('qualified_dividends'),
@@ -1623,6 +1637,7 @@
     setField('tax_year',                   inp.tax_year);
     setField('filing_status',              inp.filing_status);
     setField('pension',                    inp.pension);
+    setField('pension_taxable',            inp.pension_taxable);
     setField('interest',                   inp.interest);
     setField('ordinary_dividends',         inp.ordinary_dividends);
     setField('qualified_dividends',        inp.qualified_dividends);

@@ -16,6 +16,7 @@ _BASE = {
     "filing_status": "single",
     "tax_year": 2026,
     "pension": 0.0,
+    "pension_taxable": 0.0,
     "interest": 0.0,
     "ordinary_dividends": 0.0,
     "ira_distributions": 0.0,
@@ -59,6 +60,7 @@ class TestSummaryHappyPath:
             "aca_distance", "aca_cliff_magi",
             "total_taxable_withdrawals", "total_traditional_withdrawals",
             "total_roth_withdrawals", "total_hsa_withdrawals",
+            "total_pension_annuity", "total_ss_benefit",
             "total_all_withdrawals",
         }
         assert required.issubset(self.body.keys())
@@ -75,18 +77,21 @@ class TestSummaryHappyPath:
 
 class TestSummaryWithPension:
     def setup_method(self):
-        body = {**_BASE, "pension": 30000.0}
+        body = {**_BASE, "pension": 30000.0, "pension_taxable": 30000.0}
         self.resp = client.post("/api/income-plan/summary", json=body)
         self.body = self.resp.json()
 
-    def test_magi_equals_pension(self):
+    def test_magi_equals_pension_taxable(self):
         assert self.body["magi"] == 30000.0
 
-    def test_forced_ordinary_equals_pension(self):
+    def test_forced_ordinary_equals_pension_taxable(self):
         assert self.body["forced_ordinary"] == 30000.0
 
     def test_forced_preferential_is_zero(self):
         assert self.body["forced_preferential"] == 0.0
+
+    def test_pension_annuity_shows_gross(self):
+        assert self.body["total_pension_annuity"] == 30000.0
 
 
 class TestSummarySSAccuracy:
@@ -94,14 +99,14 @@ class TestSummarySSAccuracy:
 
     def test_single_ss_below_threshold_zero_taxable(self):
         # PI = 15000 + 10000 = 25000 → exactly at threshold → 0 taxable
-        body = {**_BASE, "ss_benefit": 20000.0, "pension": 15000.0}
+        body = {**_BASE, "ss_benefit": 20000.0, "pension": 15000.0, "pension_taxable": 15000.0}
         resp = client.post("/api/income-plan/summary", json=body)
         assert resp.status_code == 200
         assert resp.json()["ss_taxable"] == 0.0
 
     def test_mfj_uses_higher_thresholds(self):
         # MFJ tier_1 = 32000; PI = 20000 + 12000 = 32000 → no taxable SS
-        body = {**_BASE, "filing_status": "mfj", "ss_benefit": 24000.0, "pension": 20000.0}
+        body = {**_BASE, "filing_status": "mfj", "ss_benefit": 24000.0, "pension": 20000.0, "pension_taxable": 20000.0}
         resp = client.post("/api/income-plan/summary", json=body)
         assert resp.status_code == 200
         data = resp.json()
@@ -147,13 +152,13 @@ class TestSummaryWithdrawals:
 
 class TestSummaryACADistance:
     def test_distance_computed_correctly(self):
-        body = {**_BASE, "pension": 30000.0, "aca_cliff_magi": 62600.0}
+        body = {**_BASE, "pension": 30000.0, "pension_taxable": 30000.0, "aca_cliff_magi": 62600.0}
         resp = client.post("/api/income-plan/summary", json=body)
         assert resp.status_code == 200
         assert resp.json()["aca_distance"] == pytest.approx(32600.0)
 
     def test_negative_distance_when_over_cliff(self):
-        body = {**_BASE, "pension": 70000.0, "aca_cliff_magi": 62600.0}
+        body = {**_BASE, "pension": 70000.0, "pension_taxable": 70000.0, "aca_cliff_magi": 62600.0}
         resp = client.post("/api/income-plan/summary", json=body)
         assert resp.status_code == 200
         assert resp.json()["aca_distance"] < 0.0
@@ -161,16 +166,53 @@ class TestSummaryACADistance:
 
 class TestSummaryShortfall:
     def test_shortfall_positive_when_expenses_exceed_income(self):
-        body = {**_BASE, "pension": 20000.0, "essential_spending": 30000.0}
+        body = {**_BASE, "pension": 20000.0, "pension_taxable": 20000.0, "essential_spending": 30000.0}
         resp = client.post("/api/income-plan/summary", json=body)
         assert resp.status_code == 200
         assert resp.json()["shortfall"] > 0.0
 
     def test_surplus_when_income_exceeds_expenses(self):
-        body = {**_BASE, "pension": 50000.0, "essential_spending": 20000.0}
+        body = {**_BASE, "pension": 50000.0, "pension_taxable": 50000.0, "essential_spending": 20000.0}
         resp = client.post("/api/income-plan/summary", json=body)
         assert resp.status_code == 200
         assert resp.json()["shortfall"] < 0.0
+
+
+class TestSummaryPensionGrossTaxableSplit:
+    """Verify gross pension flows to withdrawals, taxable to MAGI."""
+
+    def test_magi_uses_taxable(self):
+        body = {**_BASE, "pension": 10000.0, "pension_taxable": 7000.0}
+        resp = client.post("/api/income-plan/summary", json=body)
+        assert resp.status_code == 200
+        assert resp.json()["magi"] == 7000.0
+
+    def test_forced_ordinary_uses_taxable(self):
+        body = {**_BASE, "pension": 10000.0, "pension_taxable": 7000.0}
+        resp = client.post("/api/income-plan/summary", json=body)
+        assert resp.json()["forced_ordinary"] == 7000.0
+
+    def test_pension_annuity_shows_gross(self):
+        body = {**_BASE, "pension": 10000.0, "pension_taxable": 7000.0}
+        resp = client.post("/api/income-plan/summary", json=body)
+        assert resp.json()["total_pension_annuity"] == 10000.0
+
+    def test_shortfall_uses_gross(self):
+        body = {**_BASE, "pension": 10000.0, "pension_taxable": 7000.0, "essential_spending": 12000.0}
+        resp = client.post("/api/income-plan/summary", json=body)
+        assert resp.json()["shortfall"] == pytest.approx(2000.0)
+
+    def test_ss_benefit_in_response(self):
+        body = {**_BASE, "ss_benefit": 24000.0}
+        resp = client.post("/api/income-plan/summary", json=body)
+        assert resp.json()["total_ss_benefit"] == 24000.0
+
+    def test_forced_income_merged_into_withdrawal_totals(self):
+        body = {**_BASE, "interest": 3000.0, "ira_distributions": 5000.0}
+        resp = client.post("/api/income-plan/summary", json=body)
+        data = resp.json()
+        assert data["total_taxable_withdrawals"] == 3000.0
+        assert data["total_traditional_withdrawals"] == 5000.0
 
 
 class TestSummaryValidation:

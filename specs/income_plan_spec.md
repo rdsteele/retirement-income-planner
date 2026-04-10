@@ -59,6 +59,7 @@ def compute_plan_summary(
     *,
     filing_status: str,
     pension: Decimal,
+    pension_taxable: Decimal,
     interest: Decimal,
     ordinary_dividends: Decimal,
     ira_distributions: Decimal,
@@ -83,7 +84,7 @@ form blur event in `income.html` via `POST /api/income-plan/summary`.
 
 ```
 AGI (excl. SS) =
-    pension + interest + ordinary_dividends + ira_distributions
+    pension_taxable + interest + ordinary_dividends + ira_distributions
   + qualified_dividends + fixed_ltcg
   + traditional_withdrawals + taxable_gains
   + exec_ordinary + exec_preferential
@@ -117,7 +118,7 @@ total_expenses = total_spending + above_the_line_adjustments + estimated_taxes
 
 gross_forced_income =
     pension + interest + ordinary_dividends + ira_distributions
-  + qualified_dividends + fixed_ltcg + ss_benefit   ← gross SS, not taxable portion
+  + qualified_dividends + fixed_ltcg + ss_benefit   ← gross amounts (pension gross, not taxable)
 
 shortfall = total_expenses - gross_forced_income - total_all_withdrawals
 ```
@@ -144,7 +145,7 @@ to the summary endpoint by the UI on each subsequent call.
 ```python
 def assemble_sweep_inputs(
     *,
-    pension, interest, ordinary_dividends, ira_distributions,
+    pension_taxable, interest, ordinary_dividends, ira_distributions,
     ss_benefit, qualified_dividends, fixed_ltcg,
     above_the_line_adjustments, tax_exempt_interest,
     planned: list[PlannedWithdrawal],
@@ -205,7 +206,9 @@ Live plan summary. Called on every `focusout` event in `income.html`
   "total_traditional_withdrawals": 15000,
   "total_roth_withdrawals": 0,
   "total_hsa_withdrawals": 0,
-  "total_all_withdrawals": 23800
+  "total_pension_annuity": 12000,
+  "total_ss_benefit": 24000,
+  "total_all_withdrawals": 59800
 }
 ```
 
@@ -233,7 +236,8 @@ The sweep is always run in `ordinary` mode with the full withdrawal mix baked in
 |-------|------|---------|-------|
 | `filing_status` | str | required | `"single"` or `"mfj"` |
 | `tax_year` | int | required | |
-| `pension` | float ≥ 0 | 0 | |
+| `pension` | float ≥ 0 | 0 | Gross pension/annuity payment (1040 line 5a) |
+| `pension_taxable` | float ≥ 0 | 0 | Taxable portion (1040 line 5b) |
 | `interest` | float ≥ 0 | 0 | |
 | `ordinary_dividends` | float ≥ 0 | 0 | |
 | `ira_distributions` | float ≥ 0 | 0 | Fixed IRA distributions (not including withdrawals) |
