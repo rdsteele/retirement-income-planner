@@ -94,6 +94,7 @@ def _compute_planning_signals(
     mode: SweepMode,
 ) -> TotalCostPlanningSignals:
     from typing import cast
+
     from services.emr import EMRPoint, EMRResult
     emr_result = EMRResult(
         sweep_mode=mode,

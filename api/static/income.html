@@ -406,6 +406,30 @@
     }
     .acct-details[open] > summary::before { transform: rotate(90deg); }
 
+    /* ── Holding group within taxable account ── */
+    .holding-group { margin-bottom: 6px; margin-left: 4px; }
+    .holding-group > summary {
+      list-style: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-weight: 500;
+      font-size: 12px;
+      color: #495057;
+      user-select: none;
+      padding: 2px 0;
+    }
+    .holding-group > summary::-webkit-details-marker { display: none; }
+    .holding-group > summary::before {
+      content: '▶';
+      font-size: 7px;
+      transition: transform 0.15s;
+      display: inline-block;
+      color: #adb5bd;
+    }
+    .holding-group[open] > summary::before { transform: rotate(90deg); }
+
     /* ── Scenario bar ── */
     .scenario-bar {
       display: flex;
@@ -882,45 +906,62 @@
 
     let html = '';
 
-    // Taxable accounts — each account collapsible (open by default), sorted by unrealized gain asc
+    // Taxable accounts — each account collapsible, holdings grouped by ticker
     if (taxable.length > 0) {
       html += '<div class="mix-section-label">Taxable</div>';
       for (const acct of taxable) {
-        const sortedHoldings = acct.holdings
-          ? [...acct.holdings].sort((a, b) => (a.unrealized_gain ?? 0) - (b.unrealized_gain ?? 0))
-          : [];
+        const holdings = acct.holdings ? [...acct.holdings] : [];
         html += `<details class="acct-details" open data-acct-id="${escHtml(acct.id)}">
           <summary>${escHtml(acct.name)}</summary>
           <div>`;
-        if (sortedHoldings.length > 0) {
-          html += `<table class="holding-table">
-            <thead><tr>
-              <th class="th-left">Holding</th>
-              <th>Value</th>
-              <th>Basis</th>
-              <th>Unrlzd Gain</th>
-              <th>Withdraw ($)</th>
-              <th>Basis Portion ($)</th>
-              <th>Gain ($)</th>
-            </tr></thead><tbody>`;
-          for (const h of sortedHoldings) {
-            const unrealGain = (h.value || 0) - (h.basis || 0);
-            html += `<tr>
-              <td class="td-left">${escHtml(h.ticker)}</td>
-              <td>${fmt$(h.value)}</td>
-              <td>${fmt$(h.basis)}${h.value > 0 ? ` <span style="color:#6c757d;font-size:11px;">(${(h.basis/h.value*100).toFixed(1)}%)</span>` : ''}</td>
-              <td>${fmt$(unrealGain)}</td>
-              <td><input type="number" id="withdraw_${escHtml(h.id)}" class="mix-input" min="0" step="1" placeholder="0"
-                         data-basis="${h.basis}" data-value="${h.value}"></td>
-              <td><input type="number" id="basis_${escHtml(h.id)}" class="mix-input" min="0" step="1" placeholder="0"
-                         data-manual="false"></td>
-              <td class="derived-cell" id="gain_${escHtml(h.id)}">$0</td>
-            </tr>`;
+        if (holdings.length > 0) {
+          // Group by ticker (holding), sorted alphabetically
+          const groups = new Map();
+          for (const h of holdings) {
+            const key = h.ticker;
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key).push(h);
           }
-          const acctTotalVal   = sortedHoldings.reduce((s, h) => s + (h.value || 0), 0);
-          const acctTotalBasis = sortedHoldings.reduce((s, h) => s + (h.basis || 0), 0);
-          html += `</tbody></table>
-          </div></details>
+          const sortedTickers = [...groups.keys()].sort((a, b) => a.localeCompare(b));
+
+          for (const ticker of sortedTickers) {
+            // Sort lots within each holding by basis descending (highest first)
+            const basisPct = h => h.value > 0 ? (h.basis || 0) / h.value : 1;
+            const lots = groups.get(ticker).sort((a, b) => basisPct(b) - basisPct(a));
+            const grpVal   = lots.reduce((s, h) => s + (h.value || 0), 0);
+            const grpBasis = lots.reduce((s, h) => s + (h.basis || 0), 0);
+            const grpGain  = grpVal - grpBasis;
+            const lotLabel = lots.length === 1 ? '1 lot' : `${lots.length} lots`;
+            html += `<details class="holding-group">
+              <summary>${escHtml(ticker)} <span style="color:#6c757d;font-size:11px;margin-left:4px;">${lotLabel} &middot; ${fmt$(grpVal)} &middot; Gain ${fmt$(grpGain)}</span></summary>
+              <table class="holding-table">
+                <thead><tr>
+                  <th>Value</th>
+                  <th>Basis</th>
+                  <th>Unrlzd Gain</th>
+                  <th>Withdraw ($)</th>
+                  <th>Basis Portion ($)</th>
+                  <th>Gain ($)</th>
+                </tr></thead><tbody>`;
+            for (const h of lots) {
+              const unrealGain = (h.value || 0) - (h.basis || 0);
+              html += `<tr>
+                <td>${fmt$(h.value)}</td>
+                <td>${fmt$(h.basis)}${h.value > 0 ? ` <span style="color:#6c757d;font-size:11px;">(${(h.basis/h.value*100).toFixed(1)}%)</span>` : ''}</td>
+                <td>${fmt$(unrealGain)}</td>
+                <td><input type="number" id="withdraw_${escHtml(h.id)}" class="mix-input" min="0" step="1" placeholder="0"
+                           data-basis="${h.basis}" data-value="${h.value}"></td>
+                <td><input type="number" id="basis_${escHtml(h.id)}" class="mix-input" min="0" step="1" placeholder="0"
+                           data-manual="false"></td>
+                <td class="derived-cell" id="gain_${escHtml(h.id)}">$0</td>
+              </tr>`;
+            }
+            html += `</tbody></table></details>`;
+          }
+
+          const acctTotalVal   = holdings.reduce((s, h) => s + (h.value || 0), 0);
+          const acctTotalBasis = holdings.reduce((s, h) => s + (h.basis || 0), 0);
+          html += `</div></details>
           <div class="acct-subtotals" id="subtotals_${escHtml(acct.id)}">
             <span class="sub-label">Total:</span>
             <span>Value <span id="sub_val_${escHtml(acct.id)}">${fmt$(acctTotalVal)}</span></span>
