@@ -584,7 +584,7 @@
 
     setField('tax_year',                           inp.tax_year);
     setField('filing_status',                      inp.filing_status);
-    setField('pension',                            (inp.pension || 0) + (inp.wages || 0));
+    setField('pension',                            (inp.pension_taxable || 0) + (inp.wages || 0));
     setField('interest',                           inp.interest);
     setField('ordinary_dividends',                 inp.ordinary_dividends);
     setField('qualified_dividends',                inp.qualified_dividends);

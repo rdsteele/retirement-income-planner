@@ -556,6 +556,7 @@
           <div class="section-body">
             <div class="field field-wide"><label>HSA Contribution</label><input type="number" id="above_the_line_adjustments" min="0" step="1" placeholder="0"><span class="field-hint">Above-the-line deduction; pre-filled from accounts if available</span></div>
             <div class="field field-wide"><label>Additional Deductions</label><input type="number" id="additional_deductions" min="0" step="1" placeholder="0"><span class="field-hint">e.g. QBI, excess itemized deductions</span></div>
+            <div class="field field-wide"><label>Ohio Qualifying Retirement Income</label><input type="number" id="ohio_qualifying_retirement_income" min="0" step="1" placeholder="0"><span class="field-hint">Pension, annuity, IRA distributions eligible for Ohio retirement credit</span></div>
           </div>
         </details>
 
@@ -695,8 +696,12 @@
             <span class="magi-value" id="hsa-contribution-display">$0</span>
           </div>
           <div class="magi-row">
-            <span class="magi-label">Estimated Taxes</span>
-            <span class="magi-value" id="estimated-taxes-display">—</span>
+            <span class="magi-label">Federal Taxes</span>
+            <span class="magi-value" id="federal-taxes-display">—</span>
+          </div>
+          <div class="magi-row">
+            <span class="magi-label">Ohio Taxes</span>
+            <span class="magi-value" id="ohio-taxes-display">—</span>
           </div>
           <div id="taxes-stale-hint" style="text-align:right;font-size:11px;color:#888;padding-bottom:10px;">click Calculate to estimate</div>
         </details>
@@ -809,8 +814,10 @@
   let accounts           = [];
   let executedWithdrawals = [];  // [{ id, description, amount, basis, type }]
   let acaCliffMagi    = 0;     // updated from Calculate response
-  let estimatedTaxes  = 0;     // total_tax at sweep_floor from last Calculate run
-  let taxesStale      = true;  // true until Calculate is clicked; reset to true on any input change
+  let estimatedFederalTaxes = 0;  // (total_tax - ohio_tax) at sweep_floor from last Calculate run
+  let estimatedOhioTaxes   = 0;  // ohio_tax at sweep_floor from last Calculate run
+  let estimatedTaxes       = 0;  // total of both — used for shortfall/summary payload
+  let taxesStale           = true;  // true until Calculate is clicked; reset to true on any input change
 
   // ── Helpers ───────────────────────────────────────────────────────────
   const el    = id => document.getElementById(id);
@@ -1226,7 +1233,8 @@
     el('essential-spending-display').textContent     = fmt$(fnum('essential_spending'));
     el('discretionary-spending-display').textContent = fmt$(fnum('discretionary_spending'));
     el('hsa-contribution-display').textContent       = fmt$(fnum('above_the_line_adjustments'));
-    el('estimated-taxes-display').textContent        = taxesStale ? '—' : fmt$(estimatedTaxes);
+    el('federal-taxes-display').textContent            = taxesStale ? '—' : fmt$(estimatedFederalTaxes);
+    el('ohio-taxes-display').textContent              = taxesStale ? '—' : fmt$(estimatedOhioTaxes);
     const taxHint = el('taxes-stale-hint');
     if (taxHint) taxHint.style.display = taxesStale ? 'block' : 'none';
     const totalExpenses = data.total_spending + fnum('above_the_line_adjustments') + (taxesStale ? 0 : estimatedTaxes);
@@ -1324,6 +1332,7 @@
       sweep_ceiling:              150000,
       sweep_step:                 100,
       include_ohio:               true,
+      ohio_qualifying_retirement_income: fnum('ohio_qualifying_retirement_income'),
     };
 
     try {
@@ -1350,7 +1359,11 @@
       if (lastResult.aca_cliff_magi > 0) {
         acaCliffMagi = lastResult.aca_cliff_magi;
       }
-      estimatedTaxes = lastResult.points?.total_tax?.[0] ?? 0;
+      const totalTax0 = lastResult.points?.total_tax?.[0] ?? 0;
+      const ohioTax0  = lastResult.points?.ohio_tax?.[0] ?? 0;
+      estimatedFederalTaxes = totalTax0 - ohioTax0;
+      estimatedOhioTaxes    = ohioTax0;
+      estimatedTaxes        = totalTax0;
       taxesStale = false;
       const aptcEl = el('aptc-estimate-display');
       if (aptcEl) {
@@ -1621,6 +1634,8 @@
 
   // ── Mark estimated taxes stale whenever any input changes ─────────────
   document.addEventListener('input', () => {
+    estimatedFederalTaxes = 0;
+    estimatedOhioTaxes = 0;
     estimatedTaxes = 0;
     taxesStale = true;
   });
@@ -1669,6 +1684,10 @@
         additional_deductions:      fnum('additional_deductions'),
       },
       aca: { include_aca: el('include_aca')?.checked ?? true },
+      ohio: {
+        include_ohio: true,
+        ohio_qualifying_retirement_income: fnum('ohio_qualifying_retirement_income'),
+      },
     };
   }
 
@@ -1689,6 +1708,8 @@
     setField('above_the_line_adjustments', inp.above_the_line_adjustments);
     setField('additional_deductions',      inp.additional_deductions);
     setField('include_aca',                aca.include_aca);
+    const ohio = scenario.ohio || {};
+    setField('ohio_qualifying_retirement_income', ohio.ohio_qualifying_retirement_income);
   }
 
   function gatherPageInputs() {
@@ -1739,6 +1760,14 @@
     for (const w of (ip.hsa_withdrawals  || [])) setField(`hsa_${w.id}`,  w.amount);
     executedWithdrawals = (ip.executed_withdrawals || []).map(ew => ({ ...ew }));
     renderExecutedWithdrawals();
+
+    // Recalculate gain displays and account subtotals after restoring values
+    for (const acct of accounts) {
+      if (acct.account_type === 'taxable' && acct.holdings) {
+        for (const h of acct.holdings) updateGainDisplay(h.id);
+        updateAccountSubtotals(acct.id);
+      }
+    }
   }
 
   async function loadCurrentScenario() {
@@ -1773,6 +1802,7 @@
         version: '1.0',
         inputs: { ...(existing.inputs || {}), ...shared.inputs },
         aca:    { ...(existing.aca    || {}), ...shared.aca    },
+        ohio:   { ...(existing.ohio   || {}), ...shared.ohio   },
         ...gatherPageInputs(),
       };
       await fetch(`/api/scenarios/${encodeURIComponent(currentScenarioName)}`, {
@@ -1804,6 +1834,7 @@
         version: '1.0',
         inputs: { ...(existing.inputs || {}), ...shared.inputs },
         aca:    { ...(existing.aca    || {}), ...shared.aca    },
+        ohio:   { ...(existing.ohio   || {}), ...shared.ohio   },
         ...gatherPageInputs(),
       };
       await fetch(`/api/scenarios/${encodeURIComponent(trimmed)}`, {
