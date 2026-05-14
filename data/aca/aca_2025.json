@@ -1,0 +1,52 @@
+{
+  "tax_year": 2025,
+  "filing_status_cliffs": {
+    "single": 120000,
+    "mfj": 200000
+  },
+  "fpl_100pct": {
+    "single": 15650,
+    "mfj": 32150
+  },
+  "applicable_percentage_400pct": "0.0996",
+  "aptc_schedule": {
+    "single": [
+      {"magi": 21000, "monthly_aptc": 829},
+      {"magi": 25000, "monthly_aptc": 815},
+      {"magi": 30000, "monthly_aptc": 779},
+      {"magi": 35000, "monthly_aptc": 733},
+      {"magi": 40000, "monthly_aptc": 675},
+      {"magi": 45000, "monthly_aptc": 605},
+      {"magi": 50000, "monthly_aptc": 545},
+      {"magi": 55000, "monthly_aptc": 479},
+      {"magi": 60000, "monthly_aptc": 406},
+      {"magi": 65000, "monthly_aptc": 368},
+      {"magi": 70000, "monthly_aptc": 333},
+      {"magi": 75000, "monthly_aptc": 297},
+      {"magi": 80000, "monthly_aptc": 262},
+      {"magi": 85000, "monthly_aptc": 227},
+      {"magi": 90000, "monthly_aptc": 191},
+      {"magi": 95000, "monthly_aptc": 156},
+      {"magi": 100000, "monthly_aptc": 120},
+      {"magi": 105000, "monthly_aptc": 85},
+      {"magi": 110000, "monthly_aptc": 49},
+      {"magi": 115000, "monthly_aptc": 14},
+      {"magi": 120000, "monthly_aptc": 0}
+    ],
+    "mfj": [
+      {"magi": 30000, "monthly_aptc": 946},
+      {"magi": 35000, "monthly_aptc": 894},
+      {"magi": 40000, "monthly_aptc": 836},
+      {"magi": 45000, "monthly_aptc": 773},
+      {"magi": 50000, "monthly_aptc": 707},
+      {"magi": 55000, "monthly_aptc": 637},
+      {"magi": 60000, "monthly_aptc": 565},
+      {"magi": 65000, "monthly_aptc": 499},
+      {"magi": 70000, "monthly_aptc": 457},
+      {"magi": 75000, "monthly_aptc": 416},
+      {"magi": 80000, "monthly_aptc": 374},
+      {"magi": 84000, "monthly_aptc": 341},
+      {"magi": 85000, "monthly_aptc": 0}
+    ]
+  }
+}
