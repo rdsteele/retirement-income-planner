@@ -640,29 +640,22 @@
 
   // ── IRMAA helpers ─────────────────────────────────────────────────────────
 
-  // Returns { thresholds, adjusted } — applies inflation if checkbox is checked,
-  // then filters to only thresholds within the current sweep range.
-  function effectiveIrmaaThresholds() {
+  // Returns { lines, adjusted }: the IRMAA lines inside the sweep, after applying inflation
+  // when the checkbox is on. Each line is { tier, x } with x on the sweep axis.
+  function effectiveIrmaaLines() {
     const raw = lastResult ? lastResult.irmaa_thresholds : [];
     const adjChecked = el('irmaa_inflation_adj').checked;
     const rate = adjChecked ? (parseFloat(el('irmaa_inflation_rate').value) || 0) / 100 : 0;
     const scaled = adjChecked ? raw.map(t => t * (1 + rate) ** CONFIG.irmaaLookbackYears) : raw;
-
-    // Filter to sweep range so out-of-range thresholds don't expand the x-axis.
-    const income = lastResult?.points?.income;
-    if (income?.length) {
-      const sweepMin = income[0];
-      const sweepMax = income[income.length - 1];
-      return { thresholds: scaled.filter(t => t >= sweepMin && t <= sweepMax), adjusted: adjChecked };
-    }
-    return { thresholds: scaled, adjusted: adjChecked };
+    const lines = lastResult?.points ? irmaaLines(scaled, lastResult.points) : [];
+    return { lines, adjusted: adjChecked };
   }
 
-  function buildIrmaaShapes(thresholds, show) {
+  function buildIrmaaShapes(lines, show) {
     if (!show) return [];
-    return thresholds.map((t, i) => ({
+    return lines.map(({ x }) => ({
       type: 'line',
-      x0: t, x1: t,
+      x0: x, x1: x,
       y0: 0, y1: 1,
       yref: 'paper',
       line: { color: 'gray', dash: 'dash', width: 1 },
@@ -670,14 +663,14 @@
   }
 
   // adjusted: when true, appends "(est. YYYY)" to each label.
-  function buildIrmaaAnnotations(thresholds, show, adjusted) {
+  function buildIrmaaAnnotations(lines, show, adjusted) {
     if (!show) return [];
     const estYear = adjusted
       ? selectedTaxYear() + CONFIG.irmaaLookbackYears
       : null;
-    return thresholds.map((t, i) => ({
-      x: t, y: 1, yref: 'paper',
-      text: 'IRMAA ' + (i + 1) + (estYear ? ` (est. ${estYear})` : ''),
+    return lines.map(({ tier, x }) => ({
+      x, y: 1, yref: 'paper',
+      text: 'IRMAA ' + tier + (estYear ? ` (est. ${estYear})` : ''),
       showarrow: false,
       font: { size: 10, color: 'gray' },
       xanchor: 'left',
@@ -690,11 +683,11 @@
     if (!lastResult) return;
     const show = irmaaToggle.checked;
     if (!show) return;
-    const { thresholds, adjusted } = effectiveIrmaaThresholds();
+    const { lines, adjusted } = effectiveIrmaaLines();
     const currentRange = document.getElementById('chart').layout?.xaxis?.range;
     const update = {
-      shapes:      buildIrmaaShapes(thresholds, true),
-      annotations: buildIrmaaAnnotations(thresholds, true, adjusted),
+      shapes:      buildIrmaaShapes(lines, true),
+      annotations: buildIrmaaAnnotations(lines, true, adjusted),
     };
     if (currentRange) {
       update['xaxis.range']     = currentRange;
@@ -715,11 +708,11 @@
     if (!lastResult) return;
     await drawChart(lastResult.points, buildLayout());
     if (irmaaToggle.checked) {
-      const { thresholds, adjusted } = effectiveIrmaaThresholds();
+      const { lines, adjusted } = effectiveIrmaaLines();
       const currentRange = document.getElementById('chart').layout.xaxis.range;
       Plotly.relayout('chart', {
-        shapes:            buildIrmaaShapes(thresholds, true),
-        annotations:       buildIrmaaAnnotations(thresholds, true, adjusted),
+        shapes:            buildIrmaaShapes(lines, true),
+        annotations:       buildIrmaaAnnotations(lines, true, adjusted),
         'xaxis.range':     currentRange,
         'xaxis.autorange': false,
       });
@@ -734,11 +727,11 @@
     if (!lastResult) return;
     const show = irmaaToggle.checked;
     if (show) {
-      const { thresholds, adjusted } = effectiveIrmaaThresholds();
+      const { lines, adjusted } = effectiveIrmaaLines();
       const currentRange = document.getElementById('chart').layout.xaxis.range;
       Plotly.relayout('chart', {
-        shapes:              buildIrmaaShapes(thresholds, true),
-        annotations:         buildIrmaaAnnotations(thresholds, true, adjusted),
+        shapes:              buildIrmaaShapes(lines, true),
+        annotations:         buildIrmaaAnnotations(lines, true, adjusted),
         'xaxis.range':       currentRange,
         'xaxis.autorange':   false,
       });

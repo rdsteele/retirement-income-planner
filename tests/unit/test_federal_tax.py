@@ -357,3 +357,35 @@ class TestFederalResultPreferentialBreakdown:
     def test_no_preferential_income_has_no_rows(self):
         result = calculate_federal_tax(dec("30000"), dec("0"), "single", 2026)
         assert result.preferential_breakdown == []
+
+
+# ---------------------------------------------------------------------------
+# marginal_rate_of_next_dollar — the rate on the next dollar of ordinary income
+# ---------------------------------------------------------------------------
+
+from services.federal_tax import marginal_rate_of_next_dollar  # noqa: E402
+
+
+class TestMarginalRateOfNextDollar:
+    def test_zero_taxable_income_is_the_first_bracket_rate(self):
+        assert marginal_rate_of_next_dollar(dec("0"), _LIT_ORDINARY) == dec("0.10")
+
+    def test_inside_a_bracket_is_that_brackets_rate(self):
+        assert marginal_rate_of_next_dollar(dec("30000"), _LIT_ORDINARY) == dec("0.20")
+
+    def test_exactly_at_a_bracket_top_is_the_next_brackets_rate(self):
+        # the 10,000th dollar is the last in the 10% bracket, so the NEXT dollar is 20%
+        assert marginal_rate_of_next_dollar(dec("10000"), _LIT_ORDINARY) == dec("0.20")
+
+    def test_one_dollar_below_a_bracket_top_is_still_the_lower_rate(self):
+        assert marginal_rate_of_next_dollar(dec("9999"), _LIT_ORDINARY) == dec("0.10")
+
+    def test_in_the_unbounded_top_bracket(self):
+        assert marginal_rate_of_next_dollar(dec("60000"), _LIT_ORDINARY) == dec("0.30")
+
+    def test_differs_from_the_top_dollar_rate_only_at_a_boundary(self):
+        # marginal_bracket_rate is the rate of the TOP dollar already taxed (spec);
+        # at exactly a bracket top the next dollar is in the next bracket
+        _, top_dollar_rate, _ = _apply_ordinary_brackets(dec("10000"), _LIT_ORDINARY)
+        assert top_dollar_rate == dec("0.10")
+        assert marginal_rate_of_next_dollar(dec("10000"), _LIT_ORDINARY) == dec("0.20")

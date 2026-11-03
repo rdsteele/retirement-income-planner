@@ -1144,7 +1144,8 @@ class TestEmrOrdinaryAttribution:
         # sweep_floor=17000 → taxable_ordinary starts at 1,250 (10% bracket).
         # Sweep crosses the 10%→12% boundary at total_ordinary=27,675
         # (taxable=11,925).  For all points strictly above the deduction, emr_ordinary
-        # must match the marginal bracket rate at that sweep point.
+        # must match the rate on the NEXT dollar at that sweep point, so a point at
+        # exactly taxable=11,925 is already 12%.
         result = calculate_emr(
             income=IncomeInputs(
                 pension=dec("0"),
@@ -1168,15 +1169,15 @@ class TestEmrOrdinaryAttribution:
             assert pt.taxable_ordinary > _ZERO, (
                 f"income={pt.income}: taxable_ordinary should be positive above deduction"
             )
-            if pt.taxable_ordinary <= dec("11925"):
+            if pt.taxable_ordinary < dec("11925"):
                 # 10% bracket
                 assert pt.emr_ordinary == dec("0.10"), (
                     f"income={pt.income}: emr_ordinary={pt.emr_ordinary} in 10% bracket, "
                     f"expected 0.10"
                 )
                 saw_10pct = True
-            elif pt.taxable_ordinary <= dec("48475"):
-                # 12% bracket
+            elif pt.taxable_ordinary < dec("48475"):
+                # 12% bracket (the next dollar at exactly 11,925 is 12%)
                 assert pt.emr_ordinary == dec("0.12"), (
                     f"income={pt.income}: emr_ordinary={pt.emr_ordinary} in 12% bracket, "
                     f"expected 0.12"
@@ -1536,6 +1537,7 @@ def _point(income: str, emr_ordinary: str) -> EMRPoint:
         ss_inclusion_rate=zero,
         taxable_ordinary=zero,
         taxable_preferential=zero,
+        irmaa_magi=zero,
     )
 
 

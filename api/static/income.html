@@ -597,7 +597,7 @@
           <summary><span>ACA</span><span class="section-summary-value" id="aca-section-summary">—</span></summary>
           <div class="magi-row">
             <span class="magi-label">ACA Cliff</span>
-            <span class="magi-value" id="aca-cliff-display">$62,600</span>
+            <span class="magi-value" id="aca-cliff-display">—</span>
           </div>
           <div class="magi-row">
             <span class="magi-label">Distance to Cliff</span>
@@ -1132,7 +1132,7 @@
     el('total-spending-display').textContent = fmt$(data.total_spending);
 
     // ACA section
-    el('aca-cliff-display').textContent = fmt$(data.aca_cliff_magi);
+    el('aca-cliff-display').textContent = data.aca_cliff_magi > 0 ? fmt$(data.aca_cliff_magi) : '—';
     const distEl       = el('distance-display');
     const acaSummaryEl = el('aca-section-summary');
     if (data.aca_distance === null || data.aca_distance === undefined) {
@@ -1330,23 +1330,16 @@
     const shapes      = [];
     const annotations = [];
 
-    // IRMAA vertical lines — only render thresholds within the sweep range
+    // IRMAA vertical lines, placed where the sweep's MAGI reaches each threshold
     if (el('irmaa-toggle')?.checked && lastResult?.irmaa_thresholds?.length) {
-      const income  = lastResult.points.income;
-      const sweepMin = income[0];
-      const sweepMax = income[income.length - 1];
-      let irmaaIdx = 0;
-      for (let i = 0; i < lastResult.irmaa_thresholds.length; i++) {
-        const t = lastResult.irmaa_thresholds[i];
-        if (t < sweepMin || t > sweepMax) continue;
-        irmaaIdx++;
+      for (const { tier, x } of irmaaLines(lastResult.irmaa_thresholds, lastResult.points)) {
         shapes.push({
-          type: 'line', x0: t, x1: t, y0: 0, y1: 1, yref: 'paper',
+          type: 'line', x0: x, x1: x, y0: 0, y1: 1, yref: 'paper',
           line: { color: 'gray', dash: 'dash', width: 1 },
         });
         annotations.push({
-          x: t, y: 1, yref: 'paper',
-          text: 'IRMAA ' + irmaaIdx,
+          x, y: 1, yref: 'paper',
+          text: 'IRMAA ' + tier,
           showarrow: false,
           font: { size: 10, color: 'gray' },
           xanchor: 'left', yanchor: 'top',

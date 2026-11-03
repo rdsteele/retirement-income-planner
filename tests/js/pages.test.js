@@ -147,16 +147,19 @@ test('emr: renders one badge per configured bracket rate and the default ceiling
 test('emr: IRMAA labels and inflation scaling use the configured lookback years', async () => {
   const app = await startPage('emr');
   const years = FX.config.irmaa_lookback_years;
-  const labels = __page.buildIrmaaAnnotations([100000], true, true).map((a) => a.text);
+  const labels = __page.buildIrmaaAnnotations([{ tier: 1, x: 100000 }], true, true).map((a) => a.text);
   assertEqual(labels, [`IRMAA 1 (est. ${DEFAULT_YEAR() + years})`]);
 
   // 10% inflation over the lookback years, applied to a threshold inside the sweep range
   app.el('irmaa_inflation_adj').checked = true;
   app.el('irmaa_inflation_rate').value = '10';
+  // MAGI = sweep + 1,000 here, so the line sits at (scaled threshold - 1,000)
   __page.lastResult.irmaa_thresholds = [5000];
   __page.lastResult.points.income = [0, 20000];
-  const scaled = __page.effectiveIrmaaThresholds().thresholds[0];
-  assertTrue(Math.abs(scaled - 5000 * 1.1 ** years) < 1e-6, `expected 5000 x 1.1^${years}, got ${scaled}`);
+  __page.lastResult.points.irmaa_magi = [1000, 21000];
+  const x = __page.effectiveIrmaaLines().lines[0].x;
+  const expected = 5000 * 1.1 ** years - 1000;
+  assertTrue(Math.abs(x - expected) < 1e-6, `expected ${expected}, got ${x}`);
 });
 
 test('emr: draws the chart', async () => {
@@ -398,6 +401,18 @@ test('emr: IRMAA lines are drawn after the plot when the toggle is on', async ()
   assertEqual(relayouts[0].args[1]['xaxis.autorange'], false);
 });
 
+test('emr: an IRMAA line sits where the sweep MAGI reaches the threshold, not at the raw threshold', async () => {
+  const app = await startPage('emr', () => {
+    document.getElementById('irmaa-toggle').checked = true;
+    const r = FX.emr;
+    r.irmaa_thresholds = [50000];
+    r.points.irmaa_magi = r.points.income.map((x) => x + 40000); // 40,000 of fixed income
+  });
+  const update = app.page.plotly.calls.filter((c) => c.name === 'relayout')[0].args[1];
+  assertEqual(update.shapes.map((sh) => sh.x0), [10000]);
+  assertEqual(update.annotations.map((a) => [a.x, a.text]), [[10000, 'IRMAA 1']]);
+});
+
 test('emr: no IRMAA relayout when the toggle is off', async () => {
   const app = await startPage('emr');
   assertEqual(app.page.plotly.calls.filter((c) => c.name === 'relayout').length, 0);
@@ -417,6 +432,26 @@ test('income: the chart uses the configured axis maximum, draws the ACA cliff an
   assertTrue(traceNames(plot).indexOf('Total Cost EMR (incl. ACA)') !== -1, 'missing Total Cost trace');
   assertTrue(plot.layout.shapes.some((s) => s.x0 === 12345), 'missing ACA cliff line');
   assertTrue(plot.layout.annotations.some((a) => a.text === 'ACA Cliff $12,345'), 'missing ACA cliff label');
+});
+
+test('income: an IRMAA line sits where the sweep MAGI reaches the threshold', async () => {
+  const app = await startPage('income', () => {
+    document.getElementById('irmaa-toggle').checked = true;
+    const r = FX.income_plan_calculate;
+    r.irmaa_thresholds = [50000, 55000, 90000]; // the third is beyond the sweep
+    r.points.irmaa_magi = r.points.income.map((x) => x + 40000);
+    r.planning_signals.aca_cliff_sweep_value = null;
+  });
+  await app.el('calc-btn').click();
+  await settle();
+  const { shapes, annotations } = lastPlot(app).layout;
+  assertEqual(shapes.map((sh) => sh.x0), [10000, 15000]);
+  assertEqual(annotations.map((a) => a.text), ['IRMAA 1', 'IRMAA 2']);
+});
+
+test('income: the ACA cliff shows a dash, not a number, before there is one', async () => {
+  const app = await startPage('income');
+  assertEqual(app.el('aca-cliff-display').textContent, '—');
 });
 
 test('income: the chart has no ACA markers when the response has none', async () => {

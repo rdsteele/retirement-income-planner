@@ -100,6 +100,20 @@ def _apply_preferential_brackets(
     return breakdown
 
 
+def marginal_rate_of_next_dollar(taxable_ordinary: Decimal, brackets: list[dict]) -> Decimal:
+    """Return the rate on the NEXT dollar of ordinary income.
+
+    Brackets are half-open: at exactly a bracket's upper bound the next dollar is in the
+    following bracket. This differs from ``marginal_bracket_rate`` (the rate of the top
+    dollar already taxed) only at a boundary. Zero taxable income gives the first rate.
+    """
+    for bracket in brackets:
+        upper = bracket["to"]
+        if upper is None or taxable_ordinary < Decimal(upper):
+            return Decimal(bracket["rate"])
+    return Decimal(brackets[-1]["rate"])
+
+
 def unused_deduction(ordinary_income: Decimal, deductions: Decimal) -> Decimal:
     """Return the portion of deductions that exceeds ordinary income (never negative)."""
     return max(Decimal("0"), deductions - ordinary_income)

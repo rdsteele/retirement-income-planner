@@ -24,7 +24,12 @@ from services.data_loader import (
     load_ss_data,
     require_supported_filing_status,
 )
-from services.federal_tax import calculate_federal_tax, split_taxable_income, unused_deduction
+from services.federal_tax import (
+    calculate_federal_tax,
+    marginal_rate_of_next_dollar,
+    split_taxable_income,
+    unused_deduction,
+)
 from services.income_inputs import IncomeInputs
 from services.niit import compute_niit, load_niit_parameters
 from services.ohio_tax import calculate_ohio_tax
@@ -56,6 +61,7 @@ class EMRPoint:
     ss_inclusion_rate: Decimal
     taxable_ordinary: Decimal
     taxable_preferential: Decimal
+    irmaa_magi: Decimal
 
 
 @dataclass
@@ -79,6 +85,7 @@ class _TaxSnapshot:
     ordinary_tax: Decimal
     preferential_tax: Decimal
     marginal_bracket_rate: Decimal
+    next_dollar_ordinary_rate: Decimal
     niit: Decimal
     ohio_tax: Decimal
     total_tax: Decimal
@@ -217,6 +224,22 @@ class _SnapshotKwargs(TypedDict, total=False):
     ohio_qualifying_retirement_income: Decimal
 
 
+def _next_dollar_ordinary_rate(
+    total_ordinary_after_ss: Decimal,
+    taxable_ordinary: Decimal,
+    std_deduction: Decimal,
+    income: IncomeInputs,
+    filing_status: str,
+    tax_year: int,
+) -> Decimal:
+    """Ordinary tax rate on the next dollar: zero while deductions still shelter it."""
+    deductions = std_deduction + income.additional_deductions + income.above_the_line_adjustments
+    if unused_deduction(total_ordinary_after_ss, deductions) > _ZERO:
+        return _ZERO
+    brackets = load_federal_data(tax_year)["ordinary"][filing_status]
+    return marginal_rate_of_next_dollar(taxable_ordinary, brackets)
+
+
 def _compute_tax_snapshot(
     sweep_value: Decimal,
     sweep_mode: SweepMode,
@@ -278,6 +301,14 @@ def _compute_tax_snapshot(
         ordinary_tax=fed_result.ordinary_income_tax,
         preferential_tax=fed_result.preferential_income_tax,
         marginal_bracket_rate=fed_result.marginal_bracket_rate,
+        next_dollar_ordinary_rate=_next_dollar_ordinary_rate(
+            total_ordinary + ss_taxable,
+            taxable_ordinary,
+            std_deduction,
+            income,
+            filing_status,
+            tax_year,
+        ),
         niit=niit,
         ohio_tax=ohio_tax,
         total_tax=total_tax,
@@ -302,23 +333,15 @@ def _attribute_emr_components(
 ) -> tuple[Decimal, Decimal, Decimal, Decimal, Decimal]:
     """Return (emr_ordinary, emr_ss_torpedo, emr_pref_stacking, emr_niit, emr_ohio).
 
-    emr_ordinary is the actual ordinary tax delta divided by step (ORDINARY mode) or
-    zero (PREFERENTIAL mode). This is 0 below the standard deduction and equals the
-    bracket rate above it, keeping emr_ordinary consistent with total emr.
-    Components sum to emr within rounding tolerance.
+    emr_ordinary is the ordinary rate on the next dollar at the sweep point (ORDINARY
+    mode) or zero (PREFERENTIAL mode): zero while deductions still shelter ordinary
+    income, then the rate of the bracket that dollar falls in. It is taken at the point
+    itself, not from tax 500 dollars ahead, so a bracket starts exactly where taxable
+    income reaches it. Components sum to emr within rounding tolerance.
     """
     bracket_rate = lo.marginal_bracket_rate
 
-    if sweep_mode == SweepMode.ORDINARY:
-        # Below the standard deduction both snapshots have ordinary_tax = 0; the
-        # bracket rate is technically correct for the next dollar but no tax
-        # actually changes, so the ordinary component must be 0.
-        if hi.ordinary_tax == lo.ordinary_tax:
-            emr_ordinary = _ZERO
-        else:
-            emr_ordinary = bracket_rate
-    else:
-        emr_ordinary = _ZERO
+    emr_ordinary = lo.next_dollar_ordinary_rate if sweep_mode == SweepMode.ORDINARY else _ZERO
 
     ss_delta = (hi.ss_taxable - lo.ss_taxable) / step
     emr_ss_torpedo = round_rate(bracket_rate * ss_delta)
@@ -650,6 +673,7 @@ def calculate_emr(
                 ss_inclusion_rate=lo.ss_inclusion_rate,
                 taxable_ordinary=lo.taxable_ordinary,
                 taxable_preferential=lo.taxable_preferential,
+                irmaa_magi=lo.agi + income.tax_exempt_interest,
             )
         )
 

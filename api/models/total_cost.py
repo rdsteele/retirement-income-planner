@@ -45,6 +45,7 @@ class TotalCostPoints(BaseModel):
     ss_inclusion_rate: list[float]
     taxable_ordinary: list[float]
     ohio_tax: list[float]
+    irmaa_magi: list[float]
     aca_magi: list[float]
     aptc_annual: list[float]
     aca_subsidy_loss: list[float]

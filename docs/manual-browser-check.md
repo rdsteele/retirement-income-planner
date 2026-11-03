@@ -39,25 +39,24 @@ the answers) and update this file.
 
 - [ ] Enter **Wages / Pension / Annuity** `40000`, then click **Run Analysis**. The
       button says "Running…" and then recovers.
-- [ ] Badges: `0% Ordinary Space: None`, `0% LTCG Space: None`, `To 22%: $26,600`,
-      `To 24%: $81,900`. (See *Known issues*: the exact boundaries are $26,500 and
-      $81,800.)
+- [ ] Badges: `0% Ordinary Space: None`, `0% LTCG Space: None`, `To 22%: $26,500`,
+      `To 24%: $81,800`.
 - [ ] The **Sweep Ceiling** placeholder reads `201,775 (24% bracket top)`, **Sweep Step**
       is filled with `100`, and the x-axis title reads "Additional Ordinary Income ($)".
 - [ ] Click **Lines**: separate lines plus a bold black Total EMR line. Click
       **Stacked Area** to go back.
 - [ ] Set **Sweep Mode** to *Preferential*. A **Variable Ordinary** field appears, and
       after running, the x-axis title reads "Additional Preferential Income ($)".
-- [ ] **IRMAA:** turn the IRMAA option on. The gray dashed lines are drawn on an axis of
-      *additional* income, so the first line should sit at the IRMAA threshold **minus
-      your fixed income** (here, minus $40,000). See *Known issues*.
+- [ ] **IRMAA:** turn the IRMAA option on. The x-axis is *additional* income, so the
+      first gray dashed line, labeled "IRMAA 1", should sit at **$66,000** (the first
+      IRMAA threshold, $106,000, minus your $40,000 of fixed income).
 
 ## 4. Income Planning
 
 - [ ] The dropdowns are filled, and **Other Investment Income** sits directly under
       *Tax-Deferred Distributions*.
-- [ ] **Before** Calculate, open the **ACA** section and note what the cliff shows.
-      (See *Known issues*.)
+- [ ] **Before** Calculate, open the **ACA** section. The cliff shows **—**, not a dollar
+      amount.
 - [ ] Enter **Pension (Gross)** `40000` and **(Taxable)** `40000`, then press Tab. After a
       moment, **Projected MAGI** reads **$40,000**.
 - [ ] Click **Calculate**. The button says "Calculating…" and recovers. A chart appears;
@@ -99,15 +98,5 @@ For each: the **page**, the **step**, what you **saw** against what is expected,
 
 ## Known issues
 
-As of 2026-11-03. Delete an entry here when it is fixed, and update the step that refers
-to it.
-
-1. **IRMAA lines are plotted at the raw threshold.** The x-axis is additional income
-   beyond the fixed income, but IRMAA thresholds are absolute income, so the lines sit
-   too far right by the fixed income. (`api/static/emr.html` and `income.html`.)
-2. **The Income page's ACA cliff** has a hardcoded `$62,600` in its markup, which the page
-   replaces on the first summary render. Before Calculate the request carries a cliff of
-   0, so the display is expected to read `$0` until then.
-3. **"To 22%" and "To 24%" are up to one sweep step too high.** The service inserts a sweep
-   point at the exact bracket boundary, but that point still reports the lower bracket, so
-   the badge reports the next point (by default, $100 later).
+As of 2026-11-03. None known. Add an entry here when one is found, and delete it when it is
+fixed.

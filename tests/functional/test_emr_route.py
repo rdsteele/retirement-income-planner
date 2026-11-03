@@ -725,3 +725,21 @@ class TestWagesAreOrdinaryIncome:
 
     def test_wages_change_the_result(self):
         assert self._total_tax(wages=40000.0) != self._total_tax(wages=0.0)
+
+
+# ── IRMAA MAGI per point (for placing IRMAA lines on the chart) ──────────
+
+
+class TestIrmaaMagiPoints:
+    def test_points_carry_irmaa_magi_for_every_sweep_point(self):
+        resp = client.post(
+            "/api/emr", json={**_BASE_ORDINARY, "pension": 40000.0, "sweep_ceiling": 5000.0}
+        )
+        pts = resp.json()["points"]
+        assert len(pts["irmaa_magi"]) == len(pts["income"])
+
+    def test_irmaa_magi_is_agi_plus_tax_exempt_interest(self):
+        # pension 40,000 + interest 2,000 + qualified dividends 5,000 + gains 10,000 = 57,000 AGI
+        body = {**_BASE_ORDINARY, "pension": 40000.0, "tax_exempt_interest": 500.0}
+        pts = client.post("/api/emr", json=body).json()["points"]
+        assert pts["irmaa_magi"][0] == 57500.0 + pts["income"][0]

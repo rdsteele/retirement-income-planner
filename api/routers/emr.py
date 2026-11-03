@@ -65,6 +65,7 @@ def _build_points(result: EMRResult) -> EMRPoints:
         ss_inclusion_rate=[round(float(p.ss_inclusion_rate), 4) for p in pts],
         taxable_ordinary=[float(p.taxable_ordinary) for p in pts],
         ohio_tax=[float(p.ohio_tax) for p in pts],
+        irmaa_magi=[float(p.irmaa_magi) for p in pts],
     )
 
 

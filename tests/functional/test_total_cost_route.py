@@ -228,9 +228,10 @@ class TestZeroRateThreshold:
         self.body = self.resp.json()
 
     def test_zero_rate_threshold_is_first_ordinary_income_point(self):
-        # 2026 single std_ded=16100; with step=1000, first emr_ordinary > 0 at 16000
+        # 2026 single std_ded=16100 and no other income: the deduction is used up after
+        # exactly 16,100 of added income, so that is the first point taxed at 10%
         threshold = self.body["planning_signals"]["zero_rate_threshold"]
-        assert threshold == pytest.approx(16000.0)
+        assert threshold == pytest.approx(16100.0)
 
     def test_threshold_is_in_income_array(self):
         threshold = self.body["planning_signals"]["zero_rate_threshold"]
@@ -538,3 +539,13 @@ def test_wages_tax_the_same_as_the_same_amount_of_pension():
         return resp.json()["points"]["total_tax"]
 
     assert total_tax(wages=40000.0) == total_tax(pension=40000.0)
+
+
+# ── IRMAA MAGI per point ─────────────────────────────────────────────────
+
+
+def test_total_cost_points_carry_irmaa_magi():
+    body = {**_BASE, "pension": 40000.0, "sweep_ceiling": 5000.0}
+    pts = client.post("/api/total-cost", json=body).json()["points"]
+    assert len(pts["irmaa_magi"]) == len(pts["income"])
+    assert pts["irmaa_magi"][0] == 40000.0 + pts["income"][0]

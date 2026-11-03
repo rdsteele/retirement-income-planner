@@ -38,6 +38,7 @@ class EMRPoints(BaseModel):
     ss_inclusion_rate: list[float]
     taxable_ordinary: list[float]
     ohio_tax: list[float]
+    irmaa_magi: list[float]
 
 
 class BracketDistance(BaseModel):

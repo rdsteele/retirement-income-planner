@@ -119,3 +119,55 @@ test('wireChartModeButtons switches the mode, the active button, and redraws', a
   assertEqual([el('btn-stacked').classList.contains('active'), el('btn-lines').classList.contains('active')], [true, false]);
   assertEqual(redraws, 2);
 });
+
+// ── IRMAA threshold positions on the sweep axis ───────────────────────────
+// irmaa_magi[i] is the IRMAA MAGI at sweep point income[i]; a threshold is drawn
+// where that MAGI reaches it, not at the raw threshold value.
+
+test('irmaa position: shifted left by the fixed income', () => {
+  // fixed income 40,000: MAGI = 40,000 + sweep
+  const income = [0, 10000, 20000, 30000];
+  const magi = [40000, 50000, 60000, 70000];
+  assertEqual(irmaaSweepPosition(55000, income, magi), 15000);
+});
+
+test('irmaa position: interpolates inside a step', () => {
+  assertEqual(irmaaSweepPosition(41000, [0, 1000, 2000], [40000, 41500, 43000]), 666.6666666666666);
+});
+
+test('irmaa position: follows MAGI that rises faster than the sweep (torpedo)', () => {
+  // MAGI climbs 1.85 per sweep dollar here, so the crossing comes sooner
+  assertEqual(irmaaSweepPosition(1850, [0, 1000, 2000], [0, 1850, 3700]), 1000);
+});
+
+test('irmaa position: a threshold at a point lands exactly on it', () => {
+  assertEqual(irmaaSweepPosition(50000, [0, 10000], [40000, 50000]), 10000);
+});
+
+test('irmaa position: null when the threshold is below the first point or above the last', () => {
+  assertEqual(irmaaSweepPosition(39999, [0, 10000], [40000, 50000]), null);
+  assertEqual(irmaaSweepPosition(50001, [0, 10000], [40000, 50000]), null);
+});
+
+test('irmaa position: the first point counts when MAGI starts exactly at the threshold', () => {
+  assertEqual(irmaaSweepPosition(40000, [0, 10000], [40000, 50000]), 0);
+});
+
+test('irmaa position: a flat stretch reports the first point reaching the threshold', () => {
+  assertEqual(irmaaSweepPosition(50000, [0, 1000, 2000, 3000], [40000, 50000, 50000, 60000]), 1000);
+});
+
+test('irmaa position: null when there are no points', () => {
+  assertEqual(irmaaSweepPosition(50000, [], []), null);
+});
+
+test('irmaa lines: thresholds out of range are dropped and the rest keep their number', () => {
+  const pts = { income: [0, 10000, 20000], irmaa_magi: [90000, 100000, 110000] };
+  // tiers 1-3 at 85,000 / 105,000 / 150,000: tier 1 is below the sweep, tier 3 is above it
+  assertEqual(irmaaLines([85000, 105000, 150000], pts), [{ tier: 2, x: 15000 }]);
+});
+
+test('irmaa lines: empty without thresholds or points', () => {
+  assertEqual(irmaaLines([], { income: [0], irmaa_magi: [0] }), []);
+  assertEqual(irmaaLines([100], { income: [], irmaa_magi: [] }), []);
+});

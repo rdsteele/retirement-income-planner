@@ -113,3 +113,27 @@ function wireChartModeButtons(redraw) {
   el('btn-stacked').addEventListener('click', select('stacked', 'btn-stacked', 'btn-lines'));
   el('btn-lines').addEventListener('click', select('lines', 'btn-lines', 'btn-stacked'));
 }
+
+// ── IRMAA threshold lines ────────────────────────────────────────────────
+// The x-axis is income ADDED to the fixed income, but an IRMAA threshold is a total
+// MAGI. So a threshold is drawn where the sweep point's IRMAA MAGI reaches it.
+
+// Sweep x at which `irmaaMagi` first reaches `threshold`, or null when it never does
+// within the sweep. Interpolates inside a step.
+function irmaaSweepPosition(threshold, income, irmaaMagi) {
+  if (!income.length || threshold < irmaaMagi[0] || threshold > irmaaMagi[irmaaMagi.length - 1]) {
+    return null;
+  }
+  const i = irmaaMagi.findIndex((m) => m >= threshold);
+  if (i === 0 || irmaaMagi[i] === threshold) return income[i];
+  const share = (threshold - irmaaMagi[i - 1]) / (irmaaMagi[i] - irmaaMagi[i - 1]);
+  return income[i - 1] + share * (income[i] - income[i - 1]);
+}
+
+// The IRMAA lines to draw: [{ tier, x }] for each threshold inside the sweep. `tier` is
+// the threshold's 1-based number, so a label stays "IRMAA 2" when tier 1 is out of range.
+function irmaaLines(thresholds, pts) {
+  return thresholds
+    .map((t, i) => ({ tier: i + 1, x: irmaaSweepPosition(t, pts.income, pts.irmaa_magi) }))
+    .filter((line) => line.x !== null);
+}

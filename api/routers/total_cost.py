@@ -55,6 +55,7 @@ def _build_points(result: TotalCostResult) -> TotalCostPoints:
         ss_inclusion_rate=[round(float(p.ss_inclusion_rate), 4) for p in pts],
         taxable_ordinary=[float(p.taxable_ordinary) for p in pts],
         ohio_tax=[float(p.ohio_tax) for p in pts],
+        irmaa_magi=[float(p.irmaa_magi) for p in pts],
         aca_magi=[float(p.aca_magi) for p in pts],
         aptc_annual=[float(p.aptc_annual) for p in pts],
         aca_subsidy_loss=[float(p.aca_subsidy_loss) for p in pts],
