@@ -71,7 +71,7 @@ def _apply_ohio_brackets(ohio_tax_base: Decimal, brackets: list[dict]) -> Decima
 def _is_retirement_credit_eligible(
     ohio_agi: Decimal, personal_exemption: Decimal, magi_threshold: Decimal
 ) -> bool:
-    """Return True if MAGI less personal exemption is below the $100,000 threshold."""
+    """Return True if MAGI less personal exemption is below the MAGI credit threshold."""
     return (ohio_agi - personal_exemption) < magi_threshold
 
 

@@ -4,8 +4,8 @@ Schedule-based calculation for filing statuses with a configured aptc_schedule
 (linear interpolation between enrollee-provided healthcare.gov estimates).
 Formula fallback for statuses with no schedule (uses applicable_percentage_400pct).
 
-For 2026 coverage: enhanced ARP/IRA subsidies expired; standard 400% FPL hard
-cliff applies. Single cliff = $62,600; MFJ cliff = $128,600.
+The subsidy cliff MAGI per filing status comes from the year's data file
+(filing_status_cliffs, falling back to 400% of fpl_100pct when absent).
 """
 
 import json

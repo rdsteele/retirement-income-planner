@@ -421,18 +421,18 @@ def _compute_ohio_boundaries(
 
     # Zero-rate threshold: ohio_tax_base enters the first taxable bracket
     # ohio_tax_base = ohio_agi - personal_exemption - ohio_medical_deduction = brackets[1]["from"]
-    # At this ohio_agi the personal_exemption is from the lowest tier (ohio_agi < $40,000)
+    # At this ohio_agi the personal_exemption is from the lowest exemption tier
     zero_bracket = Decimal(ohio_data["brackets"][1]["from"])
     exemption_low = Decimal(ohio_data[exemption_key][0]["amount"])
     ohio_agi_zero = zero_bracket + exemption_low + ohio_medical_deduction
     boundaries.append(ohio_agi_zero - ohio_agi_base)
 
-    # MAGI credit threshold: ohio_agi - personal_exemption crosses $100,000
-    # At this ohio_agi (> $80,000) the personal_exemption is the highest non-zero tier
+    # MAGI credit threshold: ohio_agi - personal_exemption crosses magi_credit_threshold
+    # At this ohio_agi the personal_exemption is the highest non-zero tier
     magi_threshold = Decimal(ohio_data["magi_credit_threshold"])
     exemption_high = Decimal(
         ohio_data[exemption_key][-2]["amount"]
-    )  # -2: skip the $0 sentinel tier
+    )  # -2: skip the zero-amount sentinel tier
     ohio_agi_magi = magi_threshold + exemption_high
     boundaries.append(ohio_agi_magi - ohio_agi_base)
 
