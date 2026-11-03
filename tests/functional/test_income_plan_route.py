@@ -384,3 +384,27 @@ class TestExecutedShortTermGainCountsTowardNIIT:
         interest = self._first_total_tax({"interest": 60000.0})
         assert stcg == pytest.approx(interest)
         assert stcg == pytest.approx(39514.0)
+
+
+# ── other_investment_ordinary (forced) ────────────────────────────────────
+
+
+class TestOtherInvestmentOrdinaryForcedIncome:
+    def test_summary_includes_in_magi(self):
+        resp = client.post(
+            "/api/income-plan/summary", json={**_BASE, "other_investment_ordinary": 10000.0}
+        )
+        assert resp.status_code == 200
+        assert resp.json()["magi"] == 10000.0
+        assert resp.json()["forced_ordinary"] == 10000.0
+
+    def test_calculate_counts_toward_niit(self):
+        payload = {
+            **_BASE,
+            "pension_taxable": 150000.0,
+            "other_investment_ordinary": 60000.0,
+            "tax_year": 2026,
+        }
+        resp = client.post("/api/income-plan/calculate", json=payload)
+        assert resp.status_code == 200
+        assert resp.json()["points"]["total_tax"][0] == pytest.approx(39514.0)

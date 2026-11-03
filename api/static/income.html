@@ -559,6 +559,7 @@
             <div class="field"><label>Non-Qualified Dividends</label><input type="number" id="ordinary_dividends" min="0" step="1" placeholder="0"><span class="field-hint">Ordinary dividends minus qualified dividends (1040 line 3b minus 3a)</span></div>
             <div class="field"><label>Qualified Dividends</label><input type="number" id="qualified_dividends" min="0" step="1" placeholder="0"></div>
             <div class="field"><label>Tax-Deferred Distributions</label><input type="number" id="ira_distributions" min="0" step="1" placeholder="0"><span class="field-hint">Traditional IRA/401k withdrawals, RMDs, and Roth conversions (1040 line 4b)</span></div>
+            <div class="field"><label>Other Investment Income</label><input type="number" id="other_investment_ordinary" min="0" step="1" placeholder="0"><span class="field-hint">Rental, royalties, non-qualified annuity earnings; ordinary income that counts toward NIIT</span></div>
             <div class="field"><label>Social Security Benefit</label><input type="number" id="ss_benefit" min="0" step="1" placeholder="0"><span class="field-hint">Gross annual SS benefit</span></div>
             <div class="field"><label>Capital Gains (LT)</label><input type="number" id="fixed_ltcg" min="0" step="1" placeholder="0"><span class="field-hint">Known capital gain distributions or forced sales</span></div>
             <div class="field"><label>Tax-Exempt Interest</label><input type="number" id="tax_exempt_interest" min="0" step="1" placeholder="0"><span class="field-hint">Municipal bond interest; affects SS taxability</span></div>
@@ -1296,6 +1297,7 @@
         interest:                   fnum('interest'),
         ordinary_dividends:         fnum('ordinary_dividends'),
         ira_distributions:          fnum('ira_distributions'),
+        other_investment_ordinary:  fnum('other_investment_ordinary'),
         ss_benefit:                 fnum('ss_benefit'),
         qualified_dividends:        fnum('qualified_dividends'),
         fixed_ltcg:                 fnum('fixed_ltcg'),
@@ -1347,6 +1349,7 @@
       interest:                   fnum('interest'),
       ordinary_dividends:         fnum('ordinary_dividends'),
       ira_distributions:          fnum('ira_distributions'),
+      other_investment_ordinary:  fnum('other_investment_ordinary'),
       ss_benefit:                 fnum('ss_benefit'),
       qualified_dividends:        fnum('qualified_dividends'),
       fixed_ltcg:                 fnum('fixed_ltcg'),
@@ -1710,6 +1713,7 @@
         ordinary_dividends:         fnum('ordinary_dividends'),
         qualified_dividends:        fnum('qualified_dividends'),
         ira_distributions:          fnum('ira_distributions'),
+        other_investment_ordinary:  fnum('other_investment_ordinary'),
         ss_benefit:                 fnum('ss_benefit'),
         fixed_ltcg:                 fnum('fixed_ltcg'),
         tax_exempt_interest:        fnum('tax_exempt_interest'),
@@ -1735,6 +1739,7 @@
     setField('ordinary_dividends',         inp.ordinary_dividends);
     setField('qualified_dividends',        inp.qualified_dividends);
     setField('ira_distributions',          inp.ira_distributions);
+    setField('other_investment_ordinary',  inp.other_investment_ordinary);
     setField('ss_benefit',                 inp.ss_benefit);
     setField('fixed_ltcg',                 inp.fixed_ltcg);
     setField('tax_exempt_interest',        inp.tax_exempt_interest);

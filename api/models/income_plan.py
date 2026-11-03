@@ -26,6 +26,7 @@ class IncomePlanRequest(BaseModel):
     interest: float = Field(default=0.0, ge=0)
     ordinary_dividends: float = Field(default=0.0, ge=0)
     ira_distributions: float = Field(default=0.0, ge=0)
+    other_investment_ordinary: float = Field(default=0.0, ge=0)
     ss_benefit: float = Field(default=0.0, ge=0)
     qualified_dividends: float = Field(default=0.0, ge=0)
     fixed_ltcg: float = Field(default=0.0, ge=0)

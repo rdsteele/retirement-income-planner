@@ -289,6 +289,7 @@
             <div class="field"><label>Non-Qualified Dividends</label><input type="number" id="ordinary_dividends" min="0" step="1" placeholder="0"><span class="field-hint">1040 Line 3b minus 3a</span></div>
             <div class="field"><label>Qualified Dividends</label><input type="number" id="qualified_dividends" min="0" step="1" placeholder="0"><span class="field-hint">1040 Line 3a</span></div>
             <div class="field"><label>Tax-Deferred Distributions</label><input type="number" id="ira_distributions" min="0" step="1" placeholder="0"><span class="field-hint">1040 Line 4b</span></div>
+            <div class="field"><label>Other Investment Income</label><input type="number" id="other_investment_ordinary" min="0" step="1" placeholder="0"><span class="field-hint">Rental, royalties, non-qualified annuity earnings; ordinary income that counts toward NIIT</span></div>
             <div class="field"><label>Pension / Annuity</label><input type="number" id="pension" min="0" step="1" placeholder="0"><span class="field-hint">1040 Line 5b</span></div>
             <div class="field"><label>Social Security Benefit</label><input type="number" id="ss_benefit" min="0" step="1" placeholder="0"><span class="field-hint">1040 Line 6a — taxability computed</span></div>
             <div class="field"><label>Capital Gains (LT)</label><input type="number" id="fixed_ltcg" min="0" step="1" placeholder="0"><span class="field-hint">1040 Line 7</span></div>
@@ -470,6 +471,7 @@
       ordinary_dividends:               fnum('ordinary_dividends'),
       qualified_dividends:              fnum('qualified_dividends'),
       ira_distributions:                fnum('ira_distributions'),
+      other_investment_ordinary:        fnum('other_investment_ordinary'),
       ss_benefit:                       fnum('ss_benefit'),
       fixed_ltcg:                       fnum('fixed_ltcg'),
       tax_exempt_interest:              fnum('tax_exempt_interest'),
@@ -564,7 +566,8 @@
     el('fed-summary-list').innerHTML =
       summaryRow('Ordinary Tax',       fmtDollar(fed.ordinary_income_tax)) +
       summaryRow('Preferential Tax',   fmtDollar(fed.preferential_income_tax)) +
-      summaryRow('Total Federal Tax',  fmtDollar(fed.total_tax),             { bold: true, divider: true }) +
+      summaryRow('Net Investment Income Tax', fmtDollar(fed.niit),  { hidden: fed.niit === 0 }) +
+      summaryRow('Total Federal Tax',  fmtDollar(fed.total_tax + fed.niit),  { bold: true, divider: true }) +
       summaryRow('Effective Rate',     fmtRate(fed.effective_rate)) +
       summaryRow('Marginal Bracket Rate', fmtRate(fed.marginal_bracket_rate));
 
@@ -674,13 +677,14 @@
     const tradSum = (ip.trad_withdrawals || []).reduce((s, w) => s + (w.amount || 0), 0);
     const gainSum = (ip.withdrawals      || []).reduce((s, w) => s + Math.max(0, (w.amount || 0) - (w.basis || 0)), 0);
 
-    // Executed withdrawals: classify into ordinary vs preferential income
-    let execOrdinary = 0, execPref = 0;
+    // Executed withdrawals: tax-deferred distributions, short-term gains (ordinary
+    // investment income that counts toward NIIT), and long-term gains (preferential)
+    let execTaxDeferred = 0, execStcg = 0, execPref = 0;
     for (const ew of (ip.executed_withdrawals || [])) {
       const amt = ew.amount || 0, basis = ew.basis || 0;
-      if (ew.type === 'tax_deferred')  execOrdinary += amt;
-      else if (ew.type === 'stcg')     execOrdinary += Math.max(0, amt - basis);
-      else if (ew.type === 'ltcg')     execPref     += Math.max(0, amt - basis);
+      if (ew.type === 'tax_deferred')  execTaxDeferred += amt;
+      else if (ew.type === 'stcg')     execStcg        += Math.max(0, amt - basis);
+      else if (ew.type === 'ltcg')     execPref        += Math.max(0, amt - basis);
     }
 
     setField('tax_year',                          inp.tax_year);
@@ -689,7 +693,8 @@
     setField('interest',                          inp.interest);
     setField('ordinary_dividends',                inp.ordinary_dividends);
     setField('qualified_dividends',               inp.qualified_dividends);
-    setField('ira_distributions',                 (inp.ira_distributions || 0) + tradSum + execOrdinary);
+    setField('ira_distributions',                 (inp.ira_distributions || 0) + tradSum + execTaxDeferred);
+    setField('other_investment_ordinary',         (inp.other_investment_ordinary || 0) + execStcg);
     setField('ss_benefit',                        inp.ss_benefit);
     setField('fixed_ltcg',                        (inp.fixed_ltcg || 0) + gainSum + execPref);
     setField('tax_exempt_interest',               inp.tax_exempt_interest);

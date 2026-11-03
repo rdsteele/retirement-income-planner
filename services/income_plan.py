@@ -188,6 +188,7 @@ def _compute_agi_excluding_ss(
     interest: Decimal,
     ordinary_dividends: Decimal,
     ira_distributions: Decimal,
+    other_investment_ordinary: Decimal,
     qualified_dividends: Decimal,
     fixed_ltcg: Decimal,
     above_the_line_adjustments: Decimal,
@@ -199,6 +200,7 @@ def _compute_agi_excluding_ss(
         + interest
         + ordinary_dividends
         + ira_distributions
+        + other_investment_ordinary
         + qualified_dividends
         + fixed_ltcg
         + totals.traditional
@@ -210,33 +212,12 @@ def _compute_agi_excluding_ss(
 
 
 def _compute_magi(
-    pension_taxable: Decimal,
-    interest: Decimal,
-    ordinary_dividends: Decimal,
-    ira_distributions: Decimal,
-    qualified_dividends: Decimal,
-    fixed_ltcg: Decimal,
-    above_the_line_adjustments: Decimal,
+    agi_excluding_ss: Decimal,
     ss_taxable: Decimal,
-    totals: WithdrawalTotals,
     tax_exempt_interest: Decimal,
 ) -> Decimal:
     """ACA MAGI = AGI + tax-exempt interest."""
-    agi = (
-        pension_taxable
-        + interest
-        + ordinary_dividends
-        + ira_distributions
-        + qualified_dividends
-        + fixed_ltcg
-        + totals.traditional
-        + totals.taxable_gains
-        + totals.exec_ordinary
-        + totals.exec_preferential
-        + ss_taxable
-        - above_the_line_adjustments
-    )
-    return agi + tax_exempt_interest
+    return agi_excluding_ss + ss_taxable + tax_exempt_interest
 
 
 def _compute_shortfall(
@@ -278,6 +259,7 @@ def compute_plan_summary(
     estimated_taxes: Decimal,
     planned: list[PlannedWithdrawal],
     executed: list[ExecutedWithdrawal],
+    other_investment_ordinary: Decimal = _ZERO,
 ) -> PlanSummary:
     """Compute a live plan summary without running the full EMR sweep.
 
@@ -292,6 +274,7 @@ def compute_plan_summary(
         interest,
         ordinary_dividends,
         ira_distributions,
+        other_investment_ordinary,
         qualified_dividends,
         fixed_ltcg,
         above_the_line_adjustments,
@@ -305,21 +288,15 @@ def compute_plan_summary(
         filing_status=filing_status,
     )
 
-    magi = _compute_magi(
-        pension_taxable,
-        interest,
-        ordinary_dividends,
-        ira_distributions,
-        qualified_dividends,
-        fixed_ltcg,
-        above_the_line_adjustments,
-        ss_result.taxable_ss,
-        totals,
-        tax_exempt_interest,
-    )
+    magi = _compute_magi(agi_excl_ss, ss_result.taxable_ss, tax_exempt_interest)
 
     forced_ordinary = (
-        pension_taxable + interest + ordinary_dividends + ira_distributions + ss_result.taxable_ss
+        pension_taxable
+        + interest
+        + ordinary_dividends
+        + ira_distributions
+        + other_investment_ordinary
+        + ss_result.taxable_ss
     )
     forced_preferential = qualified_dividends + fixed_ltcg
 
@@ -334,6 +311,7 @@ def compute_plan_summary(
         + qualified_dividends
         + fixed_ltcg
         + tax_exempt_interest
+        + other_investment_ordinary
     )
     total_traditional_withdrawals = totals.traditional + totals.exec_traditional + ira_distributions
     total_roth_withdrawals = totals.roth + totals.exec_roth
@@ -408,13 +386,14 @@ def assemble_sweep_inputs(
     tax_exempt_interest: Decimal,
     planned: list[PlannedWithdrawal],
     executed: list[ExecutedWithdrawal],
+    other_investment_ordinary: Decimal = _ZERO,
 ) -> dict[str, Decimal]:
     """Merge forced income with withdrawal totals into augmented sweep inputs.
 
     Returns a dict of Decimal values ready to pass to calculate_total_cost().
     Traditional distributions (planned and executed) are added to ira_distributions.
-    Executed short-term gains go to other_investment_ordinary, because they are
-    ordinary income that also counts as net investment income. Taxable gains and
+    Executed short-term gains are added to other_investment_ordinary, because they
+    are ordinary income that also counts as net investment income. Taxable gains and
     executed preferential income are added to fixed_ltcg.
 
     ``pension_taxable`` is passed as the ``pension`` key because the EMR sweep
@@ -427,7 +406,7 @@ def assemble_sweep_inputs(
         "interest": interest,
         "ordinary_dividends": ordinary_dividends,
         "ira_distributions": ira_distributions + totals.traditional + totals.exec_traditional,
-        "other_investment_ordinary": totals.exec_stcg_gain,
+        "other_investment_ordinary": other_investment_ordinary + totals.exec_stcg_gain,
         "ss_benefit": ss_benefit,
         "qualified_dividends": qualified_dividends,
         "fixed_ltcg": fixed_ltcg + totals.taxable_gains + totals.exec_preferential,

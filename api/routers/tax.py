@@ -17,6 +17,7 @@ from api.models.tax import (
 from services.common import round_rate, round_tax
 from services.data_loader import load_federal_data
 from services.federal_tax import calculate_federal_tax, split_taxable_income
+from services.niit import calculate_niit, sum_net_investment_income
 from services.ohio_tax import calculate_ohio_tax
 from services.social_security import calculate_social_security_taxability
 
@@ -115,6 +116,7 @@ def _calculate_tax(request: TaxRequest) -> TaxResponse:
     ordinary_dividends = _d(request.ordinary_dividends)
     qualified_dividends = _d(request.qualified_dividends)
     ira_distributions = _d(request.ira_distributions)
+    other_investment_ordinary = _d(request.other_investment_ordinary)
     ss_benefit = _d(request.ss_benefit)
     fixed_ltcg = _d(request.fixed_ltcg)
     tax_exempt_interest = _d(request.tax_exempt_interest)
@@ -125,7 +127,14 @@ def _calculate_tax(request: TaxRequest) -> TaxResponse:
     tax_year = request.tax_year
 
     # Step 1 — SS taxability
-    gross_ordinary = pension + interest + ordinary_dividends + ira_distributions + wages
+    gross_ordinary = (
+        pension
+        + interest
+        + ordinary_dividends
+        + ira_distributions
+        + other_investment_ordinary
+        + wages
+    )
     total_preferential = qualified_dividends + fixed_ltcg
     agi_excluding_ss = gross_ordinary + total_preferential - above_the_line
     ss_result = calculate_social_security_taxability(
@@ -150,8 +159,22 @@ def _calculate_tax(request: TaxRequest) -> TaxResponse:
         tax_year=tax_year,
     )
 
-    # Step 3 — Ohio tax (optional)
+    # Step 3 — NIIT
     federal_agi = total_ordinary + total_preferential
+    niit_result = calculate_niit(
+        magi=federal_agi,
+        net_investment_income=sum_net_investment_income(
+            interest=interest,
+            ordinary_dividends=ordinary_dividends,
+            other_investment_ordinary=other_investment_ordinary,
+            qualified_dividends=qualified_dividends,
+            fixed_ltcg=fixed_ltcg,
+        ),
+        filing_status=filing_status,
+        tax_year=tax_year,
+    )
+
+    # Step 4 — Ohio tax (optional)
     if request.include_ohio:
         ohio_result = calculate_ohio_tax(
             federal_agi=federal_agi,
@@ -202,18 +225,22 @@ def _calculate_tax(request: TaxRequest) -> TaxResponse:
         total_tax=float(federal_result.total_tax),
         effective_rate=float(federal_result.effective_rate),
         marginal_bracket_rate=float(federal_result.marginal_bracket_rate),
+        niit=float(niit_result.niit),
+        net_investment_income=float(niit_result.net_investment_income),
         bracket_breakdown=bracket_breakdown,
         preferential_breakdown=pref_breakdown,
     )
 
     # Summary
-    total_federal_tax = float(federal_result.total_tax)
+    total_niit = float(niit_result.niit)
+    total_federal_tax = float(federal_result.total_tax) + total_niit
     total_tax = total_federal_tax + total_ohio_tax
     agi_dec = federal_agi
     overall_rate = float(round_rate(_D(str(total_tax)) / agi_dec)) if agi_dec > _ZERO else 0.0
 
     summary = TaxSummary(
         total_federal_tax=total_federal_tax,
+        total_niit=total_niit,
         total_ohio_tax=total_ohio_tax,
         total_tax=total_tax,
         overall_effective_rate=overall_rate,

@@ -72,6 +72,7 @@ Fields are ordered to mirror Form 1040 line numbers. Each field has a
 | Qualified Dividends | `qualified_dividends` | Line 3a | Subset of ordinary dividends |
 | Tax-Deferred Distributions | `ira_distributions` | Line 4b | Traditional IRA/401k withdrawals, RMDs, Roth conversions |
 | Pension / Annuity | `pension` | Line 5b | Taxable pension and annuity income |
+| Other Investment Income | `other_investment_ordinary` | — | Rental, royalties, non-qualified annuity earnings; ordinary income that counts toward NIIT |
 | Social Security Benefit | `ss_benefit` | Line 6a | Gross annual SS benefit; taxability computed |
 | Capital Gains (LT) | `fixed_ltcg` | Line 7 | Long-term capital gains |
 | Tax-Exempt Interest | `tax_exempt_interest` | N/A | Not on 1040 — used for SS provisional income calculation |
@@ -112,7 +113,7 @@ reflects the full income picture.
 
 **Executed withdrawals** (from `income_planning.executed_withdrawals`):
 - `tax_deferred` — full amount added to `ira_distributions`
-- `stcg` — gain (`max(0, amount - basis)`) added to `ira_distributions`
+- `stcg` — gain (`max(0, amount - basis)`) added to `other_investment_ordinary` (investment income, counts toward NIIT)
 - `ltcg` — gain (`max(0, amount - basis)`) added to `fixed_ltcg`
 - `tax_free_roth`, `tax_free_hsa` — MAGI-neutral, not folded
 

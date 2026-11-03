@@ -460,3 +460,64 @@ def test_large_preferential_with_no_ordinary_is_reduced_by_deduction():
     body = client.post("/api/tax", json=payload).json()
     assert body["inputs_summary"]["taxable_preferential"] == pytest.approx(43900.0)
     assert body["federal"]["total_tax"] == pytest.approx(0.0)
+
+
+# ── 14. NIIT — investment income only ───────────────────────────────────
+#
+# 2026 single: ordinary income 210,000 - deduction 16,100 = 193,900 taxable
+# -> ordinary tax 39,134. MAGI exceeds the NIIT threshold by 10,000.
+#   150k pension + 60k investment income: NIIT = min(60,000, 10,000) x 3.8% = 380
+#   210k pension (no investment income): NIIT = 0
+
+
+def _tax(**income):
+    payload = {"filing_status": "single", "tax_year": 2026, **income}
+    resp = client.post("/api/tax", json=payload)
+    assert resp.status_code == 200
+    return resp.json()
+
+
+class TestNIIT:
+    def test_pension_only_has_no_niit(self):
+        body = _tax(pension=210000.0)
+        assert body["federal"]["niit"] == pytest.approx(0.0)
+        assert body["federal"]["net_investment_income"] == pytest.approx(0.0)
+        assert body["summary"]["total_tax"] == pytest.approx(39134.0)
+
+    def test_ira_distributions_are_not_investment_income(self):
+        body = _tax(ira_distributions=210000.0)
+        assert body["federal"]["niit"] == pytest.approx(0.0)
+
+    def test_interest_is_investment_income(self):
+        body = _tax(pension=150000.0, interest=60000.0)
+        assert body["federal"]["niit"] == pytest.approx(380.0)
+        assert body["federal"]["net_investment_income"] == pytest.approx(60000.0)
+
+    def test_other_investment_ordinary_is_investment_income(self):
+        body = _tax(pension=150000.0, other_investment_ordinary=60000.0)
+        assert body["federal"]["niit"] == pytest.approx(380.0)
+        assert body["federal"]["net_investment_income"] == pytest.approx(60000.0)
+
+    def test_other_investment_ordinary_taxed_as_ordinary_income(self):
+        body = _tax(pension=150000.0, other_investment_ordinary=60000.0)
+        assert body["federal"]["ordinary_income_tax"] == pytest.approx(39134.0)
+        assert body["inputs_summary"]["gross_ordinary_income"] == pytest.approx(210000.0)
+
+    def test_ltcg_and_qualified_dividends_count(self):
+        body = _tax(pension=190000.0, qualified_dividends=10000.0, fixed_ltcg=20000.0)
+        # MAGI 220,000 -> excess 20,000; NII 30,000 -> 20,000 x 3.8% = 760
+        assert body["federal"]["niit"] == pytest.approx(760.0)
+
+    def test_below_threshold_has_no_niit(self):
+        body = _tax(pension=50000.0, other_investment_ordinary=40000.0)
+        assert body["federal"]["niit"] == pytest.approx(0.0)
+
+    def test_niit_included_in_summary_totals(self):
+        body = _tax(pension=150000.0, other_investment_ordinary=60000.0)
+        assert body["summary"]["total_niit"] == pytest.approx(380.0)
+        assert body["summary"]["total_federal_tax"] == pytest.approx(39514.0)
+        assert body["summary"]["total_tax"] == pytest.approx(39514.0)
+
+    def test_federal_total_tax_excludes_niit(self):
+        body = _tax(pension=150000.0, other_investment_ordinary=60000.0)
+        assert body["federal"]["total_tax"] == pytest.approx(39134.0)

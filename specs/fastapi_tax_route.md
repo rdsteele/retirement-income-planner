@@ -53,6 +53,7 @@ All monetary fields are `float`, non-negative. The route converts them to
 | `ordinary_dividends` | `float` | Non-qualified dividends |
 | `qualified_dividends` | `float` | Qualified dividends (preferential rate) |
 | `ira_distributions` | `float` | Taxable IRA/401k distributions, RMDs, Roth conversions |
+| `other_investment_ordinary` | `float` | Ordinary income that is also investment income (rental, royalties, non-qualified annuity earnings, short-term gains); default 0 |
 | `ss_benefit` | `float` | Gross Social Security benefit (taxability computed) |
 | `fixed_ltcg` | `float` | Long-term capital gains |
 | `tax_exempt_interest` | `float` | Tax-exempt interest (counts toward SS provisional income and ACA MAGI) |
@@ -172,6 +173,8 @@ All numeric values are `float`. No `Decimal`, no Python-specific types.
     "total_tax": 0.0,
     "effective_rate": 0.0,
     "marginal_bracket_rate": 0.10,
+    "niit": 0.0,
+    "net_investment_income": 0.0,
     "bracket_breakdown": [
       {
         "rate": 0.10,
@@ -204,6 +207,7 @@ All numeric values are `float`. No `Decimal`, no Python-specific types.
   },
   "summary": {
     "total_federal_tax": 0.0,
+    "total_niit": 0.0,
     "total_ohio_tax": 0.0,
     "total_tax": 0.0,
     "overall_effective_rate": 0.0

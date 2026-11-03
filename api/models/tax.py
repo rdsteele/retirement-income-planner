@@ -12,6 +12,7 @@ class TaxRequest(BaseModel):
     ordinary_dividends: float = Field(default=0.0, ge=0)
     qualified_dividends: float = Field(default=0.0, ge=0)
     ira_distributions: float = Field(default=0.0, ge=0)
+    other_investment_ordinary: float = Field(default=0.0, ge=0)
     ss_benefit: float = Field(default=0.0, ge=0)
     fixed_ltcg: float = Field(default=0.0, ge=0)
     tax_exempt_interest: float = Field(default=0.0, ge=0)
@@ -58,6 +59,8 @@ class FederalTaxDetail(BaseModel):
     total_tax: float
     effective_rate: float
     marginal_bracket_rate: float
+    niit: float
+    net_investment_income: float
     bracket_breakdown: list[BracketRow]
     preferential_breakdown: list[BracketRow]
 
@@ -76,6 +79,7 @@ class OhioTaxDetail(BaseModel):
 
 class TaxSummary(BaseModel):
     total_federal_tax: float
+    total_niit: float
     total_ohio_tax: float
     total_tax: float
     overall_effective_rate: float

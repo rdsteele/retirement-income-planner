@@ -13,6 +13,19 @@ from api.routers.tax import router as tax_router
 from api.routers.tax_years import router as tax_years_router
 from api.routers.total_cost import router as total_cost_router
 
+
+class NoCacheStaticFiles(StaticFiles):
+    """Serve static files that browsers must revalidate (ETag) on every load.
+
+    Without this, browsers may reuse stale pages after the files change.
+    """
+
+    async def get_response(self, path, scope):
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
 app = FastAPI(title="Retirement Income Planner")
 
 app.include_router(emr_router, prefix="/api")
@@ -23,7 +36,7 @@ app.include_router(accounts_router, prefix="/api")
 app.include_router(tax_years_router, prefix="/api")
 app.include_router(config_router, prefix="/api")
 app.include_router(scenarios_router, prefix="/api")
-app.mount("/static", StaticFiles(directory="api/static"), name="static")
+app.mount("/static", NoCacheStaticFiles(directory="api/static"), name="static")
 
 
 @app.get("/")

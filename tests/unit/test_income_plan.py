@@ -348,6 +348,38 @@ class TestComputePlanSummaryPaymentsTotals:
         assert s.total_all_withdrawals == d("44000")
 
 
+class TestOtherInvestmentOrdinarySummary:
+    """other_investment_ordinary (rental, royalties, NQ annuity) is forced ordinary income."""
+
+    def test_adds_to_magi(self):
+        s = _base_summary(other_investment_ordinary=d("10000"))
+        assert s.magi == d("10000")
+
+    def test_adds_to_forced_ordinary(self):
+        s = _base_summary(other_investment_ordinary=d("10000"))
+        assert s.forced_ordinary == d("10000")
+
+    def test_adds_to_total_income(self):
+        s = _base_summary(other_investment_ordinary=d("10000"))
+        assert s.total_income == d("10000")
+
+    def test_counts_toward_ss_provisional_income(self):
+        # provisional = 20000 other + 10000 (half of 20000 SS) = 30000
+        # single tier 1 threshold -> taxable SS = 50% x (30000 - threshold)
+        s = _base_summary(ss_benefit=d("20000"), other_investment_ordinary=d("20000"))
+        assert s.provisional_income == d("30000")
+        assert s.ss_taxable > d("0")
+        assert s.magi == d("20000") + s.ss_taxable
+
+    def test_counts_as_cash_received(self):
+        s = _base_summary(other_investment_ordinary=d("10000"))
+        assert s.total_all_withdrawals == d("10000")
+
+    def test_defaults_to_zero(self):
+        s = _base_summary()
+        assert s.magi == d("0")
+
+
 class TestAssembleSweepInputs:
     def _base(self, **overrides):
         defaults = dict(
@@ -417,6 +449,19 @@ class TestAssembleSweepInputs:
         )
         assert result["ira_distributions"] == d("8000")
         assert result["other_investment_ordinary"] == d("3000")
+
+    def test_forced_other_investment_ordinary_passes_through(self):
+        result = self._base(other_investment_ordinary=d("5000"))
+        assert result["other_investment_ordinary"] == d("5000")
+
+    def test_forced_and_executed_stcg_other_investment_combine(self):
+        result = self._base(
+            other_investment_ordinary=d("5000"),
+            executed=[
+                ExecutedWithdrawal(withdrawal_type="stcg", amount=d("5000"), basis=d("2000"))
+            ],
+        )
+        assert result["other_investment_ordinary"] == d("8000")
 
     def test_executed_ltcg_added_to_fixed_ltcg(self):
         result = self._base(

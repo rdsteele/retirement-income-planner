@@ -16,6 +16,7 @@ from typing import TypedDict
 from services.common import round_rate, round_tax
 from services.data_loader import load_federal_data, load_ohio_data, load_ss_data
 from services.federal_tax import calculate_federal_tax, split_taxable_income, unused_deduction
+from services.niit import compute_niit, load_niit_parameters
 from services.ohio_tax import calculate_ohio_tax
 from services.social_security import calculate_social_security_taxability
 
@@ -76,14 +77,6 @@ class _TaxSnapshot:
 
 def _get_standard_deduction(filing_status: str, tax_year: int) -> Decimal:
     return Decimal(load_federal_data(tax_year)["standard_deduction"][filing_status])
-
-
-def _get_niit_threshold(filing_status: str, tax_year: int) -> Decimal:
-    return Decimal(load_federal_data(tax_year)["niit"][filing_status])
-
-
-def _get_niit_rate(tax_year: int) -> Decimal:
-    return Decimal(load_federal_data(tax_year)["niit"]["rate"])
 
 
 def _get_irmaa_thresholds(filing_status: str, tax_year: int) -> list[Decimal]:
@@ -177,23 +170,6 @@ def _compute_agi_and_taxable(
         std_deduction + additional_deductions + above_the_line_adjustments,
     )
     return agi, taxable_ordinary, taxable_preferential
-
-
-# ---------------------------------------------------------------------------
-# NIIT
-# ---------------------------------------------------------------------------
-
-
-def _compute_niit(
-    agi: Decimal,
-    net_investment_income: Decimal,
-    niit_threshold: Decimal,
-    niit_rate: Decimal,
-) -> Decimal:
-    if agi > niit_threshold:
-        niit_base = min(net_investment_income, agi - niit_threshold)
-        return round_tax(niit_base * niit_rate)
-    return _ZERO
 
 
 # ---------------------------------------------------------------------------
@@ -309,7 +285,7 @@ def _compute_tax_snapshot(
     )
 
     net_investment_income = investment_ordinary + total_preferential
-    niit = _compute_niit(agi, net_investment_income, niit_threshold, niit_rate)
+    niit = compute_niit(agi, net_investment_income, niit_threshold, niit_rate)
 
     ohio_tax = _ZERO
     if include_ohio:
@@ -644,8 +620,7 @@ def calculate_emr(
 
     # Load data-driven defaults
     std_deduction = _get_standard_deduction(filing_status, tax_year)
-    niit_threshold = _get_niit_threshold(filing_status, tax_year)
-    niit_rate = _get_niit_rate(tax_year)
+    niit_threshold, niit_rate = load_niit_parameters(filing_status, tax_year)
     irmaa_thresholds = _get_irmaa_thresholds(filing_status, tax_year)
 
     if sweep_ceiling is None:
