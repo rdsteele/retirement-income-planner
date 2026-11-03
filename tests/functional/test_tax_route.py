@@ -314,7 +314,7 @@ def test_all_income_zero_returns_zero_tax():
 
 
 def test_unexpected_error_returns_500():
-    with patch("api.routers.tax.calculate_federal_tax", side_effect=RuntimeError("boom")):
+    with patch("api.routers.tax.calculate_tax_detail", side_effect=RuntimeError("boom")):
         resp = client.post("/api/tax", json=_BASE)
     assert resp.status_code == 500
     assert "unexpected" in resp.json()["detail"].lower()
