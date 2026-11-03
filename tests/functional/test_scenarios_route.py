@@ -211,3 +211,82 @@ def test_delete_scenario_500(monkeypatch) -> None:
     monkeypatch.setattr(svc, "delete_scenario", boom)
     resp = client.delete("/api/scenarios/AnyName")
     assert resp.status_code == 500
+
+
+# ── GET /api/scenarios/{name}/sweep-inputs ───────────────────────────────
+
+_PLAN_WITH_WITHDRAWALS = {
+    "name": "Withdrawals",
+    "saved_at": "2026-03-16T12:00:00",
+    "version": "1.0",
+    "inputs": {
+        "pension_taxable": 1600,
+        "wages": 500,
+        "ira_distributions": 2000,
+        "fixed_ltcg": 1000,
+        "other_investment_ordinary": 300,
+    },
+    "income_planning": {
+        "trad_withdrawals": [{"id": "t", "amount": 10000}],
+        "withdrawals": [{"id": "h", "amount": 8000, "basis": 3000}],
+        "executed_withdrawals": [
+            {"type": "tax_deferred", "amount": 4000},
+            {"type": "stcg", "amount": 5000, "basis": 2000},
+            {"type": "ltcg", "amount": 6000, "basis": 4000},
+        ],
+    },
+}
+
+
+class TestSweepInputs:
+    def _inputs(self, scenario):
+        client.post(f"/api/scenarios/{scenario['name']}", json=scenario)
+        resp = client.get(f"/api/scenarios/{scenario['name']}/sweep-inputs")
+        assert resp.status_code == 200
+        return resp.json()
+
+    def test_returns_all_assembled_fields(self):
+        body = self._inputs(_PLAN_WITH_WITHDRAWALS)
+        assert set(body) == {
+            "pension",
+            "wages",
+            "interest",
+            "ordinary_dividends",
+            "qualified_dividends",
+            "ira_distributions",
+            "other_investment_ordinary",
+            "ss_benefit",
+            "fixed_ltcg",
+            "tax_exempt_interest",
+            "above_the_line_adjustments",
+            "additional_deductions",
+        }
+
+    def test_withdrawals_are_folded_into_income(self):
+        body = self._inputs(_PLAN_WITH_WITHDRAWALS)
+        assert body["ira_distributions"] == 16000.0  # 2000 + 10000 + 4000
+        assert body["other_investment_ordinary"] == 3300.0  # 300 + 3000 short-term gain
+        assert body["fixed_ltcg"] == 8000.0  # 1000 + 5000 + 2000
+
+    def test_forced_income_passes_through(self):
+        body = self._inputs(_PLAN_WITH_WITHDRAWALS)
+        assert body["pension"] == 1600.0
+        assert body["wages"] == 500.0
+
+    def test_scenario_without_planning_data_uses_inputs_only(self):
+        body = self._inputs(_SCENARIO_DATA)
+        assert body["pension"] == 0.0  # only gross "pension" is stored; taxable is not
+        assert body["ira_distributions"] == 0.0
+
+    def test_unknown_scenario_returns_404(self):
+        resp = client.get("/api/scenarios/Nope/sweep-inputs")
+        assert resp.status_code == 404
+
+    def test_route_does_not_shadow_the_scenario_route(self):
+        client.post("/api/scenarios/Test Plan", json=_SCENARIO_DATA)
+        assert client.get("/api/scenarios/Test Plan").json()["name"] == "Test Plan"
+
+    def test_malformed_amount_returns_422(self):
+        bad = {**_PLAN_WITH_WITHDRAWALS, "name": "Bad", "inputs": {"interest": "abc"}}
+        client.post("/api/scenarios/Bad", json=bad)
+        assert client.get("/api/scenarios/Bad/sweep-inputs").status_code == 422

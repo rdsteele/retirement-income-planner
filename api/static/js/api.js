@@ -61,6 +61,12 @@ async function fetchScenarioOrNull(name) {
   }
 }
 
+// The scenario's income inputs with planned and executed withdrawals already folded
+// in by the server (the EMR and Tax pages show these; they do not classify anything).
+function fetchScenarioSweepInputs(name) {
+  return apiRequest(`${scenarioUrl(name)}/sweep-inputs`);
+}
+
 function saveScenarioFile(name, data) {
   return postJson(scenarioUrl(name), data);
 }

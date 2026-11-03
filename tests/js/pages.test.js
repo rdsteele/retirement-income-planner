@@ -224,3 +224,92 @@ test('accounts: loads accounts on start without errors', async () => {
   const app = await startPage('accounts');
   assertTrue(app.server.callsMatching('GET', '/api/accounts').length >= 1, 'accounts were not requested');
 });
+
+// ── EMR and Tax pre-fill from a saved scenario ────────────────────────────
+//
+// The server folds planned and executed withdrawals into the income inputs. The
+// pages must show exactly what it returns. The values below are chosen so that any
+// arithmetic the page did itself on the raw scenario would give a different answer.
+
+const SERVER_ASSEMBLED = {
+  pension: 111, wages: 222, interest: 3, ordinary_dividends: 4, qualified_dividends: 5,
+  ira_distributions: 777, other_investment_ordinary: 999, ss_benefit: 6, fixed_ltcg: 888,
+  tax_exempt_interest: 7, above_the_line_adjustments: 8, additional_deductions: 9,
+};
+
+function savedScenario() {
+  return {
+    name: 'Plan A',
+    inputs: { tax_year: 2031, filing_status: 'beta', ira_distributions: 1, fixed_ltcg: 2, pension_taxable: 5 },
+    ohio: { include_ohio: true, gross_medical_expenses: 400 },
+    aca: {},
+    emr_settings: {},
+    income_planning: {
+      trad_withdrawals: [{ amount: 50000 }],
+      withdrawals: [{ amount: 90000, basis: 10000 }],
+      executed_withdrawals: [{ type: 'stcg', amount: 70000, basis: 10000 }],
+    },
+  };
+}
+
+function loadSavedScenario(server) {
+  document.getElementById('include_ohio').type = 'checkbox'; // as in the real form
+  FX.scenario_sweep_inputs = { ...SERVER_ASSEMBLED };
+  server.scenarios['Plan A'] = savedScenario();
+  server.current = 'Plan A';
+}
+
+for (const name of ['emr', 'tax']) {
+  test(`${name}: pre-fills income from the server's assembled inputs`, async () => {
+    const app = await startPage(name, loadSavedScenario);
+    const value = (id) => Number(app.el(id).value);
+    assertEqual(app.server.callsMatching('GET', '/api/scenarios/Plan A/sweep-inputs').length, 1);
+    assertEqual(
+      [value('interest'), value('ordinary_dividends'), value('qualified_dividends'), value('ira_distributions')],
+      [3, 4, 5, 777],
+    );
+    assertEqual(
+      [value('other_investment_ordinary'), value('ss_benefit'), value('fixed_ltcg'), value('tax_exempt_interest')],
+      [999, 6, 888, 7],
+    );
+    assertEqual([value('above_the_line_adjustments'), value('additional_deductions')], [8, 9]);
+    assertEqual(errorShown(app), null);
+  });
+
+  test(`${name}: takes status, year, and Ohio settings from the scenario itself`, async () => {
+    const app = await startPage(name, loadSavedScenario);
+    assertEqual([app.el('filing_status').value, String(app.el('tax_year').value)], ['beta', '2031']);
+    assertEqual(app.el('include_ohio').checked, true);
+    assertEqual(Number(app.el('gross_medical_expenses').value), 400);
+  });
+
+  test(`${name}: a failed assembled-inputs request clears the scenario and shows the error`, async () => {
+    const app = await startPage(name, (server) => {
+      loadSavedScenario(server);
+      server.failOn('GET', '/sweep-inputs', 500);
+    });
+    const message = errorShown(app);
+    assertTrue(message !== null && /Could not load scenario "Plan A": disk full/.test(message), String(message));
+    assertEqual(app.el('scenario-name-display').textContent.indexOf('Plan A'), -1);
+  });
+
+  test(`${name}: after a failed scenario load the page does not run over the error`, async () => {
+    const app = await startPage(name, (server) => {
+      loadSavedScenario(server);
+      server.failOn('GET', '/sweep-inputs', 500);
+    });
+    const endpoint = name === 'emr' ? '/api/emr' : '/api/tax';
+    assertEqual(app.server.callsMatching('POST', endpoint).length, 0);
+    assertTrue(errorShown(app) !== null, 'the error must still be visible');
+  });
+}
+
+test('emr: pension and wages share one form field, so the field shows their sum', async () => {
+  const app = await startPage('emr', loadSavedScenario);
+  assertEqual(Number(app.el('pension').value), 333);
+});
+
+test('tax: pension and wages have separate fields', async () => {
+  const app = await startPage('tax', loadSavedScenario);
+  assertEqual([Number(app.el('pension').value), Number(app.el('wages').value)], [111, 222]);
+});

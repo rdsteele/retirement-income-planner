@@ -11,6 +11,7 @@ matches the saved files; regenerate them with:
 import json
 import sys
 from pathlib import Path
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
@@ -29,6 +30,24 @@ _INCOME = {
     "ira_distributions": 5000.0,
     "ss_benefit": 0.0,
     "fixed_ltcg": 3000.0,
+}
+
+
+# A scenario as the planning pages store it, with planned and executed withdrawals.
+SAMPLE_SCENARIO = {
+    "name": "Sample",
+    "saved_at": "2026-01-01T00:00:00",
+    "version": "1.0",
+    "inputs": {**_INCOME, "pension_taxable": 30000.0, "wages": 2000.0},
+    "income_planning": {
+        "trad_withdrawals": [{"id": "t", "amount": 5000.0}],
+        "withdrawals": [{"id": "h", "amount": 9000.0, "basis": 4000.0}],
+        "executed_withdrawals": [
+            {"type": "tax_deferred", "amount": 3000.0, "basis": 0.0},
+            {"type": "stcg", "amount": 7000.0, "basis": 2500.0},
+            {"type": "ltcg", "amount": 6000.0, "basis": 4000.0},
+        ],
+    },
 }
 
 
@@ -69,7 +88,14 @@ def build_fixtures() -> dict[str, object]:
         ).json(),
         "income_plan_summary": client.post("/api/income-plan/summary", json=plan).json(),
         "income_plan_calculate": client.post("/api/income-plan/calculate", json=plan).json(),
+        "scenario_sweep_inputs": _scenario_sweep_inputs(client),
     }
+
+
+def _scenario_sweep_inputs(client: TestClient) -> dict:
+    """The real endpoint's response for SAMPLE_SCENARIO (storage is never touched)."""
+    with patch("services.scenarios.load_scenario", return_value=SAMPLE_SCENARIO):
+        return client.get("/api/scenarios/Sample/sweep-inputs").json()
 
 
 def main() -> None:

@@ -77,3 +77,11 @@ def test_pages_do_not_redefine_shared_helpers():
         html = client.get(f"/static/{page}.html").text
         redefined = page_level.findall(html)
         assert redefined == [], (page, redefined)
+
+
+def test_emr_and_tax_pages_do_not_classify_withdrawals():
+    """Folding withdrawals into income is the server's job (scenario_inputs service)."""
+    for page in ["emr", "tax"]:
+        html = client.get(f"/static/{page}.html").text
+        for token in ("executed_withdrawals", "trad_withdrawals", "tax_deferred", "stcg"):
+            assert token not in html, (page, token)

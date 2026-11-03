@@ -512,38 +512,26 @@
       : '📋 No scenario loaded';
   }
 
-  function populateSharedInputs(scenario) {
+  // `inputs` is the server's assembled income (withdrawals already folded in).
+  function populateSharedInputs(scenario, inputs) {
     const inp  = scenario.inputs  || {};
     const ohio = scenario.ohio    || {};
     const aca  = scenario.aca     || {};
-    const ip   = scenario.income_planning || {};
-
-    const tradSum = (ip.trad_withdrawals || []).reduce((s, w) => s + (w.amount || 0), 0);
-    const gainSum = (ip.withdrawals      || []).reduce((s, w) => s + Math.max(0, (w.amount || 0) - (w.basis || 0)), 0);
-
-    // Executed withdrawals: tax-deferred distributions, short-term gains (ordinary
-    // investment income that counts toward NIIT), and long-term gains (preferential)
-    let execTaxDeferred = 0, execStcg = 0, execPref = 0;
-    for (const ew of (ip.executed_withdrawals || [])) {
-      const amt = ew.amount || 0, basis = ew.basis || 0;
-      if (ew.type === 'tax_deferred')  execTaxDeferred += amt;
-      else if (ew.type === 'stcg')     execStcg        += Math.max(0, amt - basis);
-      else if (ew.type === 'ltcg')     execPref        += Math.max(0, amt - basis);
-    }
 
     setField('tax_year',                           inp.tax_year);
     setField('filing_status',                      inp.filing_status);
-    setField('pension',                            (inp.pension_taxable || 0) + (inp.wages || 0));
-    setField('interest',                           inp.interest);
-    setField('ordinary_dividends',                 inp.ordinary_dividends);
-    setField('qualified_dividends',                inp.qualified_dividends);
-    setField('ira_distributions',                  (inp.ira_distributions || 0) + tradSum + execTaxDeferred);
-    setField('other_investment_ordinary',          (inp.other_investment_ordinary || 0) + execStcg);
-    setField('ss_benefit',                         inp.ss_benefit);
-    setField('fixed_ltcg',                         (inp.fixed_ltcg || 0) + gainSum + execPref);
-    setField('tax_exempt_interest',                inp.tax_exempt_interest);
-    setField('above_the_line_adjustments',         inp.above_the_line_adjustments);
-    setField('additional_deductions',              inp.additional_deductions);
+    // The EMR form has one field for pension and wages (both non-investment ordinary income)
+    setField('pension',                            inputs.pension + inputs.wages);
+    setField('interest',                           inputs.interest);
+    setField('ordinary_dividends',                 inputs.ordinary_dividends);
+    setField('qualified_dividends',                inputs.qualified_dividends);
+    setField('ira_distributions',                  inputs.ira_distributions);
+    setField('other_investment_ordinary',          inputs.other_investment_ordinary);
+    setField('ss_benefit',                         inputs.ss_benefit);
+    setField('fixed_ltcg',                         inputs.fixed_ltcg);
+    setField('tax_exempt_interest',                inputs.tax_exempt_interest);
+    setField('above_the_line_adjustments',         inputs.above_the_line_adjustments);
+    setField('additional_deductions',              inputs.additional_deductions);
     setField('include_ohio',                       ohio.include_ohio);
     setField('ohio_medical_deduction',             ohio.gross_medical_expenses);
     setField('gross_medical_expenses',             ohio.gross_medical_expenses);
@@ -571,16 +559,19 @@
     setField('irmaa_inflation_rate', emr.irmaa_inflation_rate);
   }
 
+  // Resolves true when there is nothing to load or the scenario loaded, and false when
+  // loading failed (the error is shown and the page must not run over it).
   async function loadCurrentScenario() {
     try {
       const { name } = await apiRequest('/api/scenarios/current');
       currentScenarioName = name || null;
       updateScenarioBar();
-      if (!currentScenarioName) return;
+      if (!currentScenarioName) return true;
       const scenario = await fetchScenarioOrNull(currentScenarioName);
       if (scenario === null) throw new Error('scenario file not found');
-      populateSharedInputs(scenario);
+      populateSharedInputs(scenario, await fetchScenarioSweepInputs(currentScenarioName));
       populatePageInputs(scenario);
+      return true;
     } catch (err) {
       // Do not leave a scenario name showing over a blank form.
       const failedName = currentScenarioName;
@@ -591,12 +582,13 @@
           ? `Could not load scenario "${failedName}": ${err.message}`
           : `Could not check for a current scenario: ${err.message}`
       );
+      return false;
     }
   }
 
   Promise.all([loadConfig(), loadTaxYears()])
     .then(() => loadCurrentScenario())
-    .then(() => runBtn.click())
+    .then(loaded => { if (loaded) runBtn.click(); })
     .catch(err => showError(`Could not load page settings: ${err.message}`));
 
   // ── Build payload ─────────────────────────────────────────────────────────

@@ -46,6 +46,7 @@ router in `api/routers/` and its own independent tests.
 | `ohio_tax` | 2025/2026 Ohio tax, tiered exemption, medical deduction, retirement credit |
 | `social_security` | SS taxability, provisional income, torpedo calculation |
 | `niit` | Net Investment Income Tax; counts investment income only, not pension/IRA |
+| `scenario_inputs` | Saved scenario → assembled income inputs (withdrawals folded in) for the EMR and Tax pages |
 | `tax_detail` | Point-in-time tax breakdown: composes SS taxability, federal, NIIT, and Ohio |
 | `emr` | Effective marginal rate sweep, all components, boundary point insertion |
 | `aca` | ACA subsidy from schedule-based interpolation, cliff detection |

@@ -14,3 +14,20 @@ class CurrentScenarioResponse(BaseModel):
 
 class CurrentScenarioRequest(BaseModel):
     name: str | None
+
+
+class ScenarioSweepInputsResponse(BaseModel):
+    """A scenario's income inputs with planned and executed withdrawals folded in."""
+
+    pension: float
+    wages: float
+    interest: float
+    ordinary_dividends: float
+    qualified_dividends: float
+    ira_distributions: float
+    other_investment_ordinary: float
+    ss_benefit: float
+    fixed_ltcg: float
+    tax_exempt_interest: float
+    above_the_line_adjustments: float
+    additional_deductions: float

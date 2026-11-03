@@ -101,24 +101,33 @@ Fields are ordered to mirror Form 1040 line numbers. Each field has a
 
 ---
 
-## Scenario Load — Withdrawal Folding
+## Scenario Load — Assembled Income
 
-When a scenario is loaded, income from the income planning page's planned and
-executed withdrawals is folded into the tax input fields so the tax calculation
-reflects the full income picture.
+When a scenario is loaded, the page requests `GET /api/scenarios/{name}/sweep-inputs`
+and fills the income fields with the response, so the tax calculation reflects the
+full income picture (forced income plus planned and executed withdrawals). The page
+does no classification or arithmetic of its own.
+
+Classification is done on the server (`services/scenario_inputs.py`, composing
+`income_plan.assemble_sweep_inputs`), never in the page:
 
 **Planned withdrawals** (from `income_planning`):
-- `trad_withdrawals` — sum of amounts added to `ira_distributions`
-- `withdrawals` (taxable) — sum of gains (`max(0, amount - basis)`) added to `fixed_ltcg`
+- `trad_withdrawals` — amounts added to `ira_distributions`
+- `withdrawals` (taxable lots) — gains (`max(0, amount - basis)`) added to `fixed_ltcg`
+- `roth_withdrawals`, `hsa_withdrawals` — MAGI-neutral, not folded
 
 **Executed withdrawals** (from `income_planning.executed_withdrawals`):
 - `tax_deferred` — full amount added to `ira_distributions`
-- `stcg` — gain (`max(0, amount - basis)`) added to `other_investment_ordinary` (investment income, counts toward NIIT)
+- `stcg` — gain (`max(0, amount - basis)`) added to `other_investment_ordinary`
+  (ordinary income that is also investment income, so it counts toward NIIT)
 - `ltcg` — gain (`max(0, amount - basis)`) added to `fixed_ltcg`
 - `tax_free_roth`, `tax_free_hsa` — MAGI-neutral, not folded
 
-**Wages** are not folded from scenarios — the wages field is manually entered
-on the tax page only.
+**Wages** come from `inputs.wages` and fill the separate Wages field. Tax year,
+filing status, and the Ohio and ACA settings come from the scenario itself.
+
+If the scenario or its assembled inputs fail to load, the page shows the error,
+clears the displayed scenario name, and does not run a calculation over the error.
 
 ---
 

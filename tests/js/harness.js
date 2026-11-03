@@ -319,6 +319,16 @@ function makeAppServer(F = __FIXTURES) {
     status: 200,
     body: Object.keys(server.scenarios).map((name) => ({ name, saved_at: '2026-01-01T00:00:00' })),
   }));
+  const scenarioRoutes = server.fallback;
+  server.fallback = (method, url, body) => {
+    if (method === 'GET' && url.endsWith('/sweep-inputs')) {
+      const name = decodeURIComponent(url.slice('/api/scenarios/'.length, -'/sweep-inputs'.length));
+      return name in server.scenarios
+        ? { status: 200, body: F.scenario_sweep_inputs }
+        : { status: 404, body: { detail: 'Scenario not found: ' + name } };
+    }
+    return scenarioRoutes(method, url, body);
+  };
   server.handle('POST', '/api/tax', ok(F.tax));
   server.handle('POST', '/api/emr', ok(F.emr));
   server.handle('POST', '/api/income-plan/summary', ok(F.income_plan_summary));

@@ -168,6 +168,7 @@ Registered in `api/main.py`. All under `/api/scenarios`.
 | `GET` | `/api/scenarios/current` | Get current scenario name | 200 |
 | `POST` | `/api/scenarios/current` | Set current scenario name | 200 |
 | `GET` | `/api/scenarios/{name}` | Load scenario by name | 200 |
+| `GET` | `/api/scenarios/{name}/sweep-inputs` | The scenario's income inputs with planned and executed withdrawals folded in (for the EMR and Tax pages); 404 if missing, 422 if an amount is not a number | 200 |
 | `POST` | `/api/scenarios/{name}` | Save scenario | 200 |
 | `DELETE` | `/api/scenarios/{name}` | Delete scenario | 204 |
 

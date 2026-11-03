@@ -125,24 +125,34 @@ The two adjustment fields display a `.field-hint` span below the input with expl
 
 ---
 
-## Scenario Load — Withdrawal Folding
+## Scenario Load — Assembled Income
 
-When a scenario is loaded, income from the income planning page's planned and
-executed withdrawals is folded into the EMR input fields so the sweep reflects
-the full tax picture.
+When a scenario is loaded, the page requests `GET /api/scenarios/{name}/sweep-inputs`
+and fills the income fields with the response, so the sweep reflects the full tax
+picture (forced income plus planned and executed withdrawals). The page does no
+classification of its own.
+
+Classification is done on the server (`services/scenario_inputs.py`, composing
+`income_plan.assemble_sweep_inputs`), never in the page:
 
 **Planned withdrawals** (from `income_planning`):
-- `trad_withdrawals` — sum of amounts added to `ira_distributions`
-- `withdrawals` (taxable) — sum of gains (`max(0, amount - basis)`) added to `fixed_ltcg`
+- `trad_withdrawals` — amounts added to `ira_distributions`
+- `withdrawals` (taxable lots) — gains (`max(0, amount - basis)`) added to `fixed_ltcg`
+- `roth_withdrawals`, `hsa_withdrawals` — MAGI-neutral, not folded
 
 **Executed withdrawals** (from `income_planning.executed_withdrawals`):
 - `tax_deferred` — full amount added to `ira_distributions`
-- `stcg` — gain (`max(0, amount - basis)`) added to `ira_distributions`
+- `stcg` — gain (`max(0, amount - basis)`) added to `other_investment_ordinary`
+  (ordinary income that is also investment income, so it counts toward NIIT)
 - `ltcg` — gain (`max(0, amount - basis)`) added to `fixed_ltcg`
 - `tax_free_roth`, `tax_free_hsa` — MAGI-neutral, not folded
 
-**Wages** from `inputs.wages` are folded into the `pension` field (combined
-as "Wages / Pension / Annuity").
+**Wages** (`wages` in the response) are added to `pension` for the single
+"Wages / Pension / Annuity" field, since both are non-investment ordinary income.
+Tax year, filing status, and the Ohio and ACA settings come from the scenario itself.
+
+If the scenario or its assembled inputs fail to load, the page shows the error,
+clears the displayed scenario name, and does not run an analysis over the error.
 
 ---
 

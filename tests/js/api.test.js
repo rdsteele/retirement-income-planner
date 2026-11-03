@@ -90,3 +90,16 @@ test('deleteScenarioFile resolves null on success and rejects with the detail on
   assertEqual(await deleteScenarioFile('P'), null);
   await assertRejects(deleteScenarioFile('P'), (e) => e.message === 'Scenario not found: P');
 });
+
+test('fetchScenarioSweepInputs requests the scenario sweep-inputs endpoint', async () => {
+  const server = makeScenarioServer();
+  server.fallback = (method, url) => ({ status: 200, body: { requested: url } });
+  const result = await fetchScenarioSweepInputs('Base Plan');
+  assertEqual(result, { requested: '/api/scenarios/Base%20Plan/sweep-inputs' });
+});
+
+test('fetchScenarioSweepInputs rejects with the server detail on failure', async () => {
+  const server = makeScenarioServer();
+  server.failOn('GET', '/sweep-inputs', 422);
+  await assertRejects(fetchScenarioSweepInputs('x'), (e) => e.status === 422);
+});

@@ -1,0 +1,14 @@
+{
+ "above_the_line_adjustments": 0.0,
+ "additional_deductions": 0.0,
+ "fixed_ltcg": 10000.0,
+ "interest": 400.0,
+ "ira_distributions": 13000.0,
+ "ordinary_dividends": 1200.0,
+ "other_investment_ordinary": 4500.0,
+ "pension": 30000.0,
+ "qualified_dividends": 800.0,
+ "ss_benefit": 0.0,
+ "tax_exempt_interest": 0.0,
+ "wages": 2000.0
+}

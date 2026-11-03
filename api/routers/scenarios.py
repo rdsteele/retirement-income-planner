@@ -4,6 +4,7 @@ Route order matters: /scenarios/current must be registered before
 /scenarios/{name} to prevent FastAPI treating "current" as a name param.
 """
 
+from dataclasses import asdict
 from typing import Any
 
 from fastapi import APIRouter, Body, HTTPException, Response
@@ -14,7 +15,9 @@ from api.models.scenarios import (
     CurrentScenarioRequest,
     CurrentScenarioResponse,
     ScenarioMetaResponse,
+    ScenarioSweepInputsResponse,
 )
+from services.scenario_inputs import sweep_inputs_from_scenario
 
 router = APIRouter()
 
@@ -58,6 +61,22 @@ def get_scenario(name: str) -> JSONResponse:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.get("/scenarios/{name}/sweep-inputs", response_model=ScenarioSweepInputsResponse)
+def get_scenario_sweep_inputs(name: str) -> ScenarioSweepInputsResponse:
+    """Income inputs for the EMR and Tax pages, with withdrawals folded in."""
+    try:
+        scenario = svc.load_scenario(name)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    try:
+        assembled = sweep_inputs_from_scenario(scenario)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return ScenarioSweepInputsResponse(**{k: float(v) for k, v in asdict(assembled).items()})
 
 
 @router.post("/scenarios/{name}")
