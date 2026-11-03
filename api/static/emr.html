@@ -254,30 +254,8 @@
     #chart { width: 100%; height: 500px; }
 
     /* ── Scenario bar ── */
-    .scenario-bar {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 6px 0 8px;
-      font-size: 13px;
-      border-bottom: 1px solid #dee2e6;
-      margin-bottom: 14px;
-    }
-    .scenario-name { color: #495057; text-decoration: none; flex: 1; }
-    .scenario-name:hover { color: #1a1a2e; }
-    .scenario-btn {
-      padding: 3px 10px;
-      font-size: 12px;
-      border: 1px solid #ced4da;
-      border-radius: 4px;
-      background: #fff;
-      cursor: pointer;
-      color: #495057;
-      white-space: nowrap;
-    }
-    .scenario-btn:hover:not(:disabled) { background: #f0f2f5; }
-    .scenario-btn:disabled { opacity: 0.45; cursor: default; }
   </style>
+  <link rel="stylesheet" href="/static/css/scenario-bar.css">
 </head>
 <body>
 
@@ -295,6 +273,7 @@
 <div class="page">
   <div class="scenario-bar">
     <a class="scenario-name" id="scenario-name-display" href="/static/scenarios.html">📋 No scenario loaded</a>
+    <span class="scenario-status" id="scenario-status" role="status"></span>
   </div>
   <h1>EMR Analyzer</h1>
 
@@ -440,6 +419,7 @@
 <script src="/static/js/api.js"></script>
 <script src="/static/js/common.js"></script>
 <script src="/static/js/config.js"></script>
+<script src="/static/js/scenario-bar.js"></script>
 <script>
   // ── Config — populated from GET /api/config before first run ──────────────
   const CONFIG = {};
@@ -503,15 +483,6 @@
   el('filing_status').addEventListener('change', updateSweepCeilingHint);
 
   // ── Scenario management ───────────────────────────────────────────────────
-  let currentScenarioName = null;
-
-  function updateScenarioBar() {
-    const display = el('scenario-name-display');
-    if (display) display.textContent = currentScenarioName
-      ? '📋 ' + currentScenarioName
-      : '📋 No scenario loaded';
-  }
-
   // `inputs` is the server's assembled income (withdrawals already folded in).
   function populateSharedInputs(scenario, inputs) {
     const inp  = scenario.inputs  || {};
@@ -559,35 +530,13 @@
     setField('irmaa_inflation_rate', emr.irmaa_inflation_rate);
   }
 
-  // Resolves true when there is nothing to load or the scenario loaded, and false when
-  // loading failed (the error is shown and the page must not run over it).
-  async function loadCurrentScenario() {
-    try {
-      const { name } = await apiRequest('/api/scenarios/current');
-      currentScenarioName = name || null;
-      updateScenarioBar();
-      if (!currentScenarioName) return true;
-      const scenario = await fetchScenarioOrNull(currentScenarioName);
-      if (scenario === null) throw new Error('scenario file not found');
-      populateSharedInputs(scenario, await fetchScenarioSweepInputs(currentScenarioName));
-      populatePageInputs(scenario);
-      return true;
-    } catch (err) {
-      // Do not leave a scenario name showing over a blank form.
-      const failedName = currentScenarioName;
-      currentScenarioName = null;
-      updateScenarioBar();
-      showError(
-        failedName
-          ? `Could not load scenario "${failedName}": ${err.message}`
-          : `Could not check for a current scenario: ${err.message}`
-      );
-      return false;
-    }
-  }
+  const populateScenario = async (scenario, name) => {
+    populateSharedInputs(scenario, await fetchScenarioSweepInputs(name));
+    populatePageInputs(scenario);
+  };
 
   Promise.all([loadConfig(), loadTaxYears()])
-    .then(() => loadCurrentScenario())
+    .then(() => loadCurrentScenario(populateScenario))
     .then(loaded => { if (loaded) runBtn.click(); })
     .catch(err => showError(`Could not load page settings: ${err.message}`));
 

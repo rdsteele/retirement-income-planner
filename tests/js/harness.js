@@ -134,8 +134,11 @@ function makeFakeElement(id, tag) {
 }
 
 // Installs a fresh global document/window/Plotly; elements are created on first
-// access by id. Returns { elements, fireDocument, plotly, window }.
-function installFakePage() {
+// access by id, except ids listed in options.absent, which return null like a real
+// document does for an element the page does not have.
+// Returns { elements, fireDocument, plotly, window }.
+function installFakePage(options = {}) {
+  const absent = new Set(options.absent || []);
   const elements = {};
   const documentListeners = {};
   const plotly = { calls: [] };
@@ -143,6 +146,7 @@ function installFakePage() {
   globalThis.document = {
     body: makeFakeElement('body'),
     getElementById(id) {
+      if (absent.has(id)) return null;
       if (!elements[id]) elements[id] = makeFakeElement(id);
       return elements[id];
     },

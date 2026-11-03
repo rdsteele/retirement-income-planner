@@ -48,6 +48,13 @@ function optionValues(select) {
   return select.children.map((o) => String(o.value));
 }
 
+// The scenario bar's status line: { text, isError }, or null when it is empty.
+function barStatus(app) {
+  const status = app.el('scenario-status');
+  if (!status || status.textContent === '') return null;
+  return { text: status.textContent, isError: status.className.indexOf('error') !== -1 };
+}
+
 function errorShown(app) {
   const box = app.el('error-msg');
   return box && box.style.display === 'block' ? box.textContent : null;
@@ -288,8 +295,9 @@ for (const name of ['emr', 'tax']) {
       loadSavedScenario(server);
       server.failOn('GET', '/sweep-inputs', 500);
     });
-    const message = errorShown(app);
-    assertTrue(message !== null && /Could not load scenario "Plan A": disk full/.test(message), String(message));
+    const status = barStatus(app);
+    assertTrue(status !== null && status.isError, 'the scenario bar must show an error');
+    assertTrue(/Could not load "Plan A": disk full/.test(status.text), status.text);
     assertEqual(app.el('scenario-name-display').textContent.indexOf('Plan A'), -1);
   });
 
@@ -300,7 +308,8 @@ for (const name of ['emr', 'tax']) {
     });
     const endpoint = name === 'emr' ? '/api/emr' : '/api/tax';
     assertEqual(app.server.callsMatching('POST', endpoint).length, 0);
-    assertTrue(errorShown(app) !== null, 'the error must still be visible');
+    const status = barStatus(app);
+    assertTrue(status !== null && status.isError, 'the error must still be visible in the scenario bar');
   });
 }
 
@@ -312,4 +321,29 @@ test('emr: pension and wages share one form field, so the field shows their sum'
 test('tax: pension and wages have separate fields', async () => {
   const app = await startPage('tax', loadSavedScenario);
   assertEqual([Number(app.el('pension').value), Number(app.el('wages').value)], [111, 222]);
+});
+
+
+test('income: a failed scenario load is shown in the scenario bar and clears the name', async () => {
+  const app = await startPage('income', (server) => {
+    loadSavedScenario(server);
+    server.failOn('GET', '/api/scenarios/Plan', 500);
+  });
+  const status = barStatus(app);
+  assertTrue(status !== null && status.isError && /Could not load "Plan A"/.test(status.text), String(status && status.text));
+  assertEqual(app.el('save-btn').disabled, true);
+});
+
+test('income: Save stores the page inputs under the current scenario', async () => {
+  const app = await startPage('income', (server) => {
+    FX.scenario_sweep_inputs = { ...SERVER_ASSEMBLED };
+    server.scenarios['Plan A'] = { name: 'Plan A', keep: 'other-page' };
+    server.current = 'Plan A';
+  });
+  await app.el('save-btn').click();
+  await settle();
+  const saved = app.server.scenarios['Plan A'];
+  assertEqual(saved.keep, 'other-page');
+  assertEqual(saved.inputs.filing_status, FIRST_STATUS());
+  assertEqual(barStatus(app).isError, false);
 });

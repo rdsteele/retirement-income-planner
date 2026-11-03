@@ -5,6 +5,7 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Scenarios — Retirement Income Planner</title>
+  <link rel="stylesheet" href="/static/css/scenario-bar.css">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -38,29 +39,7 @@
     .nav-link.active { color: #1a1a2e; border-bottom: 2px solid #4c6ef5; }
 
     /* ── Scenario bar ── */
-    .scenario-bar {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 6px 0 8px;
-      font-size: 13px;
-      border-bottom: 1px solid #dee2e6;
-      margin-bottom: 20px;
-    }
-    .scenario-name { color: #495057; text-decoration: none; flex: 1; }
-    .scenario-name:hover { color: #1a1a2e; }
-    .scenario-btn {
-      padding: 3px 10px;
-      font-size: 12px;
-      border: 1px solid #ced4da;
-      border-radius: 4px;
-      background: #fff;
-      cursor: pointer;
-      color: #495057;
-      white-space: nowrap;
-    }
-    .scenario-btn:hover:not(:disabled) { background: #f0f2f5; }
-    .scenario-btn:disabled { opacity: 0.45; cursor: default; }
+    .scenario-bar { margin-bottom: 20px; }
 
     /* ── Page ── */
     .page { max-width: 800px; margin: 0 auto; }
@@ -179,8 +158,6 @@
 
 <div class="scenario-bar">
   <a class="scenario-name" id="scenario-name-display" href="/static/scenarios.html">📋 No scenario loaded</a>
-  <button class="scenario-btn" id="save-btn" disabled>Save</button>
-  <button class="scenario-btn" id="save-as-btn" disabled>Save As</button>
 </div>
 
 <div class="page">
@@ -224,17 +201,8 @@
 
 <script src="/static/js/api.js"></script>
 <script src="/static/js/common.js"></script>
+<script src="/static/js/scenario-bar.js"></script>
 <script>
-  let currentScenarioName = null;
-
-  // ── Scenario bar update ───────────────────────────────────────────────
-  function updateScenarioBar() {
-    const display = el('scenario-name-display');
-    if (display) display.textContent = currentScenarioName
-      ? '📋 ' + currentScenarioName
-      : '📋 No scenario loaded';
-  }
-
   // ── Current scenario section update ──────────────────────────────────
   function updateCurrentSection() {
     const disp = el('current-scenario-display');
@@ -260,8 +228,7 @@
   // ── Load current scenario name ────────────────────────────────────────
   async function loadCurrentName() {
     try {
-      const { name } = await apiRequest('/api/scenarios/current');
-      currentScenarioName = name || null;
+      currentScenarioName = await fetchCurrentScenarioName();
       updateScenarioBar();
       updateCurrentSection();
     } catch (err) {
@@ -431,16 +398,7 @@
       return;
     }
 
-    const data = {
-      name,
-      saved_at: new Date().toISOString().slice(0, 19),
-      version: '1.0',
-      inputs: {},
-      ohio: {},
-      aca: {},
-      emr_settings: {},
-      income_planning: {},
-    };
+    const data = newEmptyScenario(name);
 
     try {
       const existing = await fetchScenarioOrNull(name);

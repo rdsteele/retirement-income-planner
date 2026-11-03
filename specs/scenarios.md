@@ -234,22 +234,30 @@ Empty state: "No saved scenarios. Use Save or Save As on any page to create one.
 
 ---
 
-## Nav Bar Updates (all pages)
+## Scenario Bar (income, emr, tax, scenarios pages)
 
-Updated nav bar on `index.html`, `tax.html`, `income.html`, `scenarios.html`:
+Shown below the nav links on `income.html`, `emr.html`, `tax.html` and `scenarios.html`:
 
 ```
-[ Retirement Income Planner ]   
-Income Planning | EMR Analysis | Tax Detail | Scenarios
-📋 2026 Base Plan  [Save] [Save As]
+📋 My Base Plan                      [Save] [Save As]     (Income Planning page only)
+Saved "My Base Plan"                                      (status line, when there is one)
 ```
 
-- Scenario name shown below nav links, left-aligned
-- **Save** button — saves current page inputs to loaded scenario
-  (disabled if no scenario loaded)
-- **Save As** button — prompts for new name, saves, sets as current
-- If no scenario loaded: shows "📋 No scenario loaded"
-- Clicking scenario name navigates to scenarios page
+- The bar's behavior is one shared script, `api/static/js/scenario-bar.js`, and its
+  styles are `api/static/css/scenario-bar.css`. A page supplies only a `populate`
+  callback (loading) and a `gather` function (saving).
+- Scenario name shown, left-aligned; "📋 No scenario loaded" when none. Clicking the
+  name navigates to the scenarios page.
+- **Save** (Income Planning page only) — saves current page inputs to the loaded
+  scenario; disabled if no scenario is loaded.
+- **Save As** (Income Planning page only) — prompts for a name, asks before
+  overwriting an existing scenario, saves, and sets it as current.
+- **Status line** — success messages fade after a few seconds; errors stay until the
+  next action. Every failure is reported: a failed save, a failed existence check, a
+  save that worked but could not set the current scenario, and a failed load.
+- **Failed load** — the displayed name is cleared (so Save cannot overwrite the stored
+  scenario with a blank form), the error is shown, and the EMR and Tax pages do not
+  run a calculation over the error.
 
 ### Save behavior
 

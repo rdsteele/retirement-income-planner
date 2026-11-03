@@ -9,6 +9,8 @@
   <script src="/static/js/api.js"></script>
   <script src="/static/js/common.js"></script>
   <script src="/static/js/config.js"></script>
+  <script src="/static/js/scenario-bar.js"></script>
+  <link rel="stylesheet" href="/static/css/scenario-bar.css">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -449,34 +451,6 @@
     .holding-group[open] > summary::before { transform: rotate(90deg); }
 
     /* ── Scenario bar ── */
-    .scenario-bar {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 6px 0 8px;
-      font-size: 13px;
-      border-bottom: 1px solid #dee2e6;
-      margin-bottom: 14px;
-    }
-    .scenario-bar { flex-wrap: wrap; }
-    .scenario-status { flex-basis: 100%; font-size: 12px; }
-    .scenario-status:empty { display: none; }
-    .scenario-status.ok    { color: #16a34a; }
-    .scenario-status.error { color: #dc2626; }
-    .scenario-name { color: #495057; text-decoration: none; flex: 1; }
-    .scenario-name:hover { color: #1a1a2e; }
-    .scenario-btn {
-      padding: 3px 10px;
-      font-size: 12px;
-      border: 1px solid #ced4da;
-      border-radius: 4px;
-      background: #fff;
-      cursor: pointer;
-      color: #495057;
-      white-space: nowrap;
-    }
-    .scenario-btn:hover:not(:disabled) { background: #f0f2f5; }
-    .scenario-btn:disabled { opacity: 0.45; cursor: default; }
 
     /* ── Account subtotals row ── */
     .acct-subtotals {
@@ -1611,18 +1585,7 @@
     taxesStale = true;
   });
 
-  // ── Scenario management ───────────────────────────────────────────────
-  let currentScenarioName = null;
-
-  function updateScenarioBar() {
-    const display = el('scenario-name-display');
-    const saveBtn = el('save-btn');
-    if (display) display.textContent = currentScenarioName
-      ? '📋 ' + currentScenarioName
-      : '📋 No scenario loaded';
-    if (saveBtn) saveBtn.disabled = !currentScenarioName;
-  }
-
+  // ── Scenario page inputs (the bar, loading, and saving are in js/scenario-bar.js) ──
   function fnumFirst(...ids) {
     for (const id of ids) {
       if (el(id)) return parseFloat(el(id).value) || 0;
@@ -1736,100 +1699,16 @@
     }
   }
 
-  let _scenarioStatusTimer = null;
-
-  // Shows the result of a scenario action beside the Save buttons. Success
-  // messages fade after a few seconds; errors stay until the next action.
-  function setScenarioStatus(message, isError = false) {
-    const status = el('scenario-status');
-    if (!status) return;
-    clearTimeout(_scenarioStatusTimer);
-    status.textContent = message;
-    status.className = 'scenario-status ' + (isError ? 'error' : 'ok');
-    if (!isError && message) {
-      _scenarioStatusTimer = setTimeout(() => { status.textContent = ''; }, 3000);
-    }
-  }
-
-  async function loadCurrentScenario() {
-    try {
-      const { name } = await apiRequest('/api/scenarios/current');
-      currentScenarioName = name || null;
-      updateScenarioBar();
-      if (!currentScenarioName) return;
-      const scenario = await fetchScenarioOrNull(currentScenarioName);
-      if (scenario === null) throw new Error('scenario file not found');
-      populateSharedInputs(scenario);
-      populatePageInputs(scenario);
-    } catch (err) {
-      // Do not leave a scenario name showing over a blank form: Save would then
-      // overwrite the stored scenario with empty values.
-      const failedName = currentScenarioName;
-      currentScenarioName = null;
-      updateScenarioBar();
-      setScenarioStatus(
-        failedName
-          ? `Could not load "${failedName}": ${err.message}`
-          : `Could not check for a current scenario: ${err.message}`,
-        true,
-      );
-    }
-  }
-
-  function buildScenarioData(name, existing) {
-    const shared = gatherSharedInputs();
-    return {
-      ...existing,
-      name,
-      saved_at: new Date().toISOString().slice(0, 19),
-      version: '1.0',
-      inputs: { ...(existing.inputs || {}), ...shared.inputs },
-      aca:    { ...(existing.aca    || {}), ...shared.aca    },
-      ohio:   { ...(existing.ohio   || {}), ...shared.ohio   },
-      ...gatherPageInputs(),
-    };
-  }
-
-  async function saveCurrentScenario() {
-    if (!currentScenarioName) return;
-    const name = currentScenarioName;
-    try {
-      const existing = await fetchScenarioOrNull(name);
-      await saveScenarioFile(name, buildScenarioData(name, existing || {}));
-      setScenarioStatus(`Saved "${name}"`);
-    } catch (err) {
-      setScenarioStatus(`Could not save "${name}": ${err.message}`, true);
-    }
-  }
-
-  async function saveAsScenario() {
-    const name = prompt('Enter scenario name:');
-    if (!name || !name.trim()) return;
-    const trimmed = name.trim();
-    try {
-      const existing = await fetchScenarioOrNull(trimmed);
-      if (existing && !confirm(`"${trimmed}" already exists. Overwrite?`)) return;
-      await saveScenarioFile(trimmed, buildScenarioData(trimmed, existing || {}));
-    } catch (err) {
-      setScenarioStatus(`Could not save "${trimmed}": ${err.message}`, true);
-      return;
-    }
-    try {
-      await setCurrentScenarioName(trimmed);
-      currentScenarioName = trimmed;
-      updateScenarioBar();
-      setScenarioStatus(`Saved "${trimmed}"`);
-    } catch (err) {
-      setScenarioStatus(`Saved "${trimmed}", but could not make it the current scenario: ${err.message}`, true);
-    }
-  }
-
-  el('save-btn')?.addEventListener('click', saveCurrentScenario);
-  el('save-as-btn')?.addEventListener('click', saveAsScenario);
+  const gatherScenario = () => ({ shared: gatherSharedInputs(), page: gatherPageInputs() });
+  const populateScenario = (scenario) => {
+    populateSharedInputs(scenario);
+    populatePageInputs(scenario);
+  };
+  wireScenarioButtons(gatherScenario);
 
   // ── Page load ─────────────────────────────────────────────────────────
   Promise.all([loadConfig(), loadTaxYears(), loadAccounts(), loadAccountsSummary()])
-    .then(() => loadCurrentScenario())
+    .then(() => loadCurrentScenario(populateScenario))
     .then(() => { updateMagi(); updateAcaVisibility(); })
     .catch(err => showError(`Could not load page settings: ${err.message}`));
 </script>

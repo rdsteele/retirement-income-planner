@@ -61,6 +61,12 @@ async function fetchScenarioOrNull(name) {
   }
 }
 
+// The name of the scenario currently loaded, or null.
+async function fetchCurrentScenarioName() {
+  const { name } = await apiRequest('/api/scenarios/current');
+  return name || null;
+}
+
 // The scenario's income inputs with planned and executed withdrawals already folded
 // in by the server (the EMR and Tax pages show these; they do not classify anything).
 function fetchScenarioSweepInputs(name) {
