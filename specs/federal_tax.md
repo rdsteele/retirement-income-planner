@@ -41,7 +41,8 @@ Returns a `FederalTaxResult` dataclass:
 | `total_tax`              | `Decimal`               | Sum of ordinary + preferential tax                   |
 | `effective_rate`         | `Decimal`               | `total_tax / (ordinary + preferential)`, 4 decimals  |
 | `marginal_bracket_rate`  | `Decimal`               | Statutory rate of the bracket the top dollar of ordinary income falls into |
-| `bracket_breakdown`      | `list[BracketDetail]`   | Per-bracket detail for ordinary income               |
+| `bracket_breakdown`      | `list[BracketDetail]`   | Per-bracket detail for ordinary income (brackets holding income only) |
+| `preferential_breakdown` | `list[BracketDetail]`   | Per-bracket detail for preferential income (brackets holding income only) |
 
 `BracketDetail` dataclass:
 
@@ -50,6 +51,11 @@ Returns a `FederalTaxResult` dataclass:
 | `rate`         | `Decimal` | Bracket rate e.g. `Decimal('0.22')`    |
 | `income_taxed` | `Decimal` | Amount of income taxed in this bracket |
 | `tax_amount`   | `Decimal` | Tax owed for this bracket              |
+| `bracket_from` | `Decimal` | Lower bound of the bracket             |
+| `bracket_to`   | `Decimal \| None` | Upper bound; `None` for the top bracket |
+
+`make_bracket_detail(bracket, income_taxed)` builds a row from a bracket definition; it is
+shared with the tax detail service.
 
 ---
 
@@ -80,8 +86,8 @@ Rounded to 4 decimal places. If total income is zero, effective rate is `Decimal
 
 ### 5. Marginal Bracket Rate
 The statutory rate of the ordinary income bracket that the top dollar of ordinary income
-falls into. If ordinary income is zero, marginal bracket rate is `Decimal('0.10')` (the
-lowest bracket rate).
+falls into. If ordinary income is zero, marginal bracket rate is the rate of the first
+(lowest) bracket in the data file.
 
 ### 6. Data Loading
 Bracket data is loaded from:
@@ -247,7 +253,7 @@ So $8,350 of preferential income is taxed at 0%, remaining $11,650 at 15%.
 
 | Scenario                              | Expected Behavior                                              |
 |---------------------------------------|----------------------------------------------------------------|
-| `ordinary_income = 0`                 | No ordinary tax. Preferential income stacks from bottom of LTCG brackets. `marginal_bracket_rate = Decimal('0.10')` |
+| `ordinary_income = 0`                 | No ordinary tax. Preferential income stacks from bottom of LTCG brackets. `marginal_bracket_rate` is the first bracket's rate |
 | `preferential_income = 0`             | No preferential tax. Only ordinary brackets apply.            |
 | Both inputs zero                      | All outputs zero. `effective_rate = Decimal('0')`.            |
 | Unsupported `tax_year`                | Raise `ValueError`                                            |

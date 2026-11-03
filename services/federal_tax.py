@@ -9,7 +9,7 @@ This service receives pre-computed taxable income. Deductions, Social Security
 taxability, NIIT, and AMT are out of scope.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 
 from services.common import round_rate, round_tax
@@ -21,6 +21,8 @@ class BracketDetail:
     rate: Decimal
     income_taxed: Decimal
     tax_amount: Decimal
+    bracket_from: Decimal
+    bracket_to: Decimal | None  # None for the unbounded top bracket
 
 
 @dataclass
@@ -31,6 +33,19 @@ class FederalTaxResult:
     effective_rate: Decimal
     marginal_bracket_rate: Decimal
     bracket_breakdown: list[BracketDetail]
+    preferential_breakdown: list[BracketDetail] = field(default_factory=list)
+
+
+def make_bracket_detail(bracket: dict, income_taxed: Decimal) -> BracketDetail:
+    """Build a breakdown row for one bracket and the income taxed within it."""
+    rate = Decimal(bracket["rate"])
+    return BracketDetail(
+        rate=rate,
+        income_taxed=income_taxed,
+        tax_amount=round_tax(income_taxed * rate),
+        bracket_from=Decimal(bracket["from"]),
+        bracket_to=None if bracket["to"] is None else Decimal(bracket["to"]),
+    )
 
 
 def _apply_ordinary_brackets(
@@ -40,25 +55,17 @@ def _apply_ordinary_brackets(
     """Return (ordinary_tax, marginal_rate, breakdown) for ordinary income."""
     breakdown: list[BracketDetail] = []
     residual = ordinary_income
-    marginal_rate = Decimal("0.10")  # default when ordinary_income is zero
+    marginal_rate = Decimal(brackets[0]["rate"])  # default when ordinary_income is zero
 
     for bracket in brackets:
         if residual <= 0:
             break
-        rate = Decimal(bracket["rate"])
-        b_from = Decimal(bracket["from"])
         b_to = Decimal(bracket["to"]) if bracket["to"] is not None else None
-        bracket_range = (b_to - b_from) if b_to is not None else residual
+        bracket_range = (b_to - Decimal(bracket["from"])) if b_to is not None else residual
         income_taxed = min(residual, bracket_range)
         if income_taxed > 0:
-            breakdown.append(
-                BracketDetail(
-                    rate=rate,
-                    income_taxed=income_taxed,
-                    tax_amount=round_tax(income_taxed * rate),
-                )
-            )
-            marginal_rate = rate
+            breakdown.append(make_bracket_detail(bracket, income_taxed))
+            marginal_rate = Decimal(bracket["rate"])
             residual -= income_taxed
 
     ordinary_tax = sum((b.tax_amount for b in breakdown), Decimal("0"))
@@ -69,19 +76,17 @@ def _apply_preferential_brackets(
     preferential_income: Decimal,
     ordinary_income: Decimal,
     brackets: list[dict],
-) -> Decimal:
-    """Return tax on preferential income stacked on top of ordinary income."""
-    pref_tax = Decimal("0")
+) -> list[BracketDetail]:
+    """Return breakdown rows for preferential income stacked on top of ordinary income."""
+    breakdown: list[BracketDetail] = []
     remaining_pref = preferential_income
     stack_base = ordinary_income
 
     for bracket in brackets:
         if remaining_pref <= 0:
             break
-        rate = Decimal(bracket["rate"])
-        b_from = Decimal(bracket["from"])
         b_to = Decimal(bracket["to"]) if bracket["to"] is not None else None
-        bracket_start = max(stack_base, b_from)
+        bracket_start = max(stack_base, Decimal(bracket["from"]))
         if b_to is not None:
             if bracket_start >= b_to:
                 continue
@@ -89,10 +94,10 @@ def _apply_preferential_brackets(
         else:
             available = remaining_pref  # top bracket absorbs all remaining
         income_taxed = min(remaining_pref, available)
-        pref_tax += round_tax(income_taxed * rate)
+        breakdown.append(make_bracket_detail(bracket, income_taxed))
         remaining_pref -= income_taxed
 
-    return pref_tax
+    return breakdown
 
 
 def unused_deduction(ordinary_income: Decimal, deductions: Decimal) -> Decimal:
@@ -130,9 +135,10 @@ def calculate_federal_tax(
     ordinary_tax, marginal_rate, breakdown = _apply_ordinary_brackets(
         ordinary_income, data["ordinary"][filing_status]
     )
-    pref_tax = _apply_preferential_brackets(
+    pref_breakdown = _apply_preferential_brackets(
         preferential_income, ordinary_income, data["preferential"][filing_status]
     )
+    pref_tax = sum((b.tax_amount for b in pref_breakdown), Decimal("0"))
 
     total_tax = ordinary_tax + pref_tax
     total_income = ordinary_income + preferential_income
@@ -145,4 +151,5 @@ def calculate_federal_tax(
         effective_rate=effective_rate,
         marginal_bracket_rate=marginal_rate,
         bracket_breakdown=breakdown,
+        preferential_breakdown=pref_breakdown,
     )

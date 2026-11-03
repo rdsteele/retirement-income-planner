@@ -9,15 +9,11 @@ from unittest.mock import patch
 
 import pytest
 
-from services.federal_tax import FederalTaxResult
+from services.federal_tax import FederalTaxResult, make_bracket_detail
 from services.niit import NIITResult
 from services.ohio_tax import OhioTaxResult
 from services.social_security import SocialSecurityResult
-from services.tax_detail import (
-    _build_ordinary_breakdown,
-    _build_preferential_breakdown,
-    calculate_tax_detail,
-)
+from services.tax_detail import _ensure_row, calculate_tax_detail
 
 
 def dec(s: str) -> Decimal:
@@ -41,60 +37,22 @@ _FEDERAL_DATA = {
 
 
 # ---------------------------------------------------------------------------
-# Ordinary bracket breakdown
+# Zero-row fallback — the response always has at least one bracket row
 # ---------------------------------------------------------------------------
 
 
-class TestOrdinaryBreakdown:
-    def test_income_spanning_two_brackets(self):
-        rows = _build_ordinary_breakdown(dec("30000"), _ORDINARY)
-        assert [(r.rate, r.income_taxed, r.tax_amount) for r in rows] == [
-            (dec("0.10"), dec("10000"), dec("1000")),
-            (dec("0.20"), dec("20000"), dec("4000")),
-        ]
-
-    def test_rows_report_bracket_bounds(self):
-        rows = _build_ordinary_breakdown(dec("30000"), _ORDINARY)
-        assert (rows[1].bracket_from, rows[1].bracket_to) == (dec("10000"), dec("50000"))
-
-    def test_zero_income_returns_single_zero_row(self):
-        rows = _build_ordinary_breakdown(dec("0"), _ORDINARY)
+class TestEnsureRow:
+    def test_empty_rows_become_single_zero_row_for_first_bracket(self):
+        rows = _ensure_row([], _ORDINARY)
         assert len(rows) == 1
         assert rows[0].rate == dec("0.10")
         assert rows[0].income_taxed == dec("0")
         assert rows[0].tax_amount == dec("0")
+        assert (rows[0].bracket_from, rows[0].bracket_to) == (dec("0"), dec("10000"))
 
-    def test_top_bracket_is_unbounded(self):
-        rows = _build_ordinary_breakdown(dec("60000"), _ORDINARY)
-        assert rows[-1].rate == dec("0.30")
-        assert rows[-1].bracket_to is None
-        assert rows[-1].income_taxed == dec("10000")
-
-
-# ---------------------------------------------------------------------------
-# Preferential bracket breakdown
-# ---------------------------------------------------------------------------
-
-
-class TestPreferentialBreakdown:
-    def test_stacks_on_top_of_ordinary_income(self):
-        # ordinary 5,000 -> 0% room 35,000; remaining 15,000 at 15%
-        rows = _build_preferential_breakdown(dec("5000"), dec("50000"), _PREFERENTIAL)
-        assert [(r.rate, r.income_taxed, r.tax_amount) for r in rows] == [
-            (dec("0.00"), dec("35000"), dec("0")),
-            (dec("0.15"), dec("15000"), dec("2250")),
-        ]
-
-    def test_skips_bracket_filled_by_ordinary_income(self):
-        rows = _build_preferential_breakdown(dec("45000"), dec("10000"), _PREFERENTIAL)
-        assert [(r.rate, r.income_taxed, r.tax_amount) for r in rows] == [
-            (dec("0.15"), dec("10000"), dec("1500")),
-        ]
-
-    def test_zero_preferential_returns_single_zero_row(self):
-        rows = _build_preferential_breakdown(dec("5000"), dec("0"), _PREFERENTIAL)
-        assert len(rows) == 1
-        assert rows[0].income_taxed == dec("0")
+    def test_existing_rows_are_returned_unchanged(self):
+        existing = [make_bracket_detail(_ORDINARY[1], dec("100"))]
+        assert _ensure_row(existing, _ORDINARY) == existing
 
 
 # ---------------------------------------------------------------------------
@@ -236,6 +194,25 @@ class TestCalculateTaxDetail:
         with _Mocks() as m:
             calculate_tax_detail(**{**_INCOME, "filing_status": filing_status}, include_ohio=True)
         assert m["ohio"].call_args.kwargs["filing_status"] == filing_status
+
+    def test_breakdowns_come_from_federal_result(self):
+        ordinary_rows = [make_bracket_detail(_ORDINARY[0], dec("10000"))]
+        pref_rows = [make_bracket_detail(_PREFERENTIAL[1], dec("500"))]
+        federal = _federal()
+        federal.bracket_breakdown = ordinary_rows
+        federal.preferential_breakdown = pref_rows
+        with _Mocks() as m:
+            m["fed"].return_value = federal
+            result = calculate_tax_detail(**_INCOME, include_ohio=False)
+        assert result.ordinary_breakdown == ordinary_rows
+        assert result.preferential_breakdown == pref_rows
+
+    def test_empty_federal_breakdown_falls_back_to_zero_row(self):
+        with _Mocks():
+            result = calculate_tax_detail(**_INCOME, include_ohio=False)
+        assert len(result.ordinary_breakdown) == 1
+        assert result.ordinary_breakdown[0].income_taxed == dec("0")
+        assert len(result.preferential_breakdown) == 1
 
     def test_totals_combine_federal_niit_and_ohio(self):
         with _Mocks():

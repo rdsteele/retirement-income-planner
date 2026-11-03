@@ -14,8 +14,9 @@ from api.models.tax import (
     TaxResponse,
     TaxSummary,
 )
+from services.federal_tax import BracketDetail
 from services.ohio_tax import OhioTaxResult
-from services.tax_detail import TaxBracketRow, TaxDetailResult, calculate_tax_detail
+from services.tax_detail import TaxDetailResult, calculate_tax_detail
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,7 @@ def _d(value: float) -> Decimal:
     return Decimal(str(value))
 
 
-def _to_bracket_row(row: TaxBracketRow) -> BracketRow:
+def _to_bracket_row(row: BracketDetail) -> BracketRow:
     return BracketRow.model_validate(
         {
             "from": float(row.bracket_from),

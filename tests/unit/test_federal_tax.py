@@ -99,9 +99,15 @@ class TestExample2MFJOrdinaryMultiBrackets:
     def test_bracket_breakdown(self):
         bd = self.result.bracket_breakdown
         assert len(bd) == 3
-        assert bd[0] == BracketDetail(dec("0.10"), dec("23850"), dec("2385"))
-        assert bd[1] == BracketDetail(dec("0.12"), dec("73100"), dec("8772"))
-        assert bd[2] == BracketDetail(dec("0.22"), dec("3050"), dec("671"))
+        assert bd[0] == BracketDetail(
+            dec("0.10"), dec("23850"), dec("2385"), dec("0"), dec("23850")
+        )
+        assert bd[1] == BracketDetail(
+            dec("0.12"), dec("73100"), dec("8772"), dec("23850"), dec("96950")
+        )
+        assert bd[2] == BracketDetail(
+            dec("0.22"), dec("3050"), dec("671"), dec("96950"), dec("206700")
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -136,8 +142,12 @@ class TestExample3PreferentialStraddlesBoundary:
     def test_bracket_breakdown(self):
         bd = self.result.bracket_breakdown
         assert len(bd) == 2
-        assert bd[0] == BracketDetail(dec("0.10"), dec("11925"), dec("1193"))
-        assert bd[1] == BracketDetail(dec("0.12"), dec("28075"), dec("3369"))
+        assert bd[0] == BracketDetail(
+            dec("0.10"), dec("11925"), dec("1193"), dec("0"), dec("11925")
+        )
+        assert bd[1] == BracketDetail(
+            dec("0.12"), dec("28075"), dec("3369"), dec("11925"), dec("48475")
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -249,3 +259,101 @@ class TestSplitTaxableIncome:
         ordinary, pref = split_taxable_income(dec("0"), dec("60000"), dec("16100"))
         assert ordinary == dec("0")
         assert pref == dec("43900")
+
+
+# ---------------------------------------------------------------------------
+# Bracket breakdown rows — shared by federal tax and tax detail
+# ---------------------------------------------------------------------------
+
+from services.federal_tax import (  # noqa: E402
+    _apply_ordinary_brackets,
+    _apply_preferential_brackets,
+    make_bracket_detail,
+)
+
+_LIT_ORDINARY = [
+    {"rate": "0.10", "from": "0", "to": "10000"},
+    {"rate": "0.20", "from": "10000", "to": "50000"},
+    {"rate": "0.30", "from": "50000", "to": None},
+]
+_LIT_PREFERENTIAL = [
+    {"rate": "0.00", "from": "0", "to": "40000"},
+    {"rate": "0.15", "from": "40000", "to": None},
+]
+
+
+class TestMakeBracketDetail:
+    def test_computes_rounded_tax_and_reports_bounds(self):
+        row = make_bracket_detail(_LIT_ORDINARY[1], dec("20000"))
+        assert (row.rate, row.income_taxed, row.tax_amount) == (
+            dec("0.20"),
+            dec("20000"),
+            dec("4000"),
+        )
+        assert (row.bracket_from, row.bracket_to) == (dec("10000"), dec("50000"))
+
+    def test_unbounded_top_bracket_has_no_upper_bound(self):
+        assert make_bracket_detail(_LIT_ORDINARY[2], dec("5")).bracket_to is None
+
+    def test_rounds_half_up(self):
+        assert make_bracket_detail(_LIT_ORDINARY[0], dec("5")).tax_amount == dec("1")  # 0.5 -> 1
+
+
+class TestOrdinaryBracketRows:
+    def test_income_spanning_two_brackets(self):
+        _, _, rows = _apply_ordinary_brackets(dec("30000"), _LIT_ORDINARY)
+        assert [(r.rate, r.income_taxed, r.tax_amount) for r in rows] == [
+            (dec("0.10"), dec("10000"), dec("1000")),
+            (dec("0.20"), dec("20000"), dec("4000")),
+        ]
+
+    def test_rows_report_bracket_bounds(self):
+        _, _, rows = _apply_ordinary_brackets(dec("30000"), _LIT_ORDINARY)
+        assert (rows[1].bracket_from, rows[1].bracket_to) == (dec("10000"), dec("50000"))
+
+    def test_zero_income_has_no_rows(self):
+        assert _apply_ordinary_brackets(dec("0"), _LIT_ORDINARY)[2] == []
+
+    def test_top_bracket_is_unbounded(self):
+        _, _, rows = _apply_ordinary_brackets(dec("60000"), _LIT_ORDINARY)
+        assert rows[-1].rate == dec("0.30")
+        assert rows[-1].bracket_to is None
+        assert rows[-1].income_taxed == dec("10000")
+
+    def test_marginal_rate_is_last_bracket_with_income(self):
+        assert _apply_ordinary_brackets(dec("30000"), _LIT_ORDINARY)[1] == dec("0.20")
+
+    def test_zero_income_marginal_rate_is_first_bracket_rate(self):
+        brackets = [{"rate": "0.05", "from": "0", "to": "10000"}]
+        assert _apply_ordinary_brackets(dec("0"), brackets)[1] == dec("0.05")
+
+
+class TestPreferentialBracketRows:
+    def test_stacks_on_top_of_ordinary_income(self):
+        rows = _apply_preferential_brackets(dec("50000"), dec("5000"), _LIT_PREFERENTIAL)
+        assert [(r.rate, r.income_taxed, r.tax_amount) for r in rows] == [
+            (dec("0.00"), dec("35000"), dec("0")),
+            (dec("0.15"), dec("15000"), dec("2250")),
+        ]
+
+    def test_skips_bracket_filled_by_ordinary_income(self):
+        rows = _apply_preferential_brackets(dec("10000"), dec("45000"), _LIT_PREFERENTIAL)
+        assert [(r.rate, r.income_taxed, r.tax_amount) for r in rows] == [
+            (dec("0.15"), dec("10000"), dec("1500")),
+        ]
+
+    def test_zero_preferential_has_no_rows(self):
+        assert _apply_preferential_brackets(dec("0"), dec("5000"), _LIT_PREFERENTIAL) == []
+
+
+class TestFederalResultPreferentialBreakdown:
+    def test_result_carries_preferential_rows_that_sum_to_tax(self):
+        result = calculate_federal_tax(dec("5000"), dec("60000"), "single", 2026)
+        assert result.preferential_breakdown
+        assert sum(r.tax_amount for r in result.preferential_breakdown) == (
+            result.preferential_income_tax
+        )
+
+    def test_no_preferential_income_has_no_rows(self):
+        result = calculate_federal_tax(dec("30000"), dec("0"), "single", 2026)
+        assert result.preferential_breakdown == []

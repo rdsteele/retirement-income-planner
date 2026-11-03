@@ -8,23 +8,20 @@ Ohio tax, and combined totals. Pure Python with no knowledge of the API layer.
 from dataclasses import dataclass
 from decimal import Decimal
 
-from services.common import round_rate, round_tax
+from services.common import round_rate
 from services.data_loader import load_federal_data
-from services.federal_tax import FederalTaxResult, calculate_federal_tax, split_taxable_income
+from services.federal_tax import (
+    BracketDetail,
+    FederalTaxResult,
+    calculate_federal_tax,
+    make_bracket_detail,
+    split_taxable_income,
+)
 from services.niit import NIITResult, calculate_niit, sum_net_investment_income
 from services.ohio_tax import OhioTaxResult, calculate_ohio_tax
 from services.social_security import calculate_social_security_taxability
 
 _ZERO = Decimal("0")
-
-
-@dataclass
-class TaxBracketRow:
-    rate: Decimal
-    bracket_from: Decimal
-    bracket_to: Decimal | None  # None for the unbounded top bracket
-    income_taxed: Decimal
-    tax_amount: Decimal
 
 
 @dataclass
@@ -43,8 +40,8 @@ class IncomeSummary:
 class TaxDetailResult:
     income: IncomeSummary
     federal: FederalTaxResult
-    ordinary_breakdown: list[TaxBracketRow]
-    preferential_breakdown: list[TaxBracketRow]
+    ordinary_breakdown: list[BracketDetail]
+    preferential_breakdown: list[BracketDetail]
     niit: NIITResult
     ohio: OhioTaxResult | None
     total_federal_tax: Decimal  # income tax plus NIIT
@@ -59,62 +56,9 @@ class TaxDetailResult:
 # ---------------------------------------------------------------------------
 
 
-def _bracket_row(bracket: dict, income_taxed: Decimal) -> TaxBracketRow:
-    rate = Decimal(bracket["rate"])
-    return TaxBracketRow(
-        rate=rate,
-        bracket_from=Decimal(bracket["from"]),
-        bracket_to=None if bracket["to"] is None else Decimal(bracket["to"]),
-        income_taxed=income_taxed,
-        tax_amount=round_tax(income_taxed * rate),
-    )
-
-
-def _build_ordinary_breakdown(
-    taxable_ordinary: Decimal, brackets: list[dict]
-) -> list[TaxBracketRow]:
-    """Return one row per ordinary bracket that holds income (or a single zero row)."""
-    rows: list[TaxBracketRow] = []
-    residual = taxable_ordinary
-    for bracket in brackets:
-        if bracket["to"] is not None:
-            bracket_range = Decimal(bracket["to"]) - Decimal(bracket["from"])
-            income_taxed = min(residual, bracket_range)
-        else:
-            income_taxed = residual
-        residual -= income_taxed
-        if income_taxed > _ZERO:
-            rows.append(_bracket_row(bracket, income_taxed))
-        if residual <= _ZERO:
-            break
-    return rows or [_bracket_row(brackets[0], _ZERO)]
-
-
-def _build_preferential_breakdown(
-    taxable_ordinary: Decimal,
-    taxable_preferential: Decimal,
-    brackets: list[dict],
-) -> list[TaxBracketRow]:
-    """Return rows for preferential income stacked on top of ordinary income."""
-    rows: list[TaxBracketRow] = []
-    remaining = taxable_preferential
-    stack_base = taxable_ordinary
-    for bracket in brackets:
-        bracket_start = max(stack_base, Decimal(bracket["from"]))
-        if bracket["to"] is not None:
-            bracket_end = Decimal(bracket["to"])
-            if bracket_start >= bracket_end:
-                continue  # ordinary income fills this entire bracket
-            available = bracket_end - bracket_start
-        else:
-            available = remaining
-        income_taxed = min(remaining, available)
-        remaining -= income_taxed
-        if income_taxed > _ZERO:
-            rows.append(_bracket_row(bracket, income_taxed))
-        if remaining <= _ZERO:
-            break
-    return rows or [_bracket_row(brackets[0], _ZERO)]
+def _ensure_row(rows: list[BracketDetail], brackets: list[dict]) -> list[BracketDetail]:
+    """Return the rows, or a single zero row for the first bracket when there are none."""
+    return rows or [make_bracket_detail(brackets[0], _ZERO)]
 
 
 # ---------------------------------------------------------------------------
@@ -237,11 +181,9 @@ def calculate_tax_detail(
             taxable_preferential=taxable_preferential,
         ),
         federal=federal,
-        ordinary_breakdown=_build_ordinary_breakdown(
-            taxable_ordinary, data["ordinary"][filing_status]
-        ),
-        preferential_breakdown=_build_preferential_breakdown(
-            taxable_ordinary, taxable_preferential, data["preferential"][filing_status]
+        ordinary_breakdown=_ensure_row(federal.bracket_breakdown, data["ordinary"][filing_status]),
+        preferential_breakdown=_ensure_row(
+            federal.preferential_breakdown, data["preferential"][filing_status]
         ),
         niit=niit,
         ohio=ohio,
