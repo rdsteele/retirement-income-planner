@@ -10,9 +10,10 @@ Tests cover:
 """
 
 from decimal import Decimal
-from typing import TypedDict
+from typing import Any, TypedDict
 
 from services.emr import SweepMode, calculate_emr
+from services.income_inputs import IncomeInputs
 from services.total_cost import calculate_total_cost
 
 D = Decimal
@@ -35,6 +36,34 @@ class _BaseKwargs(TypedDict):
     sweep_floor: Decimal
     sweep_ceiling: Decimal
     sweep_step: Decimal
+
+
+_INCOME_KEYS = (
+    "pension",
+    "interest",
+    "ordinary_dividends",
+    "ira_distributions",
+    "ss_benefit",
+    "qualified_dividends",
+    "fixed_ltcg",
+    "tax_exempt_interest",
+    "above_the_line_adjustments",
+    "additional_deductions",
+)
+
+
+def _calculate(base: "_BaseKwargs", **extra: Any):
+    """Run calculate_total_cost on the shared scenario dict (income fields + settings)."""
+    return calculate_total_cost(
+        income=IncomeInputs(**{k: base[k] for k in _INCOME_KEYS}),  # type: ignore[literal-required]
+        sweep_mode=base["sweep_mode"],
+        filing_status=base["filing_status"],
+        tax_year=base["tax_year"],
+        sweep_floor=base["sweep_floor"],
+        sweep_ceiling=base["sweep_ceiling"],
+        sweep_step=base["sweep_step"],
+        **extra,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -72,18 +101,20 @@ _CLIFF_MAGI = D("62600")
 
 class TestNoAca:
     def setup_method(self):
-        self.tc = calculate_total_cost(**_BASE, include_aca=False)
+        self.tc = _calculate(_BASE, include_aca=False)
         self.emr = calculate_emr(
-            pension=_BASE["pension"],
-            interest=_BASE["interest"],
-            ordinary_dividends=_BASE["ordinary_dividends"],
-            ira_distributions=_BASE["ira_distributions"],
-            ss_benefit=_BASE["ss_benefit"],
-            qualified_dividends=_BASE["qualified_dividends"],
-            fixed_ltcg=_BASE["fixed_ltcg"],
-            tax_exempt_interest=_BASE["tax_exempt_interest"],
-            above_the_line_adjustments=_BASE["above_the_line_adjustments"],
-            additional_deductions=_BASE["additional_deductions"],
+            income=IncomeInputs(
+                pension=_BASE["pension"],
+                interest=_BASE["interest"],
+                ordinary_dividends=_BASE["ordinary_dividends"],
+                ira_distributions=_BASE["ira_distributions"],
+                ss_benefit=_BASE["ss_benefit"],
+                qualified_dividends=_BASE["qualified_dividends"],
+                fixed_ltcg=_BASE["fixed_ltcg"],
+                tax_exempt_interest=_BASE["tax_exempt_interest"],
+                above_the_line_adjustments=_BASE["above_the_line_adjustments"],
+                additional_deductions=_BASE["additional_deductions"],
+            ),
             sweep_mode=_BASE["sweep_mode"],
             filing_status=_BASE["filing_status"],
             tax_year=_BASE["tax_year"],
@@ -132,7 +163,7 @@ class TestNoAca:
 
 class TestAcaMagi:
     def setup_method(self):
-        self.tc = calculate_total_cost(**_BASE, include_aca=True)
+        self.tc = _calculate(_BASE, include_aca=True)
         self.fixed_ordinary = (
             _BASE["pension"]
             + _BASE["interest"]
@@ -167,7 +198,7 @@ class TestAcaMagi:
 
 class TestEmrAca:
     def setup_method(self):
-        self.tc = calculate_total_cost(**_BASE, include_aca=True)
+        self.tc = _calculate(_BASE, include_aca=True)
         self.cliff_magi = self.tc.aca_cliff_magi
 
     def test_emr_aca_nonneg_below_cliff(self):
@@ -214,7 +245,7 @@ class TestEmrAca:
 
 class TestTotalCostEmr:
     def setup_method(self):
-        self.tc = calculate_total_cost(**_BASE, include_aca=True)
+        self.tc = _calculate(_BASE, include_aca=True)
 
     def test_total_cost_emr_equals_emr_plus_emr_aca(self):
         for p in self.tc.points:
@@ -230,7 +261,7 @@ class TestTotalCostEmr:
 
 class TestCliffBoundaryInsertion:
     def setup_method(self):
-        self.tc = calculate_total_cost(**_BASE, include_aca=True)
+        self.tc = _calculate(_BASE, include_aca=True)
 
     def test_cliff_sweep_value_in_result(self):
         assert self.tc.cliff_sweep_value > D("0")
@@ -271,16 +302,18 @@ class TestCliffBoundaryInsertion:
 class TestPreferentialMode:
     def setup_method(self):
         self.tc = calculate_total_cost(
-            pension=D("30000"),
-            interest=D("1000"),
-            ordinary_dividends=D("0"),
-            ira_distributions=D("0"),
-            ss_benefit=D("0"),
-            qualified_dividends=D("3000"),
-            fixed_ltcg=D("10000"),
-            tax_exempt_interest=D("0"),
-            above_the_line_adjustments=D("5000"),
-            additional_deductions=D("0"),
+            income=IncomeInputs(
+                pension=D("30000"),
+                interest=D("1000"),
+                ordinary_dividends=D("0"),
+                ira_distributions=D("0"),
+                ss_benefit=D("0"),
+                qualified_dividends=D("3000"),
+                fixed_ltcg=D("10000"),
+                tax_exempt_interest=D("0"),
+                above_the_line_adjustments=D("5000"),
+                additional_deductions=D("0"),
+            ),
             sweep_mode=SweepMode.PREFERENTIAL,
             filing_status="single",
             tax_year=2026,
@@ -335,10 +368,12 @@ class TestCliffSweepValueFormula:
         # ltcg=21819, qd=2693
         # expected = 62600 - 18927 - 2693 - 21819 + 5400 - 0 = 24561
         tc = calculate_total_cost(
-            pension=D("18927"),
-            qualified_dividends=D("2693"),
-            fixed_ltcg=D("21819"),
-            above_the_line_adjustments=D("5400"),
+            income=IncomeInputs(
+                pension=D("18927"),
+                qualified_dividends=D("2693"),
+                fixed_ltcg=D("21819"),
+                above_the_line_adjustments=D("5400"),
+            ),
             sweep_mode=SweepMode.ORDINARY,
             filing_status="single",
             tax_year=2026,
@@ -353,9 +388,11 @@ class TestCliffSweepValueFormula:
         # fixed_ltcg=0, qualified_dividends=5000, pension=30000, atl=5000
         # expected = 62600 - 30000 - 5000 - 0 + 5000 - 0 = 32600
         tc = calculate_total_cost(
-            pension=D("30000"),
-            qualified_dividends=D("5000"),
-            above_the_line_adjustments=D("5000"),
+            income=IncomeInputs(
+                pension=D("30000"),
+                qualified_dividends=D("5000"),
+                above_the_line_adjustments=D("5000"),
+            ),
             sweep_mode=SweepMode.ORDINARY,
             filing_status="single",
             tax_year=2026,
@@ -371,11 +408,13 @@ class TestCliffSweepValueFormula:
         # fixed_ordinary = 31000, ss_taxable_floor = 0
         # expected = 62600 - 31000 - 3000 - 10000 + 5000 - 0 = 23600
         tc = calculate_total_cost(
-            pension=D("30000"),
-            interest=D("1000"),
-            qualified_dividends=D("3000"),
-            fixed_ltcg=D("10000"),
-            above_the_line_adjustments=D("5000"),
+            income=IncomeInputs(
+                pension=D("30000"),
+                interest=D("1000"),
+                qualified_dividends=D("3000"),
+                fixed_ltcg=D("10000"),
+                above_the_line_adjustments=D("5000"),
+            ),
             sweep_mode=SweepMode.PREFERENTIAL,
             filing_status="single",
             tax_year=2026,

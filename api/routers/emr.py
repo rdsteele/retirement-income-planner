@@ -17,6 +17,7 @@ from services.data_loader import get_default_sweep_ceiling_bracket_rate
 from services.emr import BracketDistance as ServiceBracketDistance
 from services.emr import EMRResult, SweepMode, calculate_emr, get_default_sweep_ceiling
 from services.emr import compute_planning_signals as _compute_service_signals
+from services.income_inputs import IncomeInputs
 
 logger = logging.getLogger(__name__)
 
@@ -71,22 +72,10 @@ def _to_float_or_none(value: Decimal | None) -> float | None:
     return float(value) if value is not None else None
 
 
-def _compute_planning_signals(result: EMRResult, request: EMRRequest) -> PlanningSignals:
-    signals = _compute_service_signals(
-        result,
-        fixed_ordinary=_to_decimal(
-            request.pension
-            + request.interest
-            + request.ordinary_dividends
-            + request.ira_distributions
-            + request.other_investment_ordinary,
-        ),
-        variable_ordinary=_to_decimal(request.variable_ordinary),
-        qualified_dividends=_to_decimal(request.qualified_dividends),
-        fixed_ltcg=_to_decimal(request.fixed_ltcg),
-        above_the_line_adjustments=_to_decimal(request.above_the_line_adjustments),
-        additional_deductions=_to_decimal(request.additional_deductions),
-    )
+def _compute_planning_signals(
+    result: EMRResult, income: IncomeInputs, variable_ordinary: Decimal
+) -> PlanningSignals:
+    signals = _compute_service_signals(result, income=income, variable_ordinary=variable_ordinary)
     return PlanningSignals(
         zero_ordinary_space=_to_float_or_none(signals.zero_ordinary_space),
         ltcg_0pct_remaining=_to_float_or_none(signals.ltcg_0pct_remaining),
@@ -108,21 +97,15 @@ def post_emr(request: EMRRequest):
             f"Must be 'ordinary' or 'preferential'.",
         )
 
+    income = request.to_income_inputs()
+    variable_ordinary = _to_decimal(request.variable_ordinary)
     try:
         result = calculate_emr(
-            pension=_to_decimal(request.pension),
-            interest=_to_decimal(request.interest),
-            ordinary_dividends=_to_decimal(request.ordinary_dividends),
-            ira_distributions=_to_decimal(request.ira_distributions),
-            other_investment_ordinary=_to_decimal(request.other_investment_ordinary),
-            ss_benefit=_to_decimal(request.ss_benefit),
-            qualified_dividends=_to_decimal(request.qualified_dividends),
-            fixed_ltcg=_to_decimal(request.fixed_ltcg),
-            tax_exempt_interest=_to_decimal(request.tax_exempt_interest),
+            income=income,
             sweep_mode=mode,
             filing_status=request.filing_status,
             tax_year=request.tax_year,
-            variable_ordinary=_to_decimal(request.variable_ordinary),
+            variable_ordinary=variable_ordinary,
             sweep_floor=_to_decimal(request.sweep_floor),
             sweep_ceiling=_to_decimal_or_none(request.sweep_ceiling),
             sweep_step=_to_decimal_or_none(request.sweep_step),
@@ -131,8 +114,6 @@ def post_emr(request: EMRRequest):
             ohio_qualifying_retirement_income=_to_decimal(
                 request.ohio_qualifying_retirement_income
             ),
-            above_the_line_adjustments=_to_decimal(request.above_the_line_adjustments),
-            additional_deductions=_to_decimal(request.additional_deductions),
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
@@ -153,5 +134,5 @@ def post_emr(request: EMRRequest):
             get_default_sweep_ceiling(result.filing_status, result.tax_year)
         ),
         default_sweep_ceiling_rate=float(get_default_sweep_ceiling_bracket_rate()),
-        planning_signals=_compute_planning_signals(result, request),
+        planning_signals=_compute_planning_signals(result, income, variable_ordinary),
     )

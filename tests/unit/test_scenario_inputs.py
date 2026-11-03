@@ -6,7 +6,8 @@ income inputs for the EMR and Tax pages. Pure function: no file I/O.
 
 from decimal import Decimal
 
-from services.scenario_inputs import ScenarioSweepInputs, sweep_inputs_from_scenario
+from services.income_inputs import IncomeInputs
+from services.scenario_inputs import sweep_inputs_from_scenario
 
 
 def dec(s: str) -> Decimal:
@@ -22,21 +23,10 @@ def _scenario(inputs=None, **income_planning):
 
 class TestEmptyAndMissing:
     def test_empty_scenario_is_all_zeros(self):
-        result = sweep_inputs_from_scenario({})
-        assert result == ScenarioSweepInputs(
-            pension=_ZERO,
-            wages=_ZERO,
-            interest=_ZERO,
-            ordinary_dividends=_ZERO,
-            qualified_dividends=_ZERO,
-            ira_distributions=_ZERO,
-            other_investment_ordinary=_ZERO,
-            ss_benefit=_ZERO,
-            fixed_ltcg=_ZERO,
-            tax_exempt_interest=_ZERO,
-            above_the_line_adjustments=_ZERO,
-            additional_deductions=_ZERO,
-        )
+        assert sweep_inputs_from_scenario({}) == IncomeInputs()
+
+    def test_returns_income_inputs(self):
+        assert isinstance(sweep_inputs_from_scenario({}), IncomeInputs)
 
     def test_null_and_missing_values_are_zero(self):
         result = sweep_inputs_from_scenario(

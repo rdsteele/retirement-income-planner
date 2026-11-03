@@ -58,16 +58,8 @@ recover more cost basis than the amount withdrawn.
 def compute_plan_summary(
     *,
     filing_status: str,
-    pension: Decimal,
-    pension_taxable: Decimal,
-    interest: Decimal,
-    ordinary_dividends: Decimal,
-    ira_distributions: Decimal,
-    ss_benefit: Decimal,
-    qualified_dividends: Decimal,
-    fixed_ltcg: Decimal,
-    above_the_line_adjustments: Decimal,
-    tax_exempt_interest: Decimal,
+    gross_pension: Decimal,        # pension payment received (cash flow)
+    income: IncomeInputs,          # forced income; income.pension is the taxable part
     essential_spending: Decimal,
     discretionary_spending: Decimal,
     aca_cliff_magi: Decimal,
@@ -77,6 +69,12 @@ def compute_plan_summary(
 ) -> PlanSummary
 ```
 
+`IncomeInputs` (`services/income_inputs.py`) carries the forced income and adjustments
+(pension, wages, interest, dividends, IRA distributions, other investment income, SS
+benefit, long-term gains, tax-exempt interest, adjustments, additional deductions) and
+the sums every calculation needs (`fixed_ordinary`, `fixed_preferential`,
+`investment_ordinary`, `net_investment_income`).
+
 Computes a live plan summary without running the full EMR sweep. Called on every
 form blur event in `income.html` via `POST /api/income-plan/summary`.
 
@@ -84,8 +82,8 @@ form blur event in `income.html` via `POST /api/income-plan/summary`.
 
 ```
 AGI (excl. SS) =
-    pension_taxable + interest + ordinary_dividends + ira_distributions
-  + qualified_dividends + fixed_ltcg
+    pension + wages + interest + ordinary_dividends + ira_distributions
+  + other_investment_ordinary + qualified_dividends + fixed_ltcg
   + traditional_withdrawals + taxable_gains
   + exec_ordinary + exec_preferential
   - above_the_line_adjustments
@@ -145,16 +143,14 @@ to the summary endpoint by the UI on each subsequent call.
 ```python
 def assemble_sweep_inputs(
     *,
-    pension_taxable, interest, ordinary_dividends, ira_distributions,
-    ss_benefit, qualified_dividends, fixed_ltcg,
-    above_the_line_adjustments, tax_exempt_interest,
+    income: IncomeInputs,
     planned: list[PlannedWithdrawal],
     executed: list[ExecutedWithdrawal],
-) -> dict[str, Decimal]
+) -> IncomeInputs
 ```
 
-Merges withdrawal totals into the forced-income fields required by
-`calculate_total_cost`. Returns a dict ready to `**`-unpack into the service call.
+Merges withdrawal totals into the forced income and returns the augmented
+`IncomeInputs`, ready to pass as `income=` to `calculate_total_cost`.
 
 #### Merge rules
 
@@ -162,7 +158,12 @@ Merges withdrawal totals into the forced-income fields required by
 ira_distributions (augmented) =
     ira_distributions
   + traditional_withdrawals        # planned traditional
-  + exec_ordinary                  # executed tax_deferred + STCG gains
+  + exec_traditional               # executed tax_deferred
+
+other_investment_ordinary (augmented) =
+    other_investment_ordinary
+  + exec_stcg_gain                 # executed short-term gains: ordinary income that
+                                   # is also investment income (counts toward NIIT)
 
 fixed_ltcg (augmented) =
     fixed_ltcg

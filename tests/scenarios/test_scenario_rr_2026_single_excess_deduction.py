@@ -19,20 +19,18 @@ import pytest
 
 from services.emr import SweepMode, calculate_emr, compute_planning_signals
 from services.federal_tax import calculate_federal_tax, split_taxable_income
+from services.income_inputs import IncomeInputs
 
-_INPUTS = dict(
+_INCOME = IncomeInputs(
     pension=Decimal("1600"),
     interest=Decimal("40"),
     ordinary_dividends=Decimal("1410"),
     ira_distributions=Decimal("2680"),
-    ss_benefit=Decimal("0"),
     qualified_dividends=Decimal("2500"),
     fixed_ltcg=Decimal("37447"),
-    tax_exempt_interest=Decimal("0"),
     above_the_line_adjustments=Decimal("5400"),
-    filing_status="single",
-    tax_year=2026,
 )
+_CONTEXT = dict(filing_status="single", tax_year=2026)
 
 
 class TestRRScenarioTaxableIncomeSplit:
@@ -55,7 +53,8 @@ class TestRRScenarioEMRSweep:
     @pytest.fixture
     def result(self):
         return calculate_emr(
-            **_INPUTS,
+            income=_INCOME,
+            **_CONTEXT,
             sweep_mode=SweepMode.ORDINARY,
             sweep_floor=Decimal("0"),
             sweep_ceiling=Decimal("2000"),
@@ -71,14 +70,6 @@ class TestRRScenarioEMRSweep:
         assert result.points[0].total_tax == Decimal("0")
 
     def test_ltcg_0pct_remaining_uses_total_taxable_income(self, result):
-        signals = compute_planning_signals(
-            result,
-            fixed_ordinary=Decimal("5730"),
-            variable_ordinary=Decimal("0"),
-            qualified_dividends=_INPUTS["qualified_dividends"],
-            fixed_ltcg=_INPUTS["fixed_ltcg"],
-            above_the_line_adjustments=_INPUTS["above_the_line_adjustments"],
-            additional_deductions=Decimal("0"),
-        )
+        signals = compute_planning_signals(result, income=_INCOME, variable_ordinary=Decimal("0"))
         # 2026 single 0% LTCG ceiling 49,450 - taxable income 24,177
         assert signals.ltcg_0pct_remaining == Decimal("25273")

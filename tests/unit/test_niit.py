@@ -69,17 +69,3 @@ class TestCalculateNiit:
     def test_unsupported_filing_status_raises(self):
         with pytest.raises(ValueError):
             self._calc("210000", "60000", "mfs")
-
-
-class TestSumNetInvestmentIncome:
-    def test_counts_investment_income_only(self):
-        from services.niit import sum_net_investment_income
-
-        total = sum_net_investment_income(
-            interest=dec("100"),
-            ordinary_dividends=dec("200"),
-            other_investment_ordinary=dec("300"),
-            qualified_dividends=dec("400"),
-            fixed_ltcg=dec("500"),
-        )
-        assert total == dec("1500")

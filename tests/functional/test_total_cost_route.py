@@ -525,3 +525,16 @@ class TestSSFullyTaxableAtFloor:
         resp = client.post("/api/total-cost", json=req)
         assert resp.status_code == 200
         assert resp.json()["planning_signals"]["ss_fully_taxable"] is True
+
+
+# ── Wages: accepted as ordinary income ───────────────────────────────────
+
+
+def test_wages_tax_the_same_as_the_same_amount_of_pension():
+    def total_tax(**income):
+        payload = {**_BASE, "sweep_ceiling": 5000.0, "pension": 0.0, **income}
+        resp = client.post("/api/total-cost", json=payload)
+        assert resp.status_code == 200
+        return resp.json()["points"]["total_tax"]
+
+    assert total_tax(wages=40000.0) == total_tax(pension=40000.0)

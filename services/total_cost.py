@@ -9,6 +9,7 @@ from decimal import Decimal
 
 from services.aca import calculate_aca_subsidy, get_aptc_schedule_magis
 from services.emr import EMRPoint, EMRResult, SweepMode, calculate_emr
+from services.income_inputs import IncomeInputs
 
 _ZERO = Decimal("0")
 _EMR_COMPUTE_STEP = Decimal("500")
@@ -41,19 +42,15 @@ def _compute_aca_magi(
     sweep_value: Decimal,
     fixed_ordinary: Decimal,
     ss_taxable: Decimal,
-    qualified_dividends: Decimal,
-    fixed_ltcg: Decimal,
-    above_the_line_adjustments: Decimal,
-    tax_exempt_interest: Decimal,
+    income: IncomeInputs,
 ) -> Decimal:
     return (
         fixed_ordinary
-        + qualified_dividends
-        + fixed_ltcg
+        + income.fixed_preferential
         + sweep_value
         + ss_taxable
-        - above_the_line_adjustments
-        + tax_exempt_interest
+        - income.above_the_line_adjustments
+        + income.tax_exempt_interest
     )
 
 
@@ -61,19 +58,15 @@ def _compute_cliff_sweep_value(
     cliff_magi: Decimal,
     fixed_ordinary: Decimal,
     ss_taxable_at_floor: Decimal,
-    qualified_dividends: Decimal,
-    fixed_ltcg: Decimal,
-    above_the_line_adjustments: Decimal,
-    tax_exempt_interest: Decimal,
+    income: IncomeInputs,
 ) -> Decimal:
     return (
         cliff_magi
         - fixed_ordinary
-        - qualified_dividends
-        - fixed_ltcg
+        - income.fixed_preferential
         - ss_taxable_at_floor
-        + above_the_line_adjustments
-        - tax_exempt_interest
+        + income.above_the_line_adjustments
+        - income.tax_exempt_interest
     )
 
 
@@ -102,21 +95,11 @@ def _make_zero_aca_point(emr_point: EMRPoint) -> TotalCostPoint:
 
 def calculate_total_cost(
     *,
-    pension: Decimal = _ZERO,
-    interest: Decimal = _ZERO,
-    ordinary_dividends: Decimal = _ZERO,
-    ira_distributions: Decimal = _ZERO,
-    other_investment_ordinary: Decimal = _ZERO,
-    ss_benefit: Decimal = _ZERO,
-    qualified_dividends: Decimal = _ZERO,
-    fixed_ltcg: Decimal = _ZERO,
-    tax_exempt_interest: Decimal = _ZERO,
-    above_the_line_adjustments: Decimal = _ZERO,
-    additional_deductions: Decimal = _ZERO,
-    sweep_mode: SweepMode = SweepMode.ORDINARY,
-    variable_ordinary: Decimal = _ZERO,
+    income: IncomeInputs,
     filing_status: str,
     tax_year: int,
+    sweep_mode: SweepMode = SweepMode.ORDINARY,
+    variable_ordinary: Decimal = _ZERO,
     sweep_floor: Decimal = _ZERO,
     sweep_ceiling: Decimal | None = None,
     sweep_step: Decimal | None = None,
@@ -125,9 +108,7 @@ def calculate_total_cost(
     ohio_qualifying_retirement_income: Decimal = _ZERO,
     include_aca: bool = False,
 ) -> TotalCostResult:
-    fixed_ordinary = (
-        pension + interest + ordinary_dividends + ira_distributions + other_investment_ordinary
-    )
+    fixed_ordinary = income.fixed_ordinary
     if sweep_mode == SweepMode.PREFERENTIAL:
         fixed_ordinary = fixed_ordinary + variable_ordinary
 
@@ -141,15 +122,7 @@ def calculate_total_cost(
         # Approximate ss_taxable at floor using a quick single-point EMR call.
         # We need it to compute cliff_sweep_value before the full sweep.
         floor_result = calculate_emr(
-            pension=pension,
-            interest=interest,
-            ordinary_dividends=ordinary_dividends,
-            ira_distributions=ira_distributions,
-            other_investment_ordinary=other_investment_ordinary,
-            ss_benefit=ss_benefit,
-            qualified_dividends=qualified_dividends,
-            fixed_ltcg=fixed_ltcg,
-            tax_exempt_interest=tax_exempt_interest,
+            income=income,
             sweep_mode=sweep_mode,
             variable_ordinary=variable_ordinary,
             filing_status=filing_status,
@@ -160,8 +133,6 @@ def calculate_total_cost(
             include_ohio=include_ohio,
             ohio_medical_deduction=ohio_medical_deduction,
             ohio_qualifying_retirement_income=ohio_qualifying_retirement_income,
-            above_the_line_adjustments=above_the_line_adjustments,
-            additional_deductions=additional_deductions,
         )
         ss_taxable_at_floor = floor_result.points[0].ss_taxable if floor_result.points else _ZERO
 
@@ -169,10 +140,7 @@ def calculate_total_cost(
             sweep_value=sweep_floor,
             fixed_ordinary=fixed_ordinary,
             ss_taxable=ss_taxable_at_floor,
-            qualified_dividends=qualified_dividends,
-            fixed_ltcg=fixed_ltcg,
-            above_the_line_adjustments=above_the_line_adjustments,
-            tax_exempt_interest=tax_exempt_interest,
+            income=income,
         )
 
         # ACA cliff and max APTC from floor-point call
@@ -189,10 +157,7 @@ def calculate_total_cost(
             cliff_magi=cliff_magi,
             fixed_ordinary=fixed_ordinary,
             ss_taxable_at_floor=ss_taxable_at_floor,
-            qualified_dividends=qualified_dividends,
-            fixed_ltcg=fixed_ltcg,
-            above_the_line_adjustments=above_the_line_adjustments,
-            tax_exempt_interest=tax_exempt_interest,
+            income=income,
         )
 
         # Boundary points: cliff + all schedule MAGI points within sweep range
@@ -203,24 +168,13 @@ def calculate_total_cost(
                 cliff_magi=sched_magi,
                 fixed_ordinary=fixed_ordinary,
                 ss_taxable_at_floor=ss_taxable_at_floor,
-                qualified_dividends=qualified_dividends,
-                fixed_ltcg=fixed_ltcg,
-                above_the_line_adjustments=above_the_line_adjustments,
-                tax_exempt_interest=tax_exempt_interest,
+                income=income,
             )
             if sweep_floor <= sched_sweep <= effective_ceiling:
                 extra_boundary_points.append(sched_sweep)
 
     emr_result: EMRResult = calculate_emr(
-        pension=pension,
-        interest=interest,
-        ordinary_dividends=ordinary_dividends,
-        ira_distributions=ira_distributions,
-        other_investment_ordinary=other_investment_ordinary,
-        ss_benefit=ss_benefit,
-        qualified_dividends=qualified_dividends,
-        fixed_ltcg=fixed_ltcg,
-        tax_exempt_interest=tax_exempt_interest,
+        income=income,
         sweep_mode=sweep_mode,
         variable_ordinary=variable_ordinary,
         filing_status=filing_status,
@@ -231,8 +185,6 @@ def calculate_total_cost(
         include_ohio=include_ohio,
         ohio_medical_deduction=ohio_medical_deduction,
         ohio_qualifying_retirement_income=ohio_qualifying_retirement_income,
-        above_the_line_adjustments=above_the_line_adjustments,
-        additional_deductions=additional_deductions,
         extra_boundary_points=extra_boundary_points,
     )
 
@@ -255,10 +207,7 @@ def calculate_total_cost(
             sweep_value=p.income,
             fixed_ordinary=fixed_ordinary,
             ss_taxable=p.ss_taxable,
-            qualified_dividends=qualified_dividends,
-            fixed_ltcg=fixed_ltcg,
-            above_the_line_adjustments=above_the_line_adjustments,
-            tax_exempt_interest=tax_exempt_interest,
+            income=income,
         )
         aca_result = calculate_aca_subsidy(
             magi=aca_magi,

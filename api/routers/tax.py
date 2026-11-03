@@ -97,20 +97,9 @@ def _to_response(request: TaxRequest, result: TaxDetailResult) -> TaxResponse:
 
 def _calculate_tax(request: TaxRequest) -> TaxResponse:
     result = calculate_tax_detail(
+        income=request.to_income_inputs(),
         filing_status=request.filing_status,
         tax_year=request.tax_year,
-        pension=_d(request.pension),
-        interest=_d(request.interest),
-        ordinary_dividends=_d(request.ordinary_dividends),
-        qualified_dividends=_d(request.qualified_dividends),
-        ira_distributions=_d(request.ira_distributions),
-        other_investment_ordinary=_d(request.other_investment_ordinary),
-        ss_benefit=_d(request.ss_benefit),
-        fixed_ltcg=_d(request.fixed_ltcg),
-        tax_exempt_interest=_d(request.tax_exempt_interest),
-        wages=_d(request.wages),
-        above_the_line_adjustments=_d(request.above_the_line_adjustments),
-        additional_deductions=_d(request.additional_deductions),
         include_ohio=request.include_ohio,
         gross_medical_expenses=_d(request.gross_medical_expenses),
         ohio_qualifying_retirement_income=_d(request.ohio_qualifying_retirement_income),

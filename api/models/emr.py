@@ -2,21 +2,10 @@
 
 from pydantic import BaseModel, Field
 
+from api.models.income import IncomeInputsRequest
 
-class EMRRequest(BaseModel):
-    # Fixed income fields
-    pension: float = Field(default=0.0, ge=0)
-    interest: float = Field(default=0.0, ge=0)
-    ordinary_dividends: float = Field(default=0.0, ge=0)
-    ira_distributions: float = Field(default=0.0, ge=0)
-    other_investment_ordinary: float = Field(default=0.0, ge=0)
-    ss_benefit: float = Field(default=0.0, ge=0)
-    qualified_dividends: float = Field(default=0.0, ge=0)
-    fixed_ltcg: float = Field(default=0.0, ge=0)
-    tax_exempt_interest: float = Field(default=0.0, ge=0)
-    above_the_line_adjustments: float = Field(default=0.0, ge=0)
-    additional_deductions: float = Field(default=0.0, ge=0)
 
+class EMRRequest(IncomeInputsRequest):
     # Mode and sweep fields
     sweep_mode: str
     filing_status: str

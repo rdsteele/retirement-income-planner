@@ -1,6 +1,10 @@
 """Pydantic models for the income-plan routes."""
 
+from decimal import Decimal
+
 from pydantic import BaseModel, Field
+
+from api.models.income import IncomeInputsRequest
 
 
 class PlannedWithdrawalRequest(BaseModel):
@@ -15,24 +19,21 @@ class ExecutedWithdrawalRequest(BaseModel):
     basis: float = Field(default=0.0, ge=0)
 
 
-class IncomePlanRequest(BaseModel):
+class IncomePlanRequest(IncomeInputsRequest):
+    """Income inputs plus spending, withdrawals, and sweep settings.
+
+    Here ``pension`` is the gross payment (cash flow) and ``pension_taxable`` the part
+    that is taxable; only the taxable part flows into the tax calculations.
+    """
+
     # Identity / filing
     filing_status: str
     tax_year: int = Field(gt=0)
 
-    # Forced income streams
-    pension: float = Field(default=0.0, ge=0)
     pension_taxable: float = Field(default=0.0, ge=0)
-    interest: float = Field(default=0.0, ge=0)
-    ordinary_dividends: float = Field(default=0.0, ge=0)
-    ira_distributions: float = Field(default=0.0, ge=0)
-    other_investment_ordinary: float = Field(default=0.0, ge=0)
-    ss_benefit: float = Field(default=0.0, ge=0)
-    qualified_dividends: float = Field(default=0.0, ge=0)
-    fixed_ltcg: float = Field(default=0.0, ge=0)
-    tax_exempt_interest: float = Field(default=0.0, ge=0)
-    above_the_line_adjustments: float = Field(default=0.0, ge=0)
-    additional_deductions: float = Field(default=0.0, ge=0)
+
+    def _taxable_pension(self) -> Decimal:
+        return Decimal(str(self.pension_taxable))
 
     # Spending
     essential_spending: float = Field(default=0.0, ge=0)
@@ -92,5 +93,6 @@ class PlanSummaryResponse(BaseModel):
     total_roth_withdrawals: float
     total_hsa_withdrawals: float
     total_pension_annuity: float
+    total_wages: float
     total_ss_benefit: float
     total_all_withdrawals: float

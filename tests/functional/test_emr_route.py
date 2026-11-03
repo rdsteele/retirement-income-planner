@@ -706,3 +706,22 @@ class TestDefaultSweepCeilingReported:
         expected_top = next(Decimal(b["to"]) for b in brackets if Decimal(b["rate"]) == rate)
         assert body["default_sweep_ceiling"] == float(expected_top)
         assert body["default_sweep_ceiling_rate"] == float(rate)
+
+
+# ── Wages: accepted on every route as ordinary income ────────────────────
+
+
+class TestWagesAreOrdinaryIncome:
+    """Wages and pension are both non-investment ordinary income, so they tax identically."""
+
+    def _total_tax(self, **income):
+        payload = {**_BASE_ORDINARY, "sweep_ceiling": 5000.0, "pension": 0.0, **income}
+        resp = client.post("/api/emr", json=payload)
+        assert resp.status_code == 200
+        return resp.json()["points"]["total_tax"]
+
+    def test_wages_tax_the_same_as_the_same_amount_of_pension(self):
+        assert self._total_tax(wages=40000.0) == self._total_tax(pension=40000.0)
+
+    def test_wages_change_the_result(self):
+        assert self._total_tax(wages=40000.0) != self._total_tax(wages=0.0)

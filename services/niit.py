@@ -36,23 +36,6 @@ def compute_niit(
     return round_tax(taxable_base * rate)
 
 
-def sum_net_investment_income(
-    *,
-    interest: Decimal,
-    ordinary_dividends: Decimal,
-    other_investment_ordinary: Decimal,
-    qualified_dividends: Decimal,
-    fixed_ltcg: Decimal,
-) -> Decimal:
-    """Return net investment income: interest, dividends, other investment income, gains.
-
-    Pension, IRA, and other retirement distributions are not net investment income.
-    """
-    return (
-        interest + ordinary_dividends + other_investment_ordinary + qualified_dividends + fixed_ltcg
-    )
-
-
 def load_niit_parameters(filing_status: str, tax_year: int) -> tuple[Decimal, Decimal]:
     """Return (threshold, rate) for the filing status and year from the data file."""
     niit_data = load_federal_data(tax_year)["niit"]

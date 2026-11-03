@@ -18,6 +18,7 @@
  "total_ss_benefit": 0.0,
  "total_taxable_withdrawals": 12400.0,
  "total_traditional_withdrawals": 10000.0,
+ "total_wages": 0.0,
  "withdrawal_ordinary": 5000.0,
  "withdrawal_preferential": 0.0
 }

@@ -29,19 +29,22 @@ from decimal import Decimal
 import pytest
 
 from services.emr import SweepMode, calculate_emr
+from services.income_inputs import IncomeInputs
 
 
 @pytest.fixture(scope="module")
 def result():
     return calculate_emr(
-        pension=Decimal("40000"),
-        interest=Decimal("0"),
-        ordinary_dividends=Decimal("0"),
-        ira_distributions=Decimal("0"),
-        ss_benefit=Decimal("0"),
-        qualified_dividends=Decimal("0"),
-        fixed_ltcg=Decimal("0"),
-        tax_exempt_interest=Decimal("0"),
+        income=IncomeInputs(
+            pension=Decimal("40000"),
+            interest=Decimal("0"),
+            ordinary_dividends=Decimal("0"),
+            ira_distributions=Decimal("0"),
+            ss_benefit=Decimal("0"),
+            qualified_dividends=Decimal("0"),
+            fixed_ltcg=Decimal("0"),
+            tax_exempt_interest=Decimal("0"),
+        ),
         sweep_mode=SweepMode.ORDINARY,
         filing_status="mfj",
         tax_year=2025,

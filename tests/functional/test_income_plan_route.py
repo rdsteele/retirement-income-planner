@@ -421,3 +421,28 @@ class TestSweepCeilingOptional:
         step = float(get_default_sweep_step())
         # the sweep runs in steps up to (not past) the default ceiling
         assert ceiling - step < incomes[-1] <= ceiling
+
+
+# ── Wages ────────────────────────────────────────────────────────────────
+
+
+class TestWages:
+    def test_summary_counts_wages_as_income_and_cash(self):
+        resp = client.post("/api/income-plan/summary", json={**_BASE, "wages": 10000.0})
+        body = resp.json()
+        assert body["magi"] == 10000.0
+        assert body["forced_ordinary"] == 10000.0
+        assert body["total_wages"] == 10000.0
+        assert body["total_all_withdrawals"] == 10000.0
+
+    def test_summary_has_no_wages_by_default(self):
+        assert client.post("/api/income-plan/summary", json=_BASE).json()["total_wages"] == 0.0
+
+    def test_calculate_taxes_wages_like_taxable_pension(self):
+        def total_tax(**income):
+            payload = {**_BASE, "pension": 0.0, "pension_taxable": 0.0, **income}
+            resp = client.post("/api/income-plan/calculate", json=payload)
+            assert resp.status_code == 200
+            return resp.json()["points"]["total_tax"]
+
+        assert total_tax(wages=40000.0) == total_tax(pension_taxable=40000.0)

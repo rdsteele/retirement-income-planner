@@ -17,7 +17,8 @@ from services.federal_tax import (
     make_bracket_detail,
     split_taxable_income,
 )
-from services.niit import NIITResult, calculate_niit, sum_net_investment_income
+from services.income_inputs import IncomeInputs
+from services.niit import NIITResult, calculate_niit
 from services.ohio_tax import OhioTaxResult, calculate_ohio_tax
 from services.social_security import calculate_social_security_taxability
 
@@ -93,38 +94,22 @@ def _calculate_ohio_if_included(
 
 def calculate_tax_detail(
     *,
+    income: IncomeInputs,
     filing_status: str,
     tax_year: int,
-    pension: Decimal = _ZERO,
-    interest: Decimal = _ZERO,
-    ordinary_dividends: Decimal = _ZERO,
-    qualified_dividends: Decimal = _ZERO,
-    ira_distributions: Decimal = _ZERO,
-    other_investment_ordinary: Decimal = _ZERO,
-    ss_benefit: Decimal = _ZERO,
-    fixed_ltcg: Decimal = _ZERO,
-    tax_exempt_interest: Decimal = _ZERO,
-    wages: Decimal = _ZERO,
-    above_the_line_adjustments: Decimal = _ZERO,
-    additional_deductions: Decimal = _ZERO,
     include_ohio: bool = False,
     gross_medical_expenses: Decimal = _ZERO,
     ohio_qualifying_retirement_income: Decimal = _ZERO,
 ) -> TaxDetailResult:
-    gross_ordinary = (
-        pension
-        + interest
-        + ordinary_dividends
-        + ira_distributions
-        + other_investment_ordinary
-        + wages
-    )
-    total_preferential = qualified_dividends + fixed_ltcg
+    gross_ordinary = income.fixed_ordinary
+    total_preferential = income.fixed_preferential
+    above_the_line_adjustments = income.above_the_line_adjustments
+    additional_deductions = income.additional_deductions
 
     ss_result = calculate_social_security_taxability(
-        ss_benefit=ss_benefit,
+        ss_benefit=income.ss_benefit,
         agi_excluding_ss=gross_ordinary + total_preferential - above_the_line_adjustments,
-        tax_exempt_interest=tax_exempt_interest,
+        tax_exempt_interest=income.tax_exempt_interest,
         filing_status=filing_status,
     )
     ss_taxable = ss_result.taxable_ss
@@ -145,13 +130,7 @@ def calculate_tax_detail(
     agi = total_ordinary + total_preferential
     niit = calculate_niit(
         magi=agi,
-        net_investment_income=sum_net_investment_income(
-            interest=interest,
-            ordinary_dividends=ordinary_dividends,
-            other_investment_ordinary=other_investment_ordinary,
-            qualified_dividends=qualified_dividends,
-            fixed_ltcg=fixed_ltcg,
-        ),
+        net_investment_income=income.net_investment_income,
         filing_status=filing_status,
         tax_year=tax_year,
     )

@@ -7,8 +7,10 @@ rely on the real SS threshold data. That is intentional: we want to verify
 that compute_plan_summary uses the accurate service, not a JS approximation.
 """
 
+import dataclasses
 from decimal import Decimal
 
+from services.income_inputs import IncomeInputs
 from services.income_plan import (
     ExecutedWithdrawal,
     PlannedWithdrawal,
@@ -123,20 +125,30 @@ class TestClassifyWithdrawals:
 # ---------------------------------------------------------------------------
 
 
+_INCOME_FIELD_NAMES = {f.name for f in dataclasses.fields(IncomeInputs)}
+
+
+def _split_income_overrides(overrides: dict) -> tuple[Decimal, IncomeInputs]:
+    """Pop the income fields out of keyword overrides.
+
+    Returns (gross pension, income). ``pension`` is the gross payment (cash flow) and
+    ``pension_taxable`` the taxable part, which is what IncomeInputs.pension holds.
+    """
+    gross_pension = overrides.pop("pension", d("0"))
+    values = {"pension": overrides.pop("pension_taxable", d("0"))}
+    for name in list(overrides):
+        if name in _INCOME_FIELD_NAMES:
+            values[name] = overrides.pop(name)
+    return gross_pension, IncomeInputs(**values)
+
+
 def _base_summary(**overrides):
     """Build a minimal summary request with all defaults."""
+    gross_pension, income = _split_income_overrides(overrides)
     defaults = dict(
         filing_status="single",
-        pension=d("0"),
-        pension_taxable=d("0"),
-        interest=d("0"),
-        ordinary_dividends=d("0"),
-        ira_distributions=d("0"),
-        ss_benefit=d("0"),
-        qualified_dividends=d("0"),
-        fixed_ltcg=d("0"),
-        above_the_line_adjustments=d("0"),
-        tax_exempt_interest=d("0"),
+        gross_pension=gross_pension,
+        income=income,
         essential_spending=d("0"),
         discretionary_spending=d("0"),
         aca_cliff_magi=d("0"),
@@ -348,6 +360,28 @@ class TestComputePlanSummaryPaymentsTotals:
         assert s.total_all_withdrawals == d("44000")
 
 
+class TestWagesInPlanSummary:
+    """Wages are ordinary income and cash received, even though no page sends them yet."""
+
+    def test_wages_add_to_magi_and_forced_ordinary(self):
+        s = _base_summary(wages=d("10000"))
+        assert s.magi == d("10000")
+        assert s.forced_ordinary == d("10000")
+        assert s.total_income == d("10000")
+
+    def test_wages_count_as_cash_received(self):
+        s = _base_summary(wages=d("10000"))
+        assert s.total_wages == d("10000")
+        assert s.total_all_withdrawals == d("10000")
+
+    def test_wages_count_toward_ss_provisional_income(self):
+        s = _base_summary(ss_benefit=d("20000"), wages=d("20000"))
+        assert s.provisional_income == d("30000")  # 20,000 wages + half of 20,000 SS
+
+    def test_no_wages_by_default(self):
+        assert _base_summary().total_wages == d("0")
+
+
 class TestOtherInvestmentOrdinarySummary:
     """other_investment_ordinary (rental, royalties, NQ annuity) is forced ordinary income."""
 
@@ -382,48 +416,37 @@ class TestOtherInvestmentOrdinarySummary:
 
 class TestAssembleSweepInputs:
     def _base(self, **overrides):
-        defaults = dict(
-            pension_taxable=d("0"),
-            interest=d("0"),
-            ordinary_dividends=d("0"),
-            ira_distributions=d("0"),
-            ss_benefit=d("0"),
-            qualified_dividends=d("0"),
-            fixed_ltcg=d("0"),
-            above_the_line_adjustments=d("0"),
-            tax_exempt_interest=d("0"),
-            planned=[],
-            executed=[],
-        )
+        _, income = _split_income_overrides(overrides)
+        defaults = dict(income=income, planned=[], executed=[])
         defaults.update(overrides)
         return assemble_sweep_inputs(**defaults)
 
     def test_no_withdrawals_passthrough(self):
         result = self._base(pension_taxable=d("30000"), ss_benefit=d("24000"))
-        assert result["pension"] == d("30000")  # pension_taxable passed as "pension"
-        assert result["ss_benefit"] == d("24000")
-        assert result["ira_distributions"] == d("0")
-        assert result["fixed_ltcg"] == d("0")
+        assert result.pension == d("30000")  # pension_taxable passed as "pension"
+        assert result.ss_benefit == d("24000")
+        assert result.ira_distributions == d("0")
+        assert result.fixed_ltcg == d("0")
 
     def test_traditional_added_to_ira_distributions(self):
         result = self._base(
             ira_distributions=d("10000"),
             planned=[PlannedWithdrawal(account_type="traditional", amount=d("20000"))],
         )
-        assert result["ira_distributions"] == d("30000")
+        assert result.ira_distributions == d("30000")
 
     def test_taxable_gains_added_to_fixed_ltcg(self):
         result = self._base(
             fixed_ltcg=d("5000"),
             planned=[PlannedWithdrawal(account_type="taxable", amount=d("10000"), basis=d("6000"))],
         )
-        assert result["fixed_ltcg"] == d("9000")  # 5000 + 4000 gain
+        assert result.fixed_ltcg == d("9000")  # 5000 + 4000 gain
 
     def test_executed_ordinary_added_to_ira_distributions(self):
         result = self._base(
             executed=[ExecutedWithdrawal(withdrawal_type="tax_deferred", amount=d("8000"))],
         )
-        assert result["ira_distributions"] == d("8000")
+        assert result.ira_distributions == d("8000")
 
     def test_executed_stcg_gain_routed_to_other_investment_ordinary(self):
         result = self._base(
@@ -431,14 +454,14 @@ class TestAssembleSweepInputs:
                 ExecutedWithdrawal(withdrawal_type="stcg", amount=d("70000"), basis=d("10000"))
             ],
         )
-        assert result["other_investment_ordinary"] == d("60000")
-        assert result["ira_distributions"] == d("0")
+        assert result.other_investment_ordinary == d("60000")
+        assert result.ira_distributions == d("0")
 
     def test_tax_deferred_is_not_investment_ordinary(self):
         result = self._base(
             executed=[ExecutedWithdrawal(withdrawal_type="tax_deferred", amount=d("8000"))],
         )
-        assert result["other_investment_ordinary"] == d("0")
+        assert result.other_investment_ordinary == d("0")
 
     def test_stcg_and_tax_deferred_split_between_buckets(self):
         result = self._base(
@@ -447,12 +470,12 @@ class TestAssembleSweepInputs:
                 ExecutedWithdrawal(withdrawal_type="stcg", amount=d("5000"), basis=d("2000")),
             ],
         )
-        assert result["ira_distributions"] == d("8000")
-        assert result["other_investment_ordinary"] == d("3000")
+        assert result.ira_distributions == d("8000")
+        assert result.other_investment_ordinary == d("3000")
 
     def test_forced_other_investment_ordinary_passes_through(self):
         result = self._base(other_investment_ordinary=d("5000"))
-        assert result["other_investment_ordinary"] == d("5000")
+        assert result.other_investment_ordinary == d("5000")
 
     def test_forced_and_executed_stcg_other_investment_combine(self):
         result = self._base(
@@ -461,7 +484,7 @@ class TestAssembleSweepInputs:
                 ExecutedWithdrawal(withdrawal_type="stcg", amount=d("5000"), basis=d("2000"))
             ],
         )
-        assert result["other_investment_ordinary"] == d("8000")
+        assert result.other_investment_ordinary == d("8000")
 
     def test_executed_ltcg_added_to_fixed_ltcg(self):
         result = self._base(
@@ -469,7 +492,7 @@ class TestAssembleSweepInputs:
                 ExecutedWithdrawal(withdrawal_type="ltcg", amount=d("10000"), basis=d("7000"))
             ],
         )
-        assert result["fixed_ltcg"] == d("3000")
+        assert result.fixed_ltcg == d("3000")
 
     def test_roth_and_hsa_not_added_to_any_income(self):
         result = self._base(
@@ -478,23 +501,23 @@ class TestAssembleSweepInputs:
                 PlannedWithdrawal(account_type="hsa", amount=d("2000")),
             ],
         )
-        assert result["ira_distributions"] == d("0")
-        assert result["fixed_ltcg"] == d("0")
+        assert result.ira_distributions == d("0")
+        assert result.fixed_ltcg == d("0")
 
-    def test_all_income_fields_present_in_output(self):
-        result = self._base()
-        required = {
-            "pension",
-            "interest",
-            "ordinary_dividends",
-            "ira_distributions",
-            "ss_benefit",
-            "qualified_dividends",
-            "fixed_ltcg",
-            "above_the_line_adjustments",
-            "tax_exempt_interest",
-        }
-        assert required.issubset(result.keys())
+    def test_returns_income_inputs_with_every_field_carried_over(self):
+        result = self._base(
+            wages=d("11"),
+            ss_benefit=d("22"),
+            tax_exempt_interest=d("33"),
+            additional_deductions=d("44"),
+        )
+        assert isinstance(result, IncomeInputs)
+        assert (result.wages, result.ss_benefit, result.tax_exempt_interest) == (
+            d("11"),
+            d("22"),
+            d("33"),
+        )
+        assert result.additional_deductions == d("44")
 
     def test_combined_scenario(self):
         result = self._base(
@@ -510,6 +533,6 @@ class TestAssembleSweepInputs:
             ],
         )
         # ira_distributions = 5000 + 10000 (trad) + 4000 (exec tax_deferred) = 19000
-        assert result["ira_distributions"] == d("19000")
+        assert result.ira_distributions == d("19000")
         # fixed_ltcg = 2000 + 5000 (taxable gain) + 2000 (ltcg exec gain) = 9000
-        assert result["fixed_ltcg"] == d("9000")
+        assert result.fixed_ltcg == d("9000")

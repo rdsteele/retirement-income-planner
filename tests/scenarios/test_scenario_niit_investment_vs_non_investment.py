@@ -13,6 +13,7 @@
 from decimal import Decimal
 
 from services.emr import SweepMode, calculate_emr
+from services.income_inputs import IncomeInputs
 
 _ZERO = Decimal("0")
 
@@ -25,15 +26,17 @@ def _total_tax_at_floor(
     other_investment_ordinary: Decimal = _ZERO,
 ) -> Decimal:
     result = calculate_emr(
-        pension=pension,
-        interest=interest,
-        ordinary_dividends=_ZERO,
-        ira_distributions=ira_distributions,
-        other_investment_ordinary=other_investment_ordinary,
-        ss_benefit=_ZERO,
-        qualified_dividends=_ZERO,
-        fixed_ltcg=_ZERO,
-        tax_exempt_interest=_ZERO,
+        income=IncomeInputs(
+            pension=pension,
+            interest=interest,
+            ordinary_dividends=_ZERO,
+            ira_distributions=ira_distributions,
+            other_investment_ordinary=other_investment_ordinary,
+            ss_benefit=_ZERO,
+            qualified_dividends=_ZERO,
+            fixed_ltcg=_ZERO,
+            tax_exempt_interest=_ZERO,
+        ),
         sweep_mode=SweepMode.ORDINARY,
         filing_status="single",
         tax_year=2026,

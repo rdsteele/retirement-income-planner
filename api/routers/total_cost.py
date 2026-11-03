@@ -16,6 +16,7 @@ from api.models.total_cost import (
 from api.routers.emr import _to_bracket_distance_responses
 from services.emr import SweepMode
 from services.emr import compute_planning_signals as _compute_service_signals
+from services.income_inputs import IncomeInputs
 from services.total_cost import TotalCostResult, calculate_total_cost
 
 logger = logging.getLogger(__name__)
@@ -93,7 +94,9 @@ def _compute_bracket_boundaries(result: TotalCostResult) -> list[BracketBoundary
 
 def _compute_planning_signals(
     result: TotalCostResult,
-    request: TotalCostRequest,
+    income: IncomeInputs,
+    variable_ordinary: Decimal,
+    include_aca: bool,
     mode: SweepMode,
 ) -> TotalCostPlanningSignals:
     from typing import cast
@@ -108,26 +111,14 @@ def _compute_planning_signals(
         filing_status=result.filing_status,
     )
     shared = _compute_service_signals(
-        emr_result,
-        fixed_ordinary=_to_decimal(
-            request.pension
-            + request.interest
-            + request.ordinary_dividends
-            + request.ira_distributions
-            + request.other_investment_ordinary,
-        ),
-        variable_ordinary=_to_decimal(request.variable_ordinary),
-        qualified_dividends=_to_decimal(request.qualified_dividends),
-        fixed_ltcg=_to_decimal(request.fixed_ltcg),
-        above_the_line_adjustments=_to_decimal(request.above_the_line_adjustments),
-        additional_deductions=_to_decimal(request.additional_deductions),
+        emr_result, income=income, variable_ordinary=variable_ordinary
     )
 
     zero_rate_threshold = _compute_zero_rate_threshold(result)
     bracket_boundaries = _compute_bracket_boundaries(result)
 
     aca_cliff_sweep_value: float | None = None
-    if request.include_aca:
+    if include_aca:
         aca_cliff_sweep_value = float(result.cliff_sweep_value)
 
     return TotalCostPlanningSignals(
@@ -154,21 +145,13 @@ def post_total_cost(request: TotalCostRequest):
             f"Must be 'ordinary' or 'preferential'.",
         )
 
+    income = request.to_income_inputs()
+    variable_ordinary = _to_decimal(request.variable_ordinary)
     try:
         result = calculate_total_cost(
-            pension=_to_decimal(request.pension),
-            interest=_to_decimal(request.interest),
-            ordinary_dividends=_to_decimal(request.ordinary_dividends),
-            ira_distributions=_to_decimal(request.ira_distributions),
-            other_investment_ordinary=_to_decimal(request.other_investment_ordinary),
-            ss_benefit=_to_decimal(request.ss_benefit),
-            qualified_dividends=_to_decimal(request.qualified_dividends),
-            fixed_ltcg=_to_decimal(request.fixed_ltcg),
-            tax_exempt_interest=_to_decimal(request.tax_exempt_interest),
-            above_the_line_adjustments=_to_decimal(request.above_the_line_adjustments),
-            additional_deductions=_to_decimal(request.additional_deductions),
+            income=income,
             sweep_mode=mode,
-            variable_ordinary=_to_decimal(request.variable_ordinary),
+            variable_ordinary=variable_ordinary,
             filing_status=request.filing_status,
             tax_year=request.tax_year,
             sweep_floor=_to_decimal(request.sweep_floor),
@@ -199,5 +182,7 @@ def post_total_cost(request: TotalCostRequest):
         aca_cliff_magi=float(result.aca_cliff_magi),
         aptc_annual_max=float(result.aptc_annual_max),
         cliff_sweep_value=float(result.cliff_sweep_value),
-        planning_signals=_compute_planning_signals(result, request, mode),
+        planning_signals=_compute_planning_signals(
+            result, income, variable_ordinary, request.include_aca, mode
+        ),
     )

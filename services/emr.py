@@ -25,6 +25,7 @@ from services.data_loader import (
     require_supported_filing_status,
 )
 from services.federal_tax import calculate_federal_tax, split_taxable_income, unused_deduction
+from services.income_inputs import IncomeInputs
 from services.niit import compute_niit, load_niit_parameters
 from services.ohio_tax import calculate_ohio_tax
 from services.social_security import calculate_social_security_taxability
@@ -105,28 +106,16 @@ def get_default_sweep_ceiling(filing_status: str, tax_year: int) -> Decimal:
 # ---------------------------------------------------------------------------
 
 
-def _compute_fixed_ordinary(
-    pension: Decimal,
-    interest: Decimal,
-    ordinary_dividends: Decimal,
-    ira_distributions: Decimal,
-    other_investment_ordinary: Decimal = _ZERO,
-) -> Decimal:
-    return pension + interest + ordinary_dividends + ira_distributions + other_investment_ordinary
-
-
 def _compute_incomes_at_point(
     sweep_value: Decimal,
     sweep_mode: SweepMode,
-    fixed_ordinary: Decimal,
+    income: IncomeInputs,
     variable_ordinary: Decimal,
-    qualified_dividends: Decimal,
-    fixed_ltcg: Decimal,
 ) -> tuple[Decimal, Decimal]:
     """Return (total_ordinary, total_preferential) at a sweep point."""
     if sweep_mode == SweepMode.ORDINARY:
-        return fixed_ordinary + sweep_value, qualified_dividends + fixed_ltcg
-    return (fixed_ordinary + variable_ordinary, qualified_dividends + fixed_ltcg + sweep_value)
+        return income.fixed_ordinary + sweep_value, income.fixed_preferential
+    return income.fixed_ordinary + variable_ordinary, income.fixed_preferential + sweep_value
 
 
 # ---------------------------------------------------------------------------
@@ -137,19 +126,17 @@ def _compute_incomes_at_point(
 def _compute_ss_at_point(
     total_ordinary: Decimal,
     total_preferential: Decimal,
-    tax_exempt_interest: Decimal,
-    ss_benefit: Decimal,
+    income: IncomeInputs,
     filing_status: str,
-    above_the_line_adjustments: Decimal = _ZERO,
 ) -> tuple[Decimal, Decimal]:
     """Return (ss_taxable, ss_inclusion_rate)."""
-    if ss_benefit == _ZERO:
+    if income.ss_benefit == _ZERO:
         return _ZERO, _ZERO
-    agi_excluding_ss = total_ordinary + total_preferential - above_the_line_adjustments
+    agi_excluding_ss = total_ordinary + total_preferential - income.above_the_line_adjustments
     result = calculate_social_security_taxability(
-        ss_benefit=ss_benefit,
+        ss_benefit=income.ss_benefit,
         agi_excluding_ss=agi_excluding_ss,
-        tax_exempt_interest=tax_exempt_interest,
+        tax_exempt_interest=income.tax_exempt_interest,
         filing_status=filing_status,
     )
     return result.taxable_ss, result.inclusion_rate
@@ -165,18 +152,18 @@ def _compute_agi_and_taxable(
     ss_taxable: Decimal,
     total_preferential: Decimal,
     std_deduction: Decimal,
-    above_the_line_adjustments: Decimal = _ZERO,
-    additional_deductions: Decimal = _ZERO,
+    income: IncomeInputs,
 ) -> tuple[Decimal, Decimal, Decimal]:
     """Return (agi, taxable_ordinary, taxable_preferential).
 
     Deductions that exceed ordinary income reduce preferential income.
     """
-    agi = total_ordinary + ss_taxable + total_preferential - above_the_line_adjustments
+    adjustments = income.above_the_line_adjustments
+    agi = total_ordinary + ss_taxable + total_preferential - adjustments
     taxable_ordinary, taxable_preferential = split_taxable_income(
         total_ordinary + ss_taxable,
         total_preferential,
-        std_deduction + additional_deductions + above_the_line_adjustments,
+        std_deduction + income.additional_deductions + adjustments,
     )
     return agi, taxable_ordinary, taxable_preferential
 
@@ -218,12 +205,8 @@ def _compute_ohio_tax_at_point(
 
 class _SnapshotKwargs(TypedDict, total=False):
     sweep_mode: SweepMode
-    fixed_ordinary: Decimal
+    income: IncomeInputs
     variable_ordinary: Decimal
-    qualified_dividends: Decimal
-    fixed_ltcg: Decimal
-    ss_benefit: Decimal
-    tax_exempt_interest: Decimal
     std_deduction: Decimal
     niit_threshold: Decimal
     niit_rate: Decimal
@@ -232,20 +215,13 @@ class _SnapshotKwargs(TypedDict, total=False):
     include_ohio: bool
     ohio_medical_deduction: Decimal
     ohio_qualifying_retirement_income: Decimal
-    investment_ordinary: Decimal
-    above_the_line_adjustments: Decimal
-    additional_deductions: Decimal
 
 
 def _compute_tax_snapshot(
     sweep_value: Decimal,
     sweep_mode: SweepMode,
-    fixed_ordinary: Decimal,
+    income: IncomeInputs,
     variable_ordinary: Decimal,
-    qualified_dividends: Decimal,
-    fixed_ltcg: Decimal,
-    ss_benefit: Decimal,
-    tax_exempt_interest: Decimal,
     std_deduction: Decimal,
     niit_threshold: Decimal,
     niit_rate: Decimal,
@@ -254,36 +230,18 @@ def _compute_tax_snapshot(
     include_ohio: bool,
     ohio_medical_deduction: Decimal,
     ohio_qualifying_retirement_income: Decimal,
-    investment_ordinary: Decimal,
-    above_the_line_adjustments: Decimal = _ZERO,
-    additional_deductions: Decimal = _ZERO,
 ) -> _TaxSnapshot:
     """Compute complete tax at a single sweep point."""
     total_ordinary, total_preferential = _compute_incomes_at_point(
-        sweep_value,
-        sweep_mode,
-        fixed_ordinary,
-        variable_ordinary,
-        qualified_dividends,
-        fixed_ltcg,
+        sweep_value, sweep_mode, income, variable_ordinary
     )
 
     ss_taxable, ss_inclusion_rate = _compute_ss_at_point(
-        total_ordinary,
-        total_preferential,
-        tax_exempt_interest,
-        ss_benefit,
-        filing_status,
-        above_the_line_adjustments=above_the_line_adjustments,
+        total_ordinary, total_preferential, income, filing_status
     )
 
     agi, taxable_ordinary, taxable_preferential = _compute_agi_and_taxable(
-        total_ordinary,
-        ss_taxable,
-        total_preferential,
-        std_deduction,
-        above_the_line_adjustments=above_the_line_adjustments,
-        additional_deductions=additional_deductions,
+        total_ordinary, ss_taxable, total_preferential, std_deduction, income
     )
 
     fed_result = calculate_federal_tax(
@@ -293,7 +251,7 @@ def _compute_tax_snapshot(
         tax_year=tax_year,
     )
 
-    net_investment_income = investment_ordinary + total_preferential
+    net_investment_income = income.investment_ordinary + total_preferential
     niit = compute_niit(agi, net_investment_income, niit_threshold, niit_rate)
 
     ohio_tax = _ZERO
@@ -424,49 +382,48 @@ def _compute_ohio_boundaries(
 
 
 def _compute_ordinary_boundaries(
-    fixed_ordinary: Decimal,
-    total_preferential: Decimal,
-    ss_benefit: Decimal,
-    tax_exempt_interest: Decimal,
+    income: IncomeInputs,
     std_deduction: Decimal,
     niit_threshold: Decimal,
     filing_status: str,
     tax_year: int,
     include_ohio: bool = False,
     ohio_medical_deduction: Decimal = _ZERO,
-    above_the_line_adjustments: Decimal = _ZERO,
-    additional_deductions: Decimal = _ZERO,
 ) -> list[Decimal]:
     """Compute approximate boundary points for ORDINARY sweep mode."""
     data = load_federal_data(tax_year)
     boundaries: list[Decimal] = []
-    total_deduction = std_deduction + additional_deductions + above_the_line_adjustments
+    total_deduction = (
+        std_deduction + income.additional_deductions + income.above_the_line_adjustments
+    )
 
     # Standard deduction exhaustion
-    boundaries.append(total_deduction - fixed_ordinary)
+    boundaries.append(total_deduction - income.fixed_ordinary)
 
     # Ordinary bracket boundaries
     for bracket in data["ordinary"][filing_status]:
         if bracket["to"] is not None:
             b_to = Decimal(bracket["to"])
-            boundaries.append(b_to + total_deduction - fixed_ordinary)
+            boundaries.append(b_to + total_deduction - income.fixed_ordinary)
 
     # Preferential stacking boundaries
-    if total_preferential > _ZERO:
+    if income.fixed_preferential > _ZERO:
         for bracket in data["preferential"][filing_status]:
             if bracket["to"] is not None:
                 p_to = Decimal(bracket["to"])
-                boundaries.append(p_to - total_preferential + total_deduction - fixed_ordinary)
-                boundaries.append(p_to + total_deduction - fixed_ordinary)
+                boundaries.append(
+                    p_to - income.fixed_preferential + total_deduction - income.fixed_ordinary
+                )
+                boundaries.append(p_to + total_deduction - income.fixed_ordinary)
 
     # SS torpedo boundaries
-    if ss_benefit > _ZERO:
-        half_ss = ss_benefit * get_provisional_income_benefit_rate()
+    if income.ss_benefit > _ZERO:
+        half_ss = income.ss_benefit * get_provisional_income_benefit_rate()
         base_prov = (
-            fixed_ordinary
-            + total_preferential
-            - above_the_line_adjustments
-            + tax_exempt_interest
+            income.fixed_ordinary
+            + income.fixed_preferential
+            - income.above_the_line_adjustments
+            + income.tax_exempt_interest
             + half_ss
         )
         ss_data = load_ss_data()
@@ -478,18 +435,18 @@ def _compute_ordinary_boundaries(
         tier_1_rate = Decimal(ss_data["tier_1_inclusion_rate"])
         tier_2_rate = Decimal(ss_data["tier_2_inclusion_rate"])
         max_rate = Decimal(ss_data["maximum_inclusion_rate"])
-        max_tier_1 = min(tier_1_rate * ss_benefit, tier_1_rate * (tier_2 - tier_1))
-        max_taxable = max_rate * ss_benefit
+        max_tier_1 = min(tier_1_rate * income.ss_benefit, tier_1_rate * (tier_2 - tier_1))
+        max_taxable = max_rate * income.ss_benefit
         if max_taxable > max_tier_1:
             ss_max_prov = tier_2 + round_tax((max_taxable - max_tier_1) / tier_2_rate)
             boundaries.append(ss_max_prov - base_prov)
 
     # NIIT threshold (approximate — ignores ss_taxable in AGI)
-    boundaries.append(niit_threshold - fixed_ordinary - total_preferential)
+    boundaries.append(niit_threshold - income.fixed_ordinary - income.fixed_preferential)
 
     # Ohio discontinuity boundaries
     if include_ohio:
-        ohio_agi_base = fixed_ordinary + total_preferential
+        ohio_agi_base = income.fixed_ordinary + income.fixed_preferential
         boundaries.extend(
             _compute_ohio_boundaries(ohio_agi_base, ohio_medical_deduction, tax_year, filing_status)
         )
@@ -498,30 +455,26 @@ def _compute_ordinary_boundaries(
 
 
 def _compute_preferential_boundaries(
-    fixed_ordinary: Decimal,
+    income: IncomeInputs,
     variable_ordinary: Decimal,
-    qualified_dividends: Decimal,
-    fixed_ltcg: Decimal,
-    ss_benefit: Decimal,
-    tax_exempt_interest: Decimal,
     std_deduction: Decimal,
     niit_threshold: Decimal,
     filing_status: str,
     tax_year: int,
     include_ohio: bool = False,
     ohio_medical_deduction: Decimal = _ZERO,
-    above_the_line_adjustments: Decimal = _ZERO,
-    additional_deductions: Decimal = _ZERO,
 ) -> list[Decimal]:
     """Compute approximate boundary points for PREFERENTIAL sweep mode."""
     data = load_federal_data(tax_year)
     boundaries: list[Decimal] = []
 
-    total_ordinary = fixed_ordinary + variable_ordinary
-    total_deduction = std_deduction + additional_deductions + above_the_line_adjustments
+    total_ordinary = income.fixed_ordinary + variable_ordinary
+    total_deduction = (
+        std_deduction + income.additional_deductions + income.above_the_line_adjustments
+    )
     taxable_ordinary, _ = split_taxable_income(total_ordinary, _ZERO, total_deduction)
     excess_deduction = unused_deduction(total_ordinary, total_deduction)
-    fixed_pref = qualified_dividends + fixed_ltcg
+    fixed_pref = income.fixed_preferential
 
     # Preferential bracket boundaries
     for bracket in data["preferential"][filing_status]:
@@ -530,10 +483,14 @@ def _compute_preferential_boundaries(
             boundaries.append(p_to - taxable_ordinary - fixed_pref + excess_deduction)
 
     # SS torpedo boundaries
-    if ss_benefit > _ZERO:
-        half_ss = ss_benefit * get_provisional_income_benefit_rate()
+    if income.ss_benefit > _ZERO:
+        half_ss = income.ss_benefit * get_provisional_income_benefit_rate()
         base_prov = (
-            total_ordinary + fixed_pref - above_the_line_adjustments + tax_exempt_interest + half_ss
+            total_ordinary
+            + fixed_pref
+            - income.above_the_line_adjustments
+            + income.tax_exempt_interest
+            + half_ss
         )
         ss_data = load_ss_data()
         tier_1 = Decimal(ss_data[filing_status]["tier_1_threshold"])
@@ -544,8 +501,8 @@ def _compute_preferential_boundaries(
         tier_1_rate = Decimal(ss_data["tier_1_inclusion_rate"])
         tier_2_rate = Decimal(ss_data["tier_2_inclusion_rate"])
         max_rate = Decimal(ss_data["maximum_inclusion_rate"])
-        max_tier_1 = min(tier_1_rate * ss_benefit, tier_1_rate * (tier_2 - tier_1))
-        max_taxable = max_rate * ss_benefit
+        max_tier_1 = min(tier_1_rate * income.ss_benefit, tier_1_rate * (tier_2 - tier_1))
+        max_taxable = max_rate * income.ss_benefit
         if max_taxable > max_tier_1:
             ss_max_prov = tier_2 + round_tax((max_taxable - max_tier_1) / tier_2_rate)
             boundaries.append(ss_max_prov - base_prov)
@@ -593,14 +550,7 @@ def _build_sweep_array(
 
 def calculate_emr(
     *,
-    pension: Decimal,
-    interest: Decimal,
-    ordinary_dividends: Decimal,
-    ira_distributions: Decimal,
-    ss_benefit: Decimal,
-    qualified_dividends: Decimal,
-    fixed_ltcg: Decimal,
-    tax_exempt_interest: Decimal,
+    income: IncomeInputs,
     sweep_mode: SweepMode,
     filing_status: str,
     tax_year: int,
@@ -611,16 +561,14 @@ def calculate_emr(
     include_ohio: bool = False,
     ohio_medical_deduction: Decimal = _ZERO,
     ohio_qualifying_retirement_income: Decimal = _ZERO,
-    above_the_line_adjustments: Decimal = _ZERO,
-    additional_deductions: Decimal = _ZERO,
     extra_boundary_points: list[Decimal] | None = None,
-    other_investment_ordinary: Decimal = _ZERO,
 ) -> EMRResult:
     """Sweep EMR across an income range.
 
-    ``other_investment_ordinary`` is ordinary income that is also net investment
-    income for NIIT (rental, royalties, non-qualified annuity earnings, short-term
-    gains). Pension, IRA, and similar distributions are not net investment income.
+    ``income`` holds the forced income and adjustments. Its ``other_investment_ordinary``
+    is ordinary income that is also net investment income for NIIT (rental, royalties,
+    non-qualified annuity earnings, short-term gains); pension, IRA, and similar
+    distributions are not net investment income.
     """
     require_supported_filing_status(filing_status)
 
@@ -634,44 +582,27 @@ def calculate_emr(
     if sweep_step is None:
         sweep_step = get_default_sweep_step()
 
-    fixed_ordinary = _compute_fixed_ordinary(
-        pension, interest, ordinary_dividends, ira_distributions, other_investment_ordinary
-    )
-    investment_ordinary = interest + ordinary_dividends + other_investment_ordinary
-    total_preferential_fixed = qualified_dividends + fixed_ltcg
-
     # Compute boundary points
     if sweep_mode == SweepMode.ORDINARY:
         boundaries = _compute_ordinary_boundaries(
-            fixed_ordinary,
-            total_preferential_fixed,
-            ss_benefit,
-            tax_exempt_interest,
+            income,
             std_deduction,
             niit_threshold,
             filing_status,
             tax_year,
             include_ohio=include_ohio,
             ohio_medical_deduction=ohio_medical_deduction,
-            above_the_line_adjustments=above_the_line_adjustments,
-            additional_deductions=additional_deductions,
         )
     else:
         boundaries = _compute_preferential_boundaries(
-            fixed_ordinary,
+            income,
             variable_ordinary,
-            qualified_dividends,
-            fixed_ltcg,
-            ss_benefit,
-            tax_exempt_interest,
             std_deduction,
             niit_threshold,
             filing_status,
             tax_year,
             include_ohio=include_ohio,
             ohio_medical_deduction=ohio_medical_deduction,
-            above_the_line_adjustments=above_the_line_adjustments,
-            additional_deductions=additional_deductions,
         )
 
     if extra_boundary_points:
@@ -682,12 +613,8 @@ def calculate_emr(
     # Shared keyword args for _compute_tax_snapshot
     shared: _SnapshotKwargs = dict(
         sweep_mode=sweep_mode,
-        fixed_ordinary=fixed_ordinary,
+        income=income,
         variable_ordinary=variable_ordinary,
-        qualified_dividends=qualified_dividends,
-        fixed_ltcg=fixed_ltcg,
-        ss_benefit=ss_benefit,
-        tax_exempt_interest=tax_exempt_interest,
         std_deduction=std_deduction,
         niit_threshold=niit_threshold,
         niit_rate=niit_rate,
@@ -696,9 +623,6 @@ def calculate_emr(
         include_ohio=include_ohio,
         ohio_medical_deduction=ohio_medical_deduction,
         ohio_qualifying_retirement_income=ohio_qualifying_retirement_income,
-        investment_ordinary=investment_ordinary,
-        above_the_line_adjustments=above_the_line_adjustments,
-        additional_deductions=additional_deductions,
     )
 
     points: list[EMRPoint] = []
@@ -786,16 +710,14 @@ def _compute_ltcg_0pct_remaining(
 def _compute_ltcg_0pct_ordinary_runway(
     points: list[EMRPoint],
     sweep_mode: SweepMode,
-    ltcg_already_used: Decimal,
-    fixed_ordinary: Decimal,
+    income: IncomeInputs,
     ss_taxable_at_floor: Decimal,
     std_deduction: Decimal,
-    above_the_line_adjustments: Decimal,
-    additional_deductions: Decimal,
     filing_status: str,
     tax_year: int,
 ) -> Decimal | None:
     """Additional ordinary income before existing LTCG leaves the 0% LTCG bracket."""
+    ltcg_already_used = income.fixed_preferential
     if not points:
         return None
     if sweep_mode == SweepMode.ORDINARY and ltcg_already_used == _ZERO:
@@ -805,9 +727,9 @@ def _compute_ltcg_0pct_ordinary_runway(
         ceiling
         - ltcg_already_used
         + std_deduction
-        + above_the_line_adjustments
-        + additional_deductions
-        - fixed_ordinary
+        + income.above_the_line_adjustments
+        + income.additional_deductions
+        - income.fixed_ordinary
         - ss_taxable_at_floor
     )
     return runway if runway > _ZERO else None
@@ -816,23 +738,21 @@ def _compute_ltcg_0pct_ordinary_runway(
 def _compute_zero_ordinary_space(
     points: list[EMRPoint],
     sweep_mode: SweepMode,
-    fixed_ordinary: Decimal,
+    income: IncomeInputs,
     variable_ordinary: Decimal,
     ss_taxable_at_floor: Decimal,
     std_deduction: Decimal,
-    above_the_line_adjustments: Decimal,
-    additional_deductions: Decimal,
 ) -> Decimal | None:
     if not points:
         return None
-    effective_fixed = fixed_ordinary
+    effective_fixed = income.fixed_ordinary
     if sweep_mode == SweepMode.PREFERENTIAL:
         effective_fixed += variable_ordinary
     return max(
         _ZERO,
         std_deduction
-        + above_the_line_adjustments
-        + additional_deductions
+        + income.above_the_line_adjustments
+        + income.additional_deductions
         - effective_fixed
         - ss_taxable_at_floor,
     )
@@ -861,28 +781,22 @@ def _compute_bracket_distances(
 def compute_planning_signals(
     result: EMRResult,
     *,
-    fixed_ordinary: Decimal,
+    income: IncomeInputs,
     variable_ordinary: Decimal,
-    qualified_dividends: Decimal,
-    fixed_ltcg: Decimal,
-    above_the_line_adjustments: Decimal,
-    additional_deductions: Decimal,
 ) -> PlanningSignals:
-    """Compute planning signals from an EMR result and its input parameters."""
+    """Compute planning signals from an EMR result and the income it was run with."""
     pts = result.points
     std_deduction = _get_standard_deduction(result.filing_status, result.tax_year)
-    ltcg_already_used = qualified_dividends + fixed_ltcg
+    ltcg_already_used = income.fixed_preferential
     ss_taxable_at_floor = pts[0].ss_taxable if pts else _ZERO
 
     zero_ordinary_space = _compute_zero_ordinary_space(
         pts,
         result.sweep_mode,
-        fixed_ordinary,
+        income,
         variable_ordinary,
         ss_taxable_at_floor,
         std_deduction,
-        above_the_line_adjustments,
-        additional_deductions,
     )
 
     ltcg_0pct_remaining = _compute_ltcg_0pct_remaining(
@@ -896,12 +810,9 @@ def compute_planning_signals(
     ltcg_0pct_ordinary_runway = _compute_ltcg_0pct_ordinary_runway(
         pts,
         result.sweep_mode,
-        ltcg_already_used,
-        fixed_ordinary,
+        income,
         ss_taxable_at_floor,
         std_deduction,
-        above_the_line_adjustments,
-        additional_deductions,
         result.filing_status,
         result.tax_year,
     )
