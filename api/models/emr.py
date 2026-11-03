@@ -71,4 +71,6 @@ class EMRResponse(BaseModel):
     tax_year: int
     points: EMRPoints
     irmaa_thresholds: list[float]
+    default_sweep_ceiling: float
+    default_sweep_ceiling_rate: float
     planning_signals: PlanningSignals

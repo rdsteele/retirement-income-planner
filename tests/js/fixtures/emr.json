@@ -1,0 +1,119 @@
+{
+ "default_sweep_ceiling": 201775.0,
+ "default_sweep_ceiling_rate": 0.24,
+ "filing_status": "single",
+ "irmaa_thresholds": [
+  106000.0,
+  133000.0,
+  167000.0,
+  200000.0,
+  500000.0
+ ],
+ "planning_signals": {
+  "bracket_distances": [
+   {
+    "distance": null,
+    "rate": 0.22
+   },
+   {
+    "distance": null,
+    "rate": 0.24
+   }
+  ],
+  "ltcg_0pct_ordinary_runway": 25150.0,
+  "ltcg_0pct_remaining": 25150.0,
+  "ss_fully_taxable": false,
+  "torpedo_active": false,
+  "zero_ordinary_space": 0.0
+ },
+ "points": {
+  "components": {
+   "niit": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "ohio": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "ordinary": [
+    0.12,
+    0.12,
+    0.12,
+    0.12,
+    0.12
+   ],
+   "pref_stacking": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "ss_torpedo": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  "emr": [
+   0.12,
+   0.12,
+   0.12,
+   0.12,
+   0.12
+  ],
+  "income": [
+   0.0,
+   5000.0,
+   10000.0,
+   15000.0,
+   20000.0
+  ],
+  "ohio_tax": [
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "ss_inclusion_rate": [
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "ss_taxable": [
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "taxable_ordinary": [
+   20500.0,
+   25500.0,
+   30500.0,
+   35500.0,
+   40500.0
+  ],
+  "total_tax": [
+   2212.0,
+   2812.0,
+   3412.0,
+   4012.0,
+   4612.0
+  ]
+ },
+ "sweep_mode": "ordinary",
+ "tax_year": 2026
+}

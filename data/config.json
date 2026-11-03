@@ -16,5 +16,7 @@
     "0.22",
     "0.24"
   ],
-  "default_sweep_ceiling_bracket_rate": "0.24"
+  "default_sweep_ceiling_bracket_rate": "0.24",
+  "irmaa_lookback_years": 2,
+  "income_plan_sweep_ceiling": 150000
 }

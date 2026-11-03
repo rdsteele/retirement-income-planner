@@ -41,6 +41,14 @@ jobs:
         run: |
           pytest tests/ --cov=services --cov=api --cov-report=term-missing --cov-fail-under=90 -v
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: JavaScript tests
+        run: node tests/js/run-node.js
+
       - name: Security scan with bandit
         run: bandit -r services/ api/ -ll
 

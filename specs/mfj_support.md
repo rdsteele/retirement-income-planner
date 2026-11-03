@@ -219,6 +219,11 @@ either as `<option>` elements in HTML or as JavaScript constants. This
 violates the hardcoding rules in CLAUDE.md.
 
 ### Solution
+> **Superseded:** the pages no longer carry an `APP_CONFIG` constant. Filing statuses
+> come from `GET /api/config` (`filing_statuses`) and years from `GET /api/tax-years`;
+> the shared loaders are in `api/static/js/config.js`. The text below is the original
+> design.
+
 Replace hardcoded values with a page-level `APP_CONFIG` constant at the top
 of each page's `<script>` block. Dropdowns are built dynamically from this
 config. Adding a new filing status or tax year is a one-line config change.

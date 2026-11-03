@@ -72,3 +72,35 @@ def _violations(path: Path) -> list[str]:
 @pytest.mark.parametrize("path", _source_files(), ids=lambda p: str(p.relative_to(_ROOT)))
 def test_no_hardcoded_tax_values(path: Path):
     assert _violations(path) == []
+
+
+# ---------------------------------------------------------------------------
+# Frontend: pages and shared scripts must take statuses and years from the API
+# ---------------------------------------------------------------------------
+
+_STATIC_DIR = _ROOT / "api" / "static"
+_SVG_NAMESPACE = "http://www.w3.org/2000/svg"  # a URL, not a year (inline favicon)
+
+
+def _frontend_files() -> list[Path]:
+    pages = sorted(_STATIC_DIR.glob("*.html"))
+    shared = sorted((_STATIC_DIR / "js").glob("*.js"))
+    return pages + shared
+
+
+def _frontend_violations(path: Path) -> list[str]:
+    found: list[str] = []
+    for number, raw_line in enumerate(path.read_text().splitlines(), start=1):
+        line = raw_line.replace(_SVG_NAMESPACE, "")
+        where = f"{path.relative_to(_ROOT)}:{number}"
+        for status in _FILING_STATUSES:
+            if re.search(rf"""['"]{re.escape(status)}['"]""", line):
+                found.append(f"{where} filing status literal {status!r}")
+        if re.search(r"\b(19|20)\d\d\b", line):
+            found.append(f"{where} year literal: {line.strip()[:60]}")
+    return found
+
+
+@pytest.mark.parametrize("path", _frontend_files(), ids=lambda p: str(p.relative_to(_ROOT)))
+def test_no_hardcoded_values_in_frontend(path: Path):
+    assert _frontend_violations(path) == []

@@ -17,9 +17,9 @@ from services.common import round_rate, round_tax
 from services.emr import (
     EMRResult,
     SweepMode,
-    _get_default_sweep_ceiling,
     calculate_emr,
     compute_planning_signals,
+    get_default_sweep_ceiling,
 )
 from services.federal_tax import FederalTaxResult
 from services.ohio_tax import OhioTaxResult
@@ -1150,13 +1150,13 @@ class TestEmrOrdinaryAttribution:
 
 
 # ---------------------------------------------------------------------------
-# sweep_ceiling=None — uses _get_default_sweep_ceiling (24% bracket top)
-# Lines 92-95 (_get_default_sweep_ceiling body) and line 608 exercised.
+# sweep_ceiling=None — uses get_default_sweep_ceiling (24% bracket top)
+# Lines 92-95 (get_default_sweep_ceiling body) and line 608 exercised.
 # ---------------------------------------------------------------------------
 
 
 class TestSweepCeilingDefault:
-    """When sweep_ceiling=None, calculate_emr resolves it via _get_default_sweep_ceiling."""
+    """When sweep_ceiling=None, calculate_emr resolves it via get_default_sweep_ceiling."""
 
     def setup_method(self):
         self.fed_patcher = patch(_PATCH_FED, side_effect=_mock_federal_single)
@@ -1198,8 +1198,8 @@ class TestSweepCeilingDefault:
         assert max(incomes) <= dec("197300")
 
 
-def test_get_default_sweep_ceiling_missing_bracket():
-    """_get_default_sweep_ceiling raises ValueError when the configured bracket is absent."""
+def testget_default_sweep_ceiling_missing_bracket():
+    """get_default_sweep_ceiling raises ValueError when the configured bracket is absent."""
     fake_data = {
         "ordinary": {
             "single": [
@@ -1221,7 +1221,7 @@ def test_get_default_sweep_ceiling_missing_bracket():
     }
     with patch("services.emr.load_federal_data", return_value=fake_data):
         with pytest.raises(ValueError, match="ordinary bracket found"):
-            _get_default_sweep_ceiling("single", 2025)
+            get_default_sweep_ceiling("single", 2025)
 
 
 # ---------------------------------------------------------------------------
@@ -1523,7 +1523,7 @@ class TestBracketDistances:
 def test_default_sweep_ceiling_uses_configured_bracket_rate():
     # 2025 single: the 22% ordinary bracket ends at 103350 (see federal_2025.json)
     with patch("services.emr.get_default_sweep_ceiling_bracket_rate", return_value=dec("0.22")):
-        assert _get_default_sweep_ceiling("single", 2025) == dec("103350")
+        assert get_default_sweep_ceiling("single", 2025) == dec("103350")
 
 
 def test_default_sweep_step_comes_from_config():

@@ -1,0 +1,66 @@
+{
+ "federal": {
+  "bracket_breakdown": [
+   {
+    "from": 0.0,
+    "income_taxed": 12400.0,
+    "rate": 0.1,
+    "tax_amount": 1240.0,
+    "to": 12400.0
+   },
+   {
+    "from": 12400.0,
+    "income_taxed": 8100.0,
+    "rate": 0.12,
+    "tax_amount": 972.0,
+    "to": 50400.0
+   }
+  ],
+  "effective_rate": 0.091,
+  "marginal_bracket_rate": 0.12,
+  "net_investment_income": 5400.0,
+  "niit": 0.0,
+  "ordinary_income_tax": 2212.0,
+  "preferential_breakdown": [
+   {
+    "from": 0.0,
+    "income_taxed": 3800.0,
+    "rate": 0.0,
+    "tax_amount": 0.0,
+    "to": 49450.0
+   }
+  ],
+  "preferential_income_tax": 0.0,
+  "total_tax": 2212.0
+ },
+ "filing_status": "single",
+ "inputs_summary": {
+  "above_the_line_adjustments": 0.0,
+  "additional_deductions": 0.0,
+  "agi": 40400.0,
+  "gross_ordinary_income": 36600.0,
+  "ss_taxable": 0.0,
+  "standard_deduction": 16100.0,
+  "taxable_ordinary": 20500.0,
+  "taxable_preferential": 3800.0
+ },
+ "ohio": {
+  "effective_rate": 0.0165,
+  "included": true,
+  "medical_deduction": 0.0,
+  "ohio_agi": 40400.0,
+  "ohio_tax": 668.0,
+  "ohio_tax_base": 38250.0,
+  "personal_exemption": 2150.0,
+  "retirement_income_credit": 0.0,
+  "tax_before_credits": 668.0
+ },
+ "summary": {
+  "overall_effective_rate": 0.0713,
+  "total_federal_tax": 2212.0,
+  "total_niit": 0.0,
+  "total_ohio_tax": 668.0,
+  "total_tax": 2880.0
+ },
+ "tax_year": 2026
+}

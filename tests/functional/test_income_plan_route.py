@@ -7,6 +7,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from api.main import app
+from services.data_loader import get_default_sweep_step
+from services.emr import get_default_sweep_ceiling
 
 client = TestClient(app)
 
@@ -407,3 +409,15 @@ class TestOtherInvestmentOrdinaryForcedIncome:
         resp = client.post("/api/income-plan/calculate", json=payload)
         assert resp.status_code == 200
         assert resp.json()["points"]["total_tax"][0] == pytest.approx(39514.0)
+
+
+class TestSweepCeilingOptional:
+    def test_calculate_without_sweep_ceiling_uses_service_default(self):
+        payload = {k: v for k, v in _BASE.items() if k not in ("sweep_ceiling", "sweep_step")}
+        resp = client.post("/api/income-plan/calculate", json=payload)
+        assert resp.status_code == 200
+        incomes = resp.json()["points"]["income"]
+        ceiling = float(get_default_sweep_ceiling(_BASE["filing_status"], _BASE["tax_year"]))
+        step = float(get_default_sweep_step())
+        # the sweep runs in steps up to (not past) the default ceiling
+        assert ceiling - step < incomes[-1] <= ceiling

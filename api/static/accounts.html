@@ -328,6 +328,7 @@ HSA,hsa,,100000,5400"></textarea>
   </div>
 </div>
 
+<script src="/static/js/common.js"></script>
 <script>
   // ── Global state ─────────────────────────────────────────────────────────────
   let accounts = [];
@@ -335,19 +336,6 @@ HSA,hsa,,100000,5400"></textarea>
   let editingAccount = null;   // account id being edited
   let editingHolding = null;   // { accountId, holdingId }
   let addingHoldingTo = null;  // account id with open "add holding" form
-
-  // ── Utilities ─────────────────────────────────────────────────────────────────
-  function fmt(n) {
-    return '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-  }
-
-  function escHtml(str) {
-    return String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
-  }
 
   function badge(type) {
     const styles = {
@@ -371,14 +359,14 @@ HSA,hsa,,100000,5400"></textarea>
       const s = await resp.json();
       container.innerHTML = `
         <table class="summary-table">
-          <tr><td>Taxable Value</td><td class="num">${fmt(s.taxable_value)}</td></tr>
-          <tr><td>Taxable Basis</td><td class="num">${fmt(s.taxable_basis)}</td></tr>
-          <tr><td>Taxable Unrealized Gain</td><td class="num">${fmt(s.taxable_unrealized_gain)}</td></tr>
-          <tr><td>Tax-Deferred Balance</td><td class="num">${fmt(s.traditional_balance)}</td></tr>
-          <tr><td>Roth Balance</td><td class="num">${fmt(s.roth_balance)}</td></tr>
-          <tr><td>HSA Balance</td><td class="num">${fmt(s.hsa_balance)}</td></tr>
-          <tr><td>HSA Annual Contribution</td><td class="num">${fmt(s.hsa_annual_contribution)}</td></tr>
-          <tr class="summary-total"><td>Total Portfolio</td><td class="num">${fmt(s.total_portfolio_value)}</td></tr>
+          <tr><td>Taxable Value</td><td class="num">${fmt$(s.taxable_value)}</td></tr>
+          <tr><td>Taxable Basis</td><td class="num">${fmt$(s.taxable_basis)}</td></tr>
+          <tr><td>Taxable Unrealized Gain</td><td class="num">${fmt$(s.taxable_unrealized_gain)}</td></tr>
+          <tr><td>Tax-Deferred Balance</td><td class="num">${fmt$(s.traditional_balance)}</td></tr>
+          <tr><td>Roth Balance</td><td class="num">${fmt$(s.roth_balance)}</td></tr>
+          <tr><td>HSA Balance</td><td class="num">${fmt$(s.hsa_balance)}</td></tr>
+          <tr><td>HSA Annual Contribution</td><td class="num">${fmt$(s.hsa_annual_contribution)}</td></tr>
+          <tr class="summary-total"><td>Total Portfolio</td><td class="num">${fmt$(s.total_portfolio_value)}</td></tr>
         </table>`;
     } catch (e) {
       container.innerHTML = '<p class="empty-state" style="color:#dc2626;">Failed to load summary.</p>';
@@ -456,9 +444,9 @@ HSA,hsa,,100000,5400"></textarea>
         </div>`;
     }
 
-    let info = `Balance: <strong>${fmt(a.balance ?? 0)}</strong>`;
+    let info = `Balance: <strong>${fmt$(a.balance ?? 0)}</strong>`;
     if (a.account_type === 'hsa' && a.annual_contribution != null) {
-      info += `&nbsp;&nbsp; Annual Contribution: <strong>${fmt(a.annual_contribution)}</strong>`;
+      info += `&nbsp;&nbsp; Annual Contribution: <strong>${fmt$(a.annual_contribution)}</strong>`;
     }
     return `
       <div class="account-row" id="account-row-${id}">
@@ -488,7 +476,7 @@ HSA,hsa,,100000,5400"></textarea>
          </span>`
       : `<span class="account-name">${escHtml(a.name)}</span> ${badge(a.account_type)}`;
 
-    const totals = `Value ${fmt(a.total_value ?? 0)} | Basis ${fmt(a.total_basis ?? 0)} | Gain ${fmt(a.total_unrealized_gain ?? 0)}`;
+    const totals = `Value ${fmt$(a.total_value ?? 0)} | Basis ${fmt$(a.total_basis ?? 0)} | Gain ${fmt$(a.total_unrealized_gain ?? 0)}`;
 
     const editNameBtn  = isEditingName       ? '' : `<button class="btn" onclick="editAccountName('${id}')">Edit Name</button>`;
     const addHoldingBtn = addingHoldingTo === id ? '' : `<button class="btn" onclick="showAddHolding('${id}')">Add Holding</button>`;
@@ -548,7 +536,7 @@ HSA,hsa,,100000,5400"></textarea>
           <td><input type="text" id="edit-hticker-${hid}" value="${escHtml(h.ticker)}"></td>
           <td><input type="number" id="edit-hvalue-${hid}" value="${h.value}" min="0" step="any"></td>
           <td><input type="number" id="edit-hbasis-${hid}" value="${h.basis}" min="0" step="any"></td>
-          <td>${fmt(h.unrealized_gain)}</td>
+          <td>${fmt$(h.unrealized_gain)}</td>
           <td>
             <div class="action-row">
               <button class="btn btn-primary" onclick="saveHolding('${accountId}', '${hid}')">Save</button>
@@ -560,9 +548,9 @@ HSA,hsa,,100000,5400"></textarea>
     return `
       <tr>
         <td>${escHtml(h.ticker)}</td>
-        <td>${fmt(h.value)}</td>
-        <td>${fmt(h.basis)}</td>
-        <td>${fmt(h.unrealized_gain)}</td>
+        <td>${fmt$(h.value)}</td>
+        <td>${fmt$(h.basis)}</td>
+        <td>${fmt$(h.unrealized_gain)}</td>
         <td>
           <div class="action-row">
             <button class="btn" onclick="editHolding('${accountId}', '${hid}')">Edit</button>

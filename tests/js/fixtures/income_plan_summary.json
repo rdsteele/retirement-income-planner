@@ -1,0 +1,23 @@
+{
+ "aca_cliff_magi": 0.0,
+ "aca_distance": null,
+ "executed_ordinary": 4500.0,
+ "executed_preferential": 0.0,
+ "forced_ordinary": 36600.0,
+ "forced_preferential": 3800.0,
+ "magi": 49900.0,
+ "provisional_income": 49900.0,
+ "shortfall": -7400.0,
+ "ss_taxable": 0.0,
+ "total_all_withdrawals": 52400.0,
+ "total_hsa_withdrawals": 0.0,
+ "total_income": 49900.0,
+ "total_pension_annuity": 30000.0,
+ "total_roth_withdrawals": 0.0,
+ "total_spending": 45000.0,
+ "total_ss_benefit": 0.0,
+ "total_taxable_withdrawals": 12400.0,
+ "total_traditional_withdrawals": 10000.0,
+ "withdrawal_ordinary": 5000.0,
+ "withdrawal_preferential": 0.0
+}

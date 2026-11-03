@@ -3,13 +3,18 @@
 Uses FastAPI TestClient with real bracket data — no mocks.
 """
 
+from decimal import Decimal
 from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
 
 from api.main import app
-from services.data_loader import get_planning_bracket_rates
+from services.data_loader import (
+    get_default_sweep_ceiling_bracket_rate,
+    get_planning_bracket_rates,
+    load_federal_data,
+)
 
 client = TestClient(app)
 
@@ -685,3 +690,19 @@ class TestOtherInvestmentOrdinary:
     def test_other_investment_ordinary_triggers_niit(self):
         total = self._total_tax(pension=150000.0, other_investment_ordinary=60000.0)
         assert total == pytest.approx(39514.0)
+
+
+# ── Default sweep ceiling reported for the UI hint ───────────────────────
+
+
+class TestDefaultSweepCeilingReported:
+    def test_reports_top_of_configured_bracket(self):
+        resp = client.post("/api/emr", json={**_BASE_ORDINARY, "sweep_ceiling": 5000.0})
+        body = resp.json()
+        rate = get_default_sweep_ceiling_bracket_rate()
+        brackets = load_federal_data(_BASE_ORDINARY["tax_year"])["ordinary"][
+            _BASE_ORDINARY["filing_status"]
+        ]
+        expected_top = next(Decimal(b["to"]) for b in brackets if Decimal(b["rate"]) == rate)
+        assert body["default_sweep_ceiling"] == float(expected_top)
+        assert body["default_sweep_ceiling_rate"] == float(rate)

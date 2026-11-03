@@ -7,6 +7,8 @@
   <title>Income Planning</title>
   <script src="/static/plotly-2.26.0.min.js"></script>
   <script src="/static/js/api.js"></script>
+  <script src="/static/js/common.js"></script>
+  <script src="/static/js/config.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -808,28 +810,6 @@
 <script>
   'use strict';
 
-  // ── App config — filing statuses and tax years ────────────────────────────
-  const APP_CONFIG = {
-    filingStatuses: [
-      { value: 'single', label: 'Single' },
-      { value: 'mfj',    label: 'Married Filing Jointly' },
-    ],
-    taxYears: [2025, 2026],
-  };
-
-  function populateSelect(selectId, options, defaultValue) {
-    const el = document.getElementById(selectId);
-    if (!el) return;
-    el.innerHTML = '';
-    options.forEach(opt => {
-      const o = document.createElement('option');
-      o.value = opt.value ?? opt;
-      o.textContent = opt.label ?? opt;
-      if (String(o.value) === String(defaultValue)) o.selected = true;
-      el.appendChild(o);
-    });
-  }
-
   // ── State ─────────────────────────────────────────────────────────────
   const CONFIG = {};
   let lastResult         = null;
@@ -842,20 +822,6 @@
   let estimatedTaxes       = 0;  // total of both — used for shortfall/summary payload
   let taxesStale           = true;  // true until Calculate is clicked; reset to true on any input change
 
-  // ── Helpers ───────────────────────────────────────────────────────────
-  const el    = id => document.getElementById(id);
-  const fnum  = id => parseFloat(el(id)?.value) || 0;
-  const fmt$  = n  => '$' + Math.round(n).toLocaleString('en-US');
-  const allZero = arr => arr.every(v => v === 0);
-
-  function escHtml(str) {
-    return String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
-  }
-
   // ── EMR chart components (same palette as index.html) ─────────────────
   const COMPONENTS = [
     { key: 'ordinary',      label: 'Ordinary',      color: '#4a86c8' },
@@ -867,25 +833,10 @@
 
   // ── Config loader ─────────────────────────────────────────────────────
   async function loadConfig() {
-    const resp = await fetch('/api/config');
-    const data = await resp.json();
+    const data = await loadAppConfig();
+    populateFilingStatuses(data.filing_statuses);
     CONFIG.yAxisMaxEMR = data.y_axis_max_emr;
-  }
-
-  // ── Tax year dropdown ─────────────────────────────────────────────────
-  async function loadTaxYears() {
-    const resp = await fetch('/api/tax-years');
-    const data = await resp.json();
-    const sel = el('tax_year');
-    if (!sel) return;
-    sel.innerHTML = '';
-    for (const year of data.years) {
-      const opt = document.createElement('option');
-      opt.value = year;
-      opt.textContent = year;
-      if (year === data.default_year) opt.selected = true;
-      sel.appendChild(opt);
-    }
+    CONFIG.sweepCeiling = data.income_plan_sweep_ceiling;
   }
 
   // ── Accounts ──────────────────────────────────────────────────────────
@@ -1293,64 +1244,54 @@
   // ── Live MAGI update — debounced API call ─────────────────────────────
   let _magiDebounceTimer = null;
 
+  function buildSummaryPayload() {
+    return {
+      filing_status:              selectedFilingStatus(),
+      tax_year:                   selectedTaxYear(),
+      pension:                    fnum('pension'),
+      pension_taxable:            fnum('pension_taxable'),
+      interest:                   fnum('interest'),
+      ordinary_dividends:         fnum('ordinary_dividends'),
+      ira_distributions:          fnum('ira_distributions'),
+      other_investment_ordinary:  fnum('other_investment_ordinary'),
+      ss_benefit:                 fnum('ss_benefit'),
+      qualified_dividends:        fnum('qualified_dividends'),
+      fixed_ltcg:                 fnum('fixed_ltcg'),
+      tax_exempt_interest:        fnum('tax_exempt_interest'),
+      above_the_line_adjustments: fnum('above_the_line_adjustments'),
+      essential_spending:         fnum('essential_spending'),
+      discretionary_spending:     fnum('discretionary_spending'),
+      include_aca:                el('include_aca')?.checked ?? false,
+      aca_cliff_magi:             acaCliffMagi,
+      estimated_taxes:            taxesStale ? 0 : estimatedTaxes,
+      planned_withdrawals:        gatherPlannedWithdrawals(),
+      executed_withdrawals:       gatherExecutedWithdrawalsPayload(),
+    };
+  }
+
   function updateMagi() {
     clearTimeout(_magiDebounceTimer);
     _magiDebounceTimer = setTimeout(async () => {
-      const payload = {
-        filing_status:              el('filing_status')?.value || 'single',
-        tax_year:                   parseInt(el('tax_year')?.value) || 2026,
-        pension:                    fnum('pension'),
-        pension_taxable:            fnum('pension_taxable'),
-        interest:                   fnum('interest'),
-        ordinary_dividends:         fnum('ordinary_dividends'),
-        ira_distributions:          fnum('ira_distributions'),
-        other_investment_ordinary:  fnum('other_investment_ordinary'),
-        ss_benefit:                 fnum('ss_benefit'),
-        qualified_dividends:        fnum('qualified_dividends'),
-        fixed_ltcg:                 fnum('fixed_ltcg'),
-        tax_exempt_interest:        fnum('tax_exempt_interest'),
-        above_the_line_adjustments: fnum('above_the_line_adjustments'),
-        essential_spending:         fnum('essential_spending'),
-        discretionary_spending:     fnum('discretionary_spending'),
-        include_aca:                el('include_aca')?.checked ?? false,
-        aca_cliff_magi:             acaCliffMagi,
-        estimated_taxes:            taxesStale ? 0 : estimatedTaxes,
-        planned_withdrawals:        gatherPlannedWithdrawals(),
-        executed_withdrawals:       gatherExecutedWithdrawalsPayload(),
-      };
+      let payload;
       try {
-        const resp = await fetch('/api/income-plan/summary', {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify(payload),
-        });
-        if (resp.ok) renderPlanSummary(await resp.json());
+        payload = buildSummaryPayload();
+      } catch (_) {
+        return;  // dropdown options not loaded yet — the page-load error is already shown
+      }
+      try {
+        renderPlanSummary(await postJson('/api/income-plan/summary', payload));
       } catch (_) { /* non-critical — summary is best-effort */ }
     }, 150);
   }
 
   // ── Error helpers ─────────────────────────────────────────────────────
   const calcBtn = el('calc-btn');
-  const errorMsg = el('error-msg');
-
-  function showError(msg) {
-    errorMsg.textContent  = msg;
-    errorMsg.style.display = 'block';
-  }
-  function clearError() {
-    errorMsg.style.display = 'none';
-    errorMsg.textContent   = '';
-  }
 
   // ── Calculate ─────────────────────────────────────────────────────────
-  calcBtn.addEventListener('click', async () => {
-    clearError();
-    calcBtn.disabled    = true;
-    calcBtn.textContent = 'Calculating…';
-
-    const payload = {
-      filing_status:              el('filing_status')?.value || 'single',
-      tax_year:                   parseInt(el('tax_year')?.value),
+  function buildCalculatePayload() {
+    return {
+      filing_status:              selectedFilingStatus(),
+      tax_year:                   selectedTaxYear(),
       pension:                    fnum('pension'),
       pension_taxable:            fnum('pension_taxable'),
       interest:                   fnum('interest'),
@@ -1367,31 +1308,19 @@
       planned_withdrawals:        gatherPlannedWithdrawals(),
       executed_withdrawals:       gatherExecutedWithdrawalsPayload(),
       sweep_floor:                0,
-      sweep_ceiling:              150000,
-      sweep_step:                 100,
+      sweep_ceiling:              CONFIG.sweepCeiling,
       include_ohio:               true,
       ohio_qualifying_retirement_income: fnum('ohio_qualifying_retirement_income'),
     };
+  }
+
+  calcBtn.addEventListener('click', async () => {
+    clearError();
+    calcBtn.disabled    = true;
+    calcBtn.textContent = 'Calculating…';
 
     try {
-      const resp = await fetch('/api/income-plan/calculate', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify(payload),
-      });
-
-      if (!resp.ok) {
-        const body = await resp.json().catch(() => ({}));
-        if (resp.status === 422) {
-          const detail = body.detail;
-          showError(typeof detail === 'string' ? detail : JSON.stringify(detail));
-        } else {
-          showError('An unexpected error occurred. Please try again.');
-        }
-        return;
-      }
-
-      lastResult = await resp.json();
+      lastResult = await postJson('/api/income-plan/calculate', buildCalculatePayload());
 
       // Update ACA cliff, estimated taxes, and APTC estimate from response
       if (lastResult.aca_cliff_magi > 0) {
@@ -1419,12 +1348,11 @@
 
       // Refresh portfolio summary
       try {
-        const summResp = await fetch('/api/accounts/summary');
-        if (summResp.ok) renderPortfolioSummary(await summResp.json());
+        renderPortfolioSummary(await apiRequest('/api/accounts/summary'));
       } catch (_) { /* non-critical */ }
 
-    } catch (_) {
-      showError('Could not reach the server. Is the API running?');
+    } catch (err) {
+      showError(err.message);
     } finally {
       calcBtn.disabled    = false;
       calcBtn.textContent = 'Calculate';
@@ -1695,13 +1623,6 @@
     if (saveBtn) saveBtn.disabled = !currentScenarioName;
   }
 
-  function setField(id, value) {
-    const e = el(id);
-    if (!e || value == null) return;
-    if (e.type === 'checkbox') e.checked = Boolean(value);
-    else e.value = value;
-  }
-
   function fnumFirst(...ids) {
     for (const id of ids) {
       if (el(id)) return parseFloat(el(id).value) || 0;
@@ -1712,8 +1633,8 @@
   function gatherSharedInputs() {
     return {
       inputs: {
-        tax_year:                   parseInt(el('tax_year')?.value),
-        filing_status:              el('filing_status')?.value || 'single',
+        tax_year:                   selectedTaxYear(),
+        filing_status:              selectedFilingStatus(),
         pension:                    fnum('pension'),
         pension_taxable:            fnum('pension_taxable'),
         interest:                   fnum('interest'),
@@ -1907,11 +1828,10 @@
   el('save-as-btn')?.addEventListener('click', saveAsScenario);
 
   // ── Page load ─────────────────────────────────────────────────────────
-  populateSelect('filing_status', APP_CONFIG.filingStatuses, 'single');
-
   Promise.all([loadConfig(), loadTaxYears(), loadAccounts(), loadAccountsSummary()])
     .then(() => loadCurrentScenario())
-    .then(() => { updateMagi(); updateAcaVisibility(); });
+    .then(() => { updateMagi(); updateAcaVisibility(); })
+    .catch(err => showError(`Could not load page settings: ${err.message}`));
 </script>
 </body>
 </html>

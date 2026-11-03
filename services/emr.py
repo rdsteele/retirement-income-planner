@@ -91,7 +91,7 @@ def _get_irmaa_thresholds(filing_status: str, tax_year: int) -> list[Decimal]:
     return [Decimal(t) for t in load_federal_data(tax_year)["irmaa_thresholds"][filing_status]]
 
 
-def _get_default_sweep_ceiling(filing_status: str, tax_year: int) -> Decimal:
+def get_default_sweep_ceiling(filing_status: str, tax_year: int) -> Decimal:
     """Return the top of the ordinary bracket configured as the default sweep ceiling."""
     ceiling_rate = get_default_sweep_ceiling_bracket_rate()
     for bracket in load_federal_data(tax_year)["ordinary"][filing_status]:
@@ -630,7 +630,7 @@ def calculate_emr(
     irmaa_thresholds = _get_irmaa_thresholds(filing_status, tax_year)
 
     if sweep_ceiling is None:
-        sweep_ceiling = _get_default_sweep_ceiling(filing_status, tax_year)
+        sweep_ceiling = get_default_sweep_ceiling(filing_status, tax_year)
     if sweep_step is None:
         sweep_step = get_default_sweep_step()
 

@@ -215,7 +215,7 @@
   <div class="section-card">
     <h2>New Scenario</h2>
     <div class="new-row">
-      <input type="text" id="new-scenario-name" placeholder="Scenario name (e.g. 2026 Base Plan)">
+      <input type="text" id="new-scenario-name" placeholder="Scenario name (e.g. My Base Plan)">
       <button class="btn btn-primary" id="create-btn">Create</button>
     </div>
     <div id="create-message" class="message"></div>
@@ -223,9 +223,8 @@
 </div>
 
 <script src="/static/js/api.js"></script>
+<script src="/static/js/common.js"></script>
 <script>
-  const el = id => document.getElementById(id);
-
   let currentScenarioName = null;
 
   // ── Scenario bar update ───────────────────────────────────────────────
@@ -329,14 +328,6 @@
       console.error('[scenarios] loadScenarioList error:', e);
       container.innerHTML = '<p class="empty-state" style="color:#dc2626;">Failed to load scenarios.</p>';
     }
-  }
-
-  function escHtml(str) {
-    return String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
   }
 
   // ── Load scenario and navigate ────────────────────────────────────────

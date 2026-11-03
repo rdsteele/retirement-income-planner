@@ -438,29 +438,9 @@
 </div><!-- /.page -->
 
 <script src="/static/js/api.js"></script>
+<script src="/static/js/common.js"></script>
+<script src="/static/js/config.js"></script>
 <script>
-  // ── App config — filing statuses and tax years ────────────────────────────
-  const APP_CONFIG = {
-    filingStatuses: [
-      { value: 'single', label: 'Single' },
-      { value: 'mfj',    label: 'Married Filing Jointly' },
-    ],
-    taxYears: [2025, 2026],
-  };
-
-  function populateSelect(selectId, options, defaultValue) {
-    const el = document.getElementById(selectId);
-    if (!el) return;
-    el.innerHTML = '';
-    options.forEach(opt => {
-      const o = document.createElement('option');
-      o.value = opt.value ?? opt;
-      o.textContent = opt.label ?? opt;
-      if (String(o.value) === String(defaultValue)) o.selected = true;
-      el.appendChild(o);
-    });
-  }
-
   // ── Config — populated from GET /api/config before first run ──────────────
   const CONFIG = {};
 
@@ -470,43 +450,21 @@
 
   // ── App config loader ─────────────────────────────────────────────────────
   async function loadConfig() {
-    const resp = await fetch('/api/config');
-    const data = await resp.json();
+    const data = await loadAppConfig();
+    populateFilingStatuses(data.filing_statuses);
     CONFIG.yAxisMaxEMR = data.y_axis_max_emr;
+    CONFIG.irmaaLookbackYears = data.irmaa_lookback_years;
     el('sweep_step').value = data.sweep_step_default;
     el('irmaa_inflation_rate').value = (data.irmaa_inflation_default * 100).toFixed(1);
   }
 
-  // ── Tax year dropdown ─────────────────────────────────────────────────────
-  async function loadTaxYears() {
-    const resp = await fetch('/api/tax-years');
-    const data = await resp.json();
-    const sel = el('tax_year');
-    sel.innerHTML = '';
-    for (const year of data.years) {
-      const opt = document.createElement('option');
-      opt.value = year;
-      opt.textContent = year;
-      if (year === data.default_year) opt.selected = true;
-      sel.appendChild(opt);
-    }
-  }
-
   // ── Sweep ceiling hint ────────────────────────────────────────────────────
-  // After a run, update the sweep_ceiling placeholder with the 24% bracket
-  // top derived from the last API result's points data.
+  // After a run, show the service's default sweep ceiling as the placeholder.
   function updateSweepCeilingHint() {
     if (!lastResult) return;
-    const comps   = lastResult.points.components.ordinary;
-    const incomes = lastResult.points.income;
-    let top24 = null;
-    for (let i = 0; i < comps.length; i++) {
-      if (comps[i] >= 0.235 && comps[i] < 0.315) top24 = incomes[i];
-    }
-    if (top24 !== null) {
-      el('sweep_ceiling').placeholder =
-        Math.round(top24).toLocaleString('en-US') + ' (24% bracket top)';
-    }
+    const ceiling = Math.round(lastResult.default_sweep_ceiling).toLocaleString('en-US');
+    const rate = formatRatePercent(lastResult.default_sweep_ceiling_rate);
+    el('sweep_ceiling').placeholder = `${ceiling} (${rate} bracket top)`;
   }
 
   // Component metadata: key, label, color
@@ -520,17 +478,12 @@
 
   // ── DOM refs ─────────────────────────────────────────────────────────────
   const runBtn       = document.getElementById('run-btn');
-  const errorMsg     = document.getElementById('error-msg');
   const signalsWrap  = document.getElementById('signals-wrap');
   const signalsBar   = document.getElementById('signals-bar');
   const chartSection = document.getElementById('chart-section');
   const btnStacked   = document.getElementById('btn-stacked');
   const btnLines     = document.getElementById('btn-lines');
   const irmaaToggle  = document.getElementById('irmaa-toggle');
-
-  // ── Field helpers ─────────────────────────────────────────────────────────
-  const el   = id => document.getElementById(id);
-  const fnum = id => parseFloat(el(id).value) || 0;
 
   // ── Conditional field visibility ──────────────────────────────────────────
   el('sweep_mode').addEventListener('change', () => {
@@ -557,13 +510,6 @@
     if (display) display.textContent = currentScenarioName
       ? '📋 ' + currentScenarioName
       : '📋 No scenario loaded';
-  }
-
-  function setField(id, value) {
-    const e = el(id);
-    if (!e || value == null) return;
-    if (e.type === 'checkbox') e.checked = Boolean(value);
-    else e.value = value;
   }
 
   function populateSharedInputs(scenario) {
@@ -648,11 +594,10 @@
     }
   }
 
-  populateSelect('filing_status', APP_CONFIG.filingStatuses, 'single');
-
   Promise.all([loadConfig(), loadTaxYears()])
     .then(() => loadCurrentScenario())
-    .then(() => runBtn.click());
+    .then(() => runBtn.click())
+    .catch(err => showError(`Could not load page settings: ${err.message}`));
 
   // ── Build payload ─────────────────────────────────────────────────────────
   function buildPayload() {
@@ -671,25 +616,15 @@
       additional_deductions:            fnum('additional_deductions'),
       sweep_mode:                       el('sweep_mode').value,
       variable_ordinary:                fnum('variable_ordinary'),
-      filing_status:                    el('filing_status').value,
-      tax_year:                         parseInt(el('tax_year').value),
+      filing_status:                    selectedFilingStatus(),
+      tax_year:                         selectedTaxYear(),
       sweep_floor:                      fnum('sweep_floor'),
       sweep_ceiling:                    ceilVal ? parseFloat(ceilVal) : null,
-      sweep_step:                       fnum('sweep_step') || 100,
+      sweep_step:                       fnum('sweep_step') || null,
       include_ohio:                     el('include_ohio').checked,
       ohio_medical_deduction:           fnum('ohio_medical_deduction'),
       ohio_qualifying_retirement_income: fnum('ohio_qualifying_retirement_income'),
     };
-  }
-
-  // ── Show / hide error ─────────────────────────────────────────────────────
-  function showError(msg) {
-    errorMsg.textContent = msg;
-    errorMsg.style.display = 'block';
-  }
-  function clearError() {
-    errorMsg.style.display = 'none';
-    errorMsg.textContent = '';
   }
 
   // ── Run Analysis ──────────────────────────────────────────────────────────
@@ -699,35 +634,15 @@
     runBtn.textContent = 'Running…';
 
     try {
-      const resp = await fetch('/api/emr', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(buildPayload()),
-      });
-
-      if (!resp.ok) {
-        const body = await resp.json().catch(() => ({}));
-        if (resp.status === 422) {
-          const detail = body.detail;
-          showError(typeof detail === 'string'
-            ? detail
-            : JSON.stringify(detail));
-        } else {
-          showError('An unexpected error occurred. Please try again.');
-        }
-        return;
-      }
-
-      lastResult = await resp.json();
+      lastResult = await postJson('/api/emr', buildPayload());
       updateSweepCeilingHint();
       renderSignals(lastResult.planning_signals);
       chartSection.style.display = 'block';
       signalsWrap.style.display  = 'block';
       Plotly.Plots.resize(document.getElementById('chart'));
       renderChart();
-
-    } catch (_) {
-      showError('Could not reach the server. Is the API running?');
+    } catch (err) {
+      showError(err.message);
     } finally {
       runBtn.disabled = false;
       runBtn.textContent = 'Run Analysis';
@@ -735,12 +650,6 @@
   });
 
   // ── Planning signals ──────────────────────────────────────────────────────
-  const formatRatePercent = rate => (rate * 100).toFixed(2).replace(/\.?0+$/, '') + '%';
-
-  function fmt$(n) {
-    return '$' + Math.round(n).toLocaleString('en-US');
-  }
-
   function renderSignals(s) {
     const badges = [];
 
@@ -796,7 +705,6 @@
   // ── Chart rendering ───────────────────────────────────────────────────────
 
   // Return true if all values in array are zero
-  function allZero(arr) { return arr.every(v => v === 0); }
 
   function pctFmt(v) { return (v * 100).toFixed(1) + '%'; }
 
@@ -808,7 +716,7 @@
     const raw = lastResult ? lastResult.irmaa_thresholds : [];
     const adjChecked = el('irmaa_inflation_adj').checked;
     const rate = adjChecked ? (parseFloat(el('irmaa_inflation_rate').value) || 0) / 100 : 0;
-    const scaled = adjChecked ? raw.map(t => t * (1 + rate) ** 2) : raw;
+    const scaled = adjChecked ? raw.map(t => t * (1 + rate) ** CONFIG.irmaaLookbackYears) : raw;
 
     // Filter to sweep range so out-of-range thresholds don't expand the x-axis.
     const income = lastResult?.points?.income;
@@ -835,7 +743,7 @@
   function buildIrmaaAnnotations(thresholds, show, adjusted) {
     if (!show) return [];
     const estYear = adjusted
-      ? (parseInt(el('tax_year').value) || 2026) + 2
+      ? selectedTaxYear() + CONFIG.irmaaLookbackYears
       : null;
     return thresholds.map((t, i) => ({
       x: t, y: 1, yref: 'paper',
@@ -1013,20 +921,6 @@
   });
 
   el('irmaa_inflation_rate').addEventListener('input', rerenderIrmaa);
-</script>
-<script>
-  window.debugPlotly = function() {
-    Plotly.newPlot('chart', [{
-      x: [1, 2, 3, 4, 5],
-      y: [0.10, 0.12, 0.22, 0.27, 0.22],
-      type: 'scatter',
-      fill: 'tozeroy',
-      name: 'Test'
-    }], {
-      yaxis: { tickformat: '.0%' },
-      title: 'Debug Test'
-    });
-  }
 </script>
 </body>
 </html>

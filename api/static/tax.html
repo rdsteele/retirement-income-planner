@@ -396,33 +396,10 @@
 </div><!-- /.page -->
 
 <script src="/static/js/api.js"></script>
+<script src="/static/js/common.js"></script>
+<script src="/static/js/config.js"></script>
 <script>
-  // ── App config — filing statuses and tax years ────────────────────────────
-  const APP_CONFIG = {
-    filingStatuses: [
-      { value: 'single', label: 'Single' },
-      { value: 'mfj',    label: 'Married Filing Jointly' },
-    ],
-    taxYears: [2025, 2026],
-  };
-
-  function populateSelect(selectId, options, defaultValue) {
-    const el = document.getElementById(selectId);
-    if (!el) return;
-    el.innerHTML = '';
-    options.forEach(opt => {
-      const o = document.createElement('option');
-      o.value = opt.value ?? opt;
-      o.textContent = opt.label ?? opt;
-      if (String(o.value) === String(defaultValue)) o.selected = true;
-      el.appendChild(o);
-    });
-  }
-
   // ── Helpers ──────────────────────────────────────────────────────────────
-  const el   = id => document.getElementById(id);
-  const fnum = id => parseFloat(el(id).value) || 0;
-
   function fmtDollar(v) {
     const r = Math.round(v);
     if (r === 0) return '$0';
@@ -444,23 +421,9 @@
   }
 
   // ── Page-load sequence ───────────────────────────────────────────────────
-  async function loadTaxYears() {
-    const resp = await fetch('/api/tax-years');
-    const data = await resp.json();
-    const sel = el('tax_year');
-    sel.innerHTML = '';
-    for (const year of data.years) {
-      const opt = document.createElement('option');
-      opt.value = year;
-      opt.textContent = year;
-      if (year === data.default_year) opt.selected = true;
-      sel.appendChild(opt);
-    }
-  }
-
   async function loadConfig() {
-    await fetch('/api/config');
-    // No config values currently applied to the tax detail page.
+    const config = await loadAppConfig();
+    populateFilingStatuses(config.filing_statuses);
   }
 
   // ── Payload builder ──────────────────────────────────────────────────────
@@ -478,22 +441,12 @@
       tax_exempt_interest:              fnum('tax_exempt_interest'),
       above_the_line_adjustments:       fnum('above_the_line_adjustments'),
       additional_deductions:            fnum('additional_deductions'),
-      filing_status:                    el('filing_status').value,
-      tax_year:                         parseInt(el('tax_year').value),
+      filing_status:                    selectedFilingStatus(),
+      tax_year:                         selectedTaxYear(),
       include_ohio:                     el('include_ohio').checked,
       gross_medical_expenses:           fnum('gross_medical_expenses'),
       ohio_qualifying_retirement_income: fnum('ohio_qualifying_retirement_income'),
     };
-  }
-
-  // ── Error handling ───────────────────────────────────────────────────────
-  function showError(msg) {
-    el('error-msg').textContent = msg;
-    el('error-msg').style.display = 'block';
-  }
-  function clearError() {
-    el('error-msg').style.display = 'none';
-    el('error-msg').textContent = '';
   }
 
   // ── Bracket table rendering ──────────────────────────────────────────────
@@ -606,32 +559,12 @@
     if (firstSuccess) panel.classList.add('loading');
 
     try {
-      const resp = await fetch('/api/tax', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(buildPayload()),
-      });
-
-      const body = await resp.json().catch(() => ({}));
-
-      if (!resp.ok) {
-        if (resp.status === 422) {
-          const detail = body.detail;
-          showError(typeof detail === 'string' ? detail : JSON.stringify(detail));
-        } else {
-          showError('An unexpected error occurred. Please try again.');
-        }
-        panel.classList.remove('loading');
-        return;
-      }
-
-      renderOutput(body);
+      renderOutput(await postJson('/api/tax', buildPayload()));
       panel.style.display = '';
-      panel.classList.remove('loading');
       firstSuccess = true;
-
-    } catch (_) {
-      showError('Could not reach the server. Is the API running?');
+    } catch (err) {
+      showError(err.message);
+    } finally {
       panel.classList.remove('loading');
     }
   }
@@ -660,13 +593,6 @@
     if (display) display.textContent = currentScenarioName
       ? '📋 ' + currentScenarioName
       : '📋 No scenario loaded';
-  }
-
-  function setField(id, value) {
-    const e = el(id);
-    if (!e || value == null) return;
-    if (e.type === 'checkbox') e.checked = Boolean(value);
-    else e.value = value;
   }
 
   function populateSharedInputs(scenario) {
@@ -740,11 +666,10 @@
   }
 
   // ── Page load ─────────────────────────────────────────────────────────────
-  populateSelect('filing_status', APP_CONFIG.filingStatuses, 'single');
-
   Promise.all([loadConfig(), loadTaxYears()])
     .then(() => loadCurrentScenario())
-    .then(calculate);
+    .then(calculate)
+    .catch(err => showError(`Could not load page settings: ${err.message}`));
 </script>
 </body>
 </html>

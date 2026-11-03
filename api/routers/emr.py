@@ -13,8 +13,9 @@ from api.models.emr import (
     EMRResponse,
     PlanningSignals,
 )
+from services.data_loader import get_default_sweep_ceiling_bracket_rate
 from services.emr import BracketDistance as ServiceBracketDistance
-from services.emr import EMRResult, SweepMode, calculate_emr
+from services.emr import EMRResult, SweepMode, calculate_emr, get_default_sweep_ceiling
 from services.emr import compute_planning_signals as _compute_service_signals
 
 logger = logging.getLogger(__name__)
@@ -148,5 +149,9 @@ def post_emr(request: EMRRequest):
         tax_year=result.tax_year,
         points=_build_points(result),
         irmaa_thresholds=[float(t) for t in result.irmaa_thresholds],
+        default_sweep_ceiling=float(
+            get_default_sweep_ceiling(result.filing_status, result.tax_year)
+        ),
+        default_sweep_ceiling_rate=float(get_default_sweep_ceiling_bracket_rate()),
         planning_signals=_compute_planning_signals(result, request),
     )

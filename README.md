@@ -170,7 +170,8 @@ See `profile/README.md` for the accounts.json format and a minimal example.
 api/              # FastAPI application
   routers/        # API route handlers
   models/         # Pydantic request/response models
-  static/         # Frontend HTML/JS and Plotly
+  static/         # Frontend HTML and Plotly
+    js/           # Shared scripts used by the pages
 data/             # Tax bracket and threshold data (JSON)
   brackets/       # Federal and Ohio bracket files by year
   aca/            # ACA schedule data by year
@@ -181,6 +182,7 @@ profile/          # Personal financial data (not in version control)
 services/         # Tax and planning calculation services
 specs/            # Design specifications
 tests/            # Unit, functional, and scenario tests
+  js/             # JavaScript tests (shared scripts and page boot tests)
 ```
 
 ---
@@ -199,10 +201,15 @@ ruff check .
 
 # Type check
 mypy .
+
+# JavaScript tests (shared scripts in api/static/js) — CI runs these with Node
+node tests/js/run-node.js
+# On a Mac without Node, run the same tests with the built-in JavaScript engine
+python3 tests/js/run_jsc.py
 ```
 
-The CI pipeline (GitHub Actions) runs ruff, mypy, pytest, bandit, and
-pip-audit on every push to main.
+The CI pipeline (GitHub Actions) runs ruff, mypy, pytest, the JavaScript tests,
+bandit, and pip-audit on every push to main.
 
 ---
 

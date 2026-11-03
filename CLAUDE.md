@@ -95,8 +95,10 @@ This includes but is not limited to:
 
 These values must always be:
 - **Backend:** loaded from data files in `data/` via `data_loader.py`
-- **Frontend:** populated dynamically from an `APP_CONFIG` object or
-  from an API response — never written inline in HTML or as JS constants
+- **Frontend:** populated dynamically from an API response (`/api/config` for
+  filing statuses and UI defaults, `/api/tax-years` for years) — never written
+  inline in HTML or as JS constants, and never as a fallback value
+  (`|| 'single'`). Shared page code lives in `api/static/js/`.
 
 **The only acceptable hardcoded values** are structural constants that
 will never change regardless of tax law or configuration — for example,
@@ -130,5 +132,11 @@ Three distinct tiers — each lives in a separate directory:
 - **`tests/scenarios/`** — named real-world tax scenarios with fully hand-verified expected
   outputs. These are regression anchors — if they break, something fundamental changed.
   Example: `test_scenario_ss_torpedo_single_filer.py`
+
+- **`tests/js/`** — JavaScript tests for the shared scripts and for each real page
+  booted in a fake DOM against saved real API responses (`tests/js/fixtures/`,
+  regenerated with `python3 tests/js/fixtures.py`). CI runs them with Node
+  (`node tests/js/run-node.js`); on a Mac without Node use
+  `python3 tests/js/run_jsc.py`.
 
 **No test ever starts a live server or writes to `profile/`.**

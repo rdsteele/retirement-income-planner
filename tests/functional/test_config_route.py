@@ -31,6 +31,13 @@ def test_response_shape():
     assert all(isinstance(data[k], float) for k in numeric)
 
 
+def test_returns_ui_settings_from_config():
+    data = client.get("/api/config").json()
+    assert isinstance(data["irmaa_lookback_years"], int)
+    assert data["irmaa_lookback_years"] > 0
+    assert data["income_plan_sweep_ceiling"] > 0
+
+
 def test_returns_filing_statuses_for_dropdowns():
     statuses = client.get("/api/config").json()["filing_statuses"]
     assert statuses

@@ -1,5 +1,7 @@
 """Functional tests for static file caching headers."""
 
+import re
+
 from fastapi.testclient import TestClient
 
 from api.main import app
@@ -20,25 +22,40 @@ def test_conditional_request_returns_not_modified():
     assert second.headers["cache-control"] == "no-cache"
 
 
-# ── Shared API helper script ─────────────────────────────────────────────
+# ── Shared scripts ───────────────────────────────────────────────────────
 #
-# Pages that call scenario endpoints rely on js/api.js to turn failed requests
-# into visible errors; losing the script tag would silently break that.
+# Pages depend on the shared scripts in api/static/js. Losing a script tag would
+# break a page at load time, so each page's required scripts are asserted here.
 
-_PAGES_USING_API_HELPERS = ["income", "emr", "tax", "scenarios"]
+_SHARED_SCRIPTS_BY_PAGE = {
+    "income": ["api.js", "common.js", "config.js"],
+    "emr": ["api.js", "common.js", "config.js"],
+    "tax": ["api.js", "common.js", "config.js"],
+    "scenarios": ["api.js", "common.js"],
+    "accounts": ["common.js"],
+}
 
 
-def test_api_helper_script_is_served():
-    resp = client.get("/static/js/api.js")
-    assert resp.status_code == 200
-    assert "function apiRequest" in resp.text
-    assert resp.headers["cache-control"] == "no-cache"
+def test_shared_scripts_are_served_without_caching():
+    for script in ("api.js", "common.js", "config.js"):
+        resp = client.get(f"/static/js/{script}")
+        assert resp.status_code == 200, script
+        assert resp.headers["cache-control"] == "no-cache", script
 
 
-def test_pages_load_the_api_helper_script():
-    for page in _PAGES_USING_API_HELPERS:
+def test_pages_load_the_shared_scripts_they_need():
+    for page, scripts in _SHARED_SCRIPTS_BY_PAGE.items():
         html = client.get(f"/static/{page}.html").text
-        assert '<script src="/static/js/api.js"></script>' in html, page
+        for script in scripts:
+            assert f'<script src="/static/js/{script}"></script>' in html, (page, script)
+
+
+def test_pages_load_shared_scripts_before_their_own_code():
+    for page, scripts in _SHARED_SCRIPTS_BY_PAGE.items():
+        html = client.get(f"/static/{page}.html").text
+        first_inline = html.index("<script>")
+        for script in scripts:
+            assert html.index(f'src="/static/js/{script}"') < first_inline, (page, script)
 
 
 def test_pages_no_longer_call_scenario_endpoints_with_bare_fetch():
@@ -47,3 +64,16 @@ def test_pages_no_longer_call_scenario_endpoints_with_bare_fetch():
         html = client.get(f"/static/{page}.html").text
         assert "fetch('/api/scenarios" not in html, page
         assert "fetch(`/api/scenarios" not in html, page
+
+
+def test_pages_do_not_redefine_shared_helpers():
+    """Shared helpers live in js/ only; a page-level copy would drift."""
+    page_level = re.compile(
+        r"^  (?:const (?:el|fnum|fmt\$)\b|function (?:escHtml|populateSelect|setField|"
+        r"showError|clearError|loadTaxYears)\b)",
+        re.MULTILINE,
+    )
+    for page, scripts in _SHARED_SCRIPTS_BY_PAGE.items():
+        html = client.get(f"/static/{page}.html").text
+        redefined = page_level.findall(html)
+        assert redefined == [], (page, redefined)
