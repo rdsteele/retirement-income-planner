@@ -2,7 +2,7 @@
 
 2026 single filer: cliff = $62,600 (from filing_status_cliffs in data).
 Schedule minimum: $22,000 (Medicaid boundary).
-MFJ cliff: $85,000 (from filing_status_cliffs; schedule ends at {85000, 0}).
+MFJ cliff: from filing_status_cliffs in data.
 
 Tests:
  1. Schedule interpolation between two points
@@ -14,7 +14,7 @@ Tests:
  7. Marginal subsidy loss correct between schedule points (gradual slope)
  8. Marginal subsidy loss spikes at cliff crossing
  9. MFJ schedule populated — interpolation at $50,000
-10. MFJ cliff uses schedule-derived threshold ($85,000)
+10. MFJ cliff comes from the data file
 11. Formula fallback — empty schedule uses applicable_percentage formula
 """
 
@@ -35,7 +35,7 @@ from services.aca import (
 D = Decimal
 
 CLIFF_SINGLE = D("62600")
-CLIFF_MFJ = D("85000")
+CLIFF_MFJ = D("84600")
 TAX_YEAR = 2026
 
 
@@ -300,13 +300,13 @@ def test_mfj_schedule_at_50k():
 
 
 # ---------------------------------------------------------------------------
-# 10. MFJ cliff uses schedule-derived threshold ($85,000)
+# 10. MFJ cliff comes from the data file
 # ---------------------------------------------------------------------------
 
 
 class TestMFJCliff:
     def test_cliff_is_mfj_threshold(self):
-        # At $80,000: below the $85,000 cliff, eligible
+        # At $80,000: below the cliff, eligible
         result = calculate_aca_subsidy(
             magi=D("80000"),
             filing_status="mfj",
@@ -314,7 +314,7 @@ class TestMFJCliff:
         )
         assert result.cliff_magi == CLIFF_MFJ
         assert result.is_eligible is True
-        assert result.distance_to_cliff == D("5000")
+        assert result.distance_to_cliff == CLIFF_MFJ - D("80000")
 
     def test_mfj_over_cliff_ineligible(self):
         result = calculate_aca_subsidy(

@@ -48,8 +48,8 @@ the answers) and update this file.
 - [ ] Set **Sweep Mode** to *Preferential*. A **Variable Ordinary** field appears, and
       after running, the x-axis title reads "Additional Preferential Income ($)".
 - [ ] **IRMAA:** turn the IRMAA option on. The x-axis is *additional* income, so the
-      first gray dashed line, labeled "IRMAA 1", should sit at **$66,000** (the first
-      IRMAA threshold, $106,000, minus your $40,000 of fixed income).
+      first gray dashed line, labeled "IRMAA 1", should sit at **$69,000** (the first
+      IRMAA threshold, $109,000, minus your $40,000 of fixed income).
 
 ## 4. Income Planning
 
