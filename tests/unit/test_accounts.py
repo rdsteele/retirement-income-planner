@@ -6,6 +6,7 @@ All monetary comparisons use Decimal.
 
 from decimal import Decimal
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -497,3 +498,22 @@ class TestDuplicateTicker:
         assert values[h1_id] == dec("9999")
         other_id = next(hid for hid in values if hid != h1_id)
         assert values[other_id] == dec("2200")
+
+
+# ---------------------------------------------------------------------------
+# Crash safety — a failed save must not lose existing data
+# ---------------------------------------------------------------------------
+
+
+def test_failed_save_keeps_existing_accounts_file_intact(tmp_path: Path) -> None:
+    path = tmp_path / "accounts.json"
+    create_account(AccountIn(name="Roth", account_type="roth", balance=dec("100")), _path=path)
+    before = path.read_text()
+
+    with patch("services.common.os.replace", side_effect=OSError("disk full")):
+        with pytest.raises(OSError):
+            create_account(AccountIn(name="HSA", account_type="hsa", balance=dec("50")), _path=path)
+
+    assert path.read_text() == before
+    assert len(load_accounts(_path=path)) == 1
+    assert [p.name for p in tmp_path.iterdir()] == ["accounts.json"]

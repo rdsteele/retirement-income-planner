@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+from services.common import write_text_atomic
+
 _SCENARIOS_DIR = Path(__file__).parent.parent / "profile" / "scenarios"
 _CURRENT_FILE = Path(__file__).parent.parent / "profile" / "current_scenario.json"
 
@@ -74,10 +76,8 @@ def save_scenario(
     _scenarios_dir: Path = _SCENARIOS_DIR,
 ) -> None:
     """Save scenario data, creating the directory if needed. Overwrites if exists."""
-    _scenarios_dir.mkdir(parents=True, exist_ok=True)
     filename = scenario_name_to_filename(name)
-    path = _scenarios_dir / filename
-    path.write_text(json.dumps(data, indent=2))
+    write_text_atomic(_scenarios_dir / filename, json.dumps(data, indent=2))
 
 
 def delete_scenario(
@@ -110,5 +110,4 @@ def set_current_scenario(
     _current_file: Path = _CURRENT_FILE,
 ) -> None:
     """Set (or clear) the current scenario name."""
-    _current_file.parent.mkdir(parents=True, exist_ok=True)
-    _current_file.write_text(json.dumps({"name": name}))
+    write_text_atomic(_current_file, json.dumps({"name": name}))

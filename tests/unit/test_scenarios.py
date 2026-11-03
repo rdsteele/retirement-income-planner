@@ -5,6 +5,7 @@ profile/current_scenario.json.
 """
 
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -182,3 +183,31 @@ def test_get_current_returns_none_for_corrupt_file(tmp_path: Path) -> None:
     current_file.write_text("not valid json{{")
     result = get_current_scenario(_current_file=current_file)
     assert result is None
+
+
+# ---------------------------------------------------------------------------
+# Crash safety — a failed save must not lose existing data
+# ---------------------------------------------------------------------------
+
+
+def test_failed_save_keeps_existing_scenario_intact(tmp_path: Path) -> None:
+    save_scenario("Plan", {"name": "Plan", "v": 1}, _scenarios_dir=tmp_path)
+    before = (tmp_path / "Plan.json").read_text()
+
+    with patch("services.common.os.replace", side_effect=OSError("disk full")):
+        with pytest.raises(OSError):
+            save_scenario("Plan", {"name": "Plan", "v": 2}, _scenarios_dir=tmp_path)
+
+    assert (tmp_path / "Plan.json").read_text() == before
+    assert [p.name for p in tmp_path.iterdir()] == ["Plan.json"]
+
+
+def test_failed_set_current_keeps_existing_value(tmp_path: Path) -> None:
+    current = tmp_path / "current_scenario.json"
+    set_current_scenario("First", _current_file=current)
+
+    with patch("services.common.os.replace", side_effect=OSError("disk full")):
+        with pytest.raises(OSError):
+            set_current_scenario("Second", _current_file=current)
+
+    assert get_current_scenario(_current_file=current) == "First"

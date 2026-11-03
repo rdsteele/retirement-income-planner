@@ -10,6 +10,11 @@ jobs:
   ci:
     runs-on: ubuntu-latest
 
+    # Fail a step if any command in a pipeline fails (bash -eo pipefail)
+    defaults:
+      run:
+        shell: bash
+
     steps:
       - uses: actions/checkout@v4
 
@@ -34,7 +39,7 @@ jobs:
 
       - name: Run tests with coverage
         run: |
-          pytest tests/ --cov=services --cov=api --cov-report=term-missing --cov-fail-under=90 -v 2>&1 | tail -20
+          pytest tests/ --cov=services --cov=api --cov-report=term-missing --cov-fail-under=90 -v
 
       - name: Security scan with bandit
         run: bandit -r services/ api/ -ll

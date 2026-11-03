@@ -13,6 +13,8 @@ from pathlib import Path
 from typing import Literal
 from uuid import uuid4
 
+from services.common import write_text_atomic
+
 _DATA_PATH = Path(__file__).parent.parent / "profile" / "accounts.json"
 _ZERO = Decimal("0")
 
@@ -81,8 +83,7 @@ def _load_raw(path: Path) -> list[dict]:
 
 
 def _save_raw(accounts: list[dict], path: Path) -> None:
-    with path.open("w") as f:
-        json.dump(accounts, f, indent=2)
+    write_text_atomic(path, json.dumps(accounts, indent=2))
 
 
 # ---------------------------------------------------------------------------
