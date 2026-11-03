@@ -356,3 +356,31 @@ class TestCalculateValidation:
         body = {**_BASE, "filing_status": "mfs", "ss_benefit": 20000.0}
         resp = client.post("/api/income-plan/calculate", json=body)
         assert resp.status_code == 422
+
+
+# ── NIIT: executed short-term gains are investment income ─────────────────
+
+
+class TestExecutedShortTermGainCountsTowardNIIT:
+    """150k pension + 60k STCG gain must match 150k pension + 60k interest.
+
+    Both have 210k MAGI and 60k of net investment income, so NIIT applies.
+    """
+
+    def _first_total_tax(self, overrides):
+        payload = {**_BASE, "pension_taxable": 150000.0, "tax_year": 2026, **overrides}
+        resp = client.post("/api/income-plan/calculate", json=payload)
+        assert resp.status_code == 200
+        return resp.json()["points"]["total_tax"][0]
+
+    def test_stcg_gain_matches_interest_income(self):
+        stcg = self._first_total_tax(
+            {
+                "executed_withdrawals": [
+                    {"withdrawal_type": "stcg", "amount": 70000.0, "basis": 10000.0}
+                ]
+            }
+        )
+        interest = self._first_total_tax({"interest": 60000.0})
+        assert stcg == pytest.approx(interest)
+        assert stcg == pytest.approx(39514.0)

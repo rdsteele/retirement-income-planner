@@ -167,6 +167,7 @@ def post_income_plan_calculate(request: IncomePlanRequest):
         interest=float(sweep_inputs["interest"]),
         ordinary_dividends=float(sweep_inputs["ordinary_dividends"]),
         ira_distributions=float(sweep_inputs["ira_distributions"]),
+        other_investment_ordinary=float(sweep_inputs["other_investment_ordinary"]),
         qualified_dividends=float(sweep_inputs["qualified_dividends"]),
         fixed_ltcg=float(sweep_inputs["fixed_ltcg"]),
         above_the_line_adjustments=float(sweep_inputs["above_the_line_adjustments"]),

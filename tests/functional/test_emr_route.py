@@ -649,3 +649,29 @@ class TestUnexpectedError:
             resp = client.post("/api/emr", json=_BASE_ORDINARY)
         assert resp.status_code == 500
         assert "unexpected" in resp.json()["detail"].lower()
+
+
+# ── other_investment_ordinary: optional NII-eligible ordinary income ──────
+
+
+class TestOtherInvestmentOrdinary:
+    _BASE_EMR = {
+        "sweep_mode": "ordinary",
+        "filing_status": "single",
+        "tax_year": 2026,
+        "sweep_floor": 0.0,
+        "sweep_ceiling": 100.0,
+        "sweep_step": 100.0,
+    }
+
+    def _total_tax(self, **income):
+        resp = client.post("/api/emr", json={**self._BASE_EMR, **income})
+        assert resp.status_code == 200
+        return resp.json()["points"]["total_tax"][0]
+
+    def test_field_is_optional(self):
+        assert self._total_tax(pension=210000.0) == pytest.approx(39134.0)
+
+    def test_other_investment_ordinary_triggers_niit(self):
+        total = self._total_tax(pension=150000.0, other_investment_ordinary=60000.0)
+        assert total == pytest.approx(39514.0)

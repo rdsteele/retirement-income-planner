@@ -51,6 +51,7 @@ class WithdrawalTotals:
     roth: Decimal  # Planned Roth withdrawals (MAGI-neutral)
     hsa: Decimal  # Planned HSA medical withdrawals (MAGI-neutral)
     exec_ordinary: Decimal  # Executed withdrawals that are ordinary income
+    exec_stcg_gain: Decimal  # Short-term gains: ordinary income that is also investment income
     exec_preferential: Decimal  # Executed withdrawals that are preferential income
     exec_taxable_amount: Decimal  # Gross executed taxable-account proceeds
     exec_traditional: Decimal  # Executed tax-deferred distributions
@@ -137,6 +138,7 @@ def classify_withdrawals(
             hsa += w.amount
 
     exec_ordinary = _ZERO
+    exec_stcg_gain = _ZERO
     exec_preferential = _ZERO
     exec_taxable_amount = _ZERO
     exec_traditional = _ZERO
@@ -150,6 +152,7 @@ def classify_withdrawals(
             exec_taxable_amount += ew.amount
         elif ew.withdrawal_type == "stcg":
             exec_ordinary += gain
+            exec_stcg_gain += gain
             exec_taxable_amount += ew.amount
         elif ew.withdrawal_type == "tax_deferred":
             exec_ordinary += ew.amount
@@ -166,6 +169,7 @@ def classify_withdrawals(
         roth=roth,
         hsa=hsa,
         exec_ordinary=exec_ordinary,
+        exec_stcg_gain=exec_stcg_gain,
         exec_preferential=exec_preferential,
         exec_taxable_amount=exec_taxable_amount,
         exec_traditional=exec_traditional,
@@ -408,9 +412,10 @@ def assemble_sweep_inputs(
     """Merge forced income with withdrawal totals into augmented sweep inputs.
 
     Returns a dict of Decimal values ready to pass to calculate_total_cost().
-    The traditional distribution total and executed ordinary income are added to
-    ira_distributions; taxable gains and executed preferential income are added
-    to fixed_ltcg.  This mirrors the payload-assembly logic previously in JS.
+    Traditional distributions (planned and executed) are added to ira_distributions.
+    Executed short-term gains go to other_investment_ordinary, because they are
+    ordinary income that also counts as net investment income. Taxable gains and
+    executed preferential income are added to fixed_ltcg.
 
     ``pension_taxable`` is passed as the ``pension`` key because the EMR sweep
     only uses the taxable portion for tax computation.
@@ -421,7 +426,8 @@ def assemble_sweep_inputs(
         "pension": pension_taxable,
         "interest": interest,
         "ordinary_dividends": ordinary_dividends,
-        "ira_distributions": ira_distributions + totals.traditional + totals.exec_ordinary,
+        "ira_distributions": ira_distributions + totals.traditional + totals.exec_traditional,
+        "other_investment_ordinary": totals.exec_stcg_gain,
         "ss_benefit": ss_benefit,
         "qualified_dividends": qualified_dividends,
         "fixed_ltcg": fixed_ltcg + totals.taxable_gains + totals.exec_preferential,

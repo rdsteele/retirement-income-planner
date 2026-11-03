@@ -108,8 +108,9 @@ def _compute_fixed_ordinary(
     interest: Decimal,
     ordinary_dividends: Decimal,
     ira_distributions: Decimal,
+    other_investment_ordinary: Decimal = _ZERO,
 ) -> Decimal:
-    return pension + interest + ordinary_dividends + ira_distributions
+    return pension + interest + ordinary_dividends + ira_distributions + other_investment_ordinary
 
 
 def _compute_incomes_at_point(
@@ -630,7 +631,14 @@ def calculate_emr(
     above_the_line_adjustments: Decimal = _ZERO,
     additional_deductions: Decimal = _ZERO,
     extra_boundary_points: list[Decimal] | None = None,
+    other_investment_ordinary: Decimal = _ZERO,
 ) -> EMRResult:
+    """Sweep EMR across an income range.
+
+    ``other_investment_ordinary`` is ordinary income that is also net investment
+    income for NIIT (rental, royalties, non-qualified annuity earnings, short-term
+    gains). Pension, IRA, and similar distributions are not net investment income.
+    """
     if filing_status not in ("single", "mfj"):
         raise ValueError(f"Unsupported filing status: {filing_status!r}")
 
@@ -644,9 +652,9 @@ def calculate_emr(
         sweep_ceiling = _get_default_sweep_ceiling(filing_status, tax_year)
 
     fixed_ordinary = _compute_fixed_ordinary(
-        pension, interest, ordinary_dividends, ira_distributions
+        pension, interest, ordinary_dividends, ira_distributions, other_investment_ordinary
     )
-    investment_ordinary = interest + ordinary_dividends
+    investment_ordinary = interest + ordinary_dividends + other_investment_ordinary
     total_preferential_fixed = qualified_dividends + fixed_ltcg
 
     # Compute boundary points

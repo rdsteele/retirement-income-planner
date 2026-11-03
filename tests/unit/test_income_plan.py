@@ -393,6 +393,31 @@ class TestAssembleSweepInputs:
         )
         assert result["ira_distributions"] == d("8000")
 
+    def test_executed_stcg_gain_routed_to_other_investment_ordinary(self):
+        result = self._base(
+            executed=[
+                ExecutedWithdrawal(withdrawal_type="stcg", amount=d("70000"), basis=d("10000"))
+            ],
+        )
+        assert result["other_investment_ordinary"] == d("60000")
+        assert result["ira_distributions"] == d("0")
+
+    def test_tax_deferred_is_not_investment_ordinary(self):
+        result = self._base(
+            executed=[ExecutedWithdrawal(withdrawal_type="tax_deferred", amount=d("8000"))],
+        )
+        assert result["other_investment_ordinary"] == d("0")
+
+    def test_stcg_and_tax_deferred_split_between_buckets(self):
+        result = self._base(
+            executed=[
+                ExecutedWithdrawal(withdrawal_type="tax_deferred", amount=d("8000")),
+                ExecutedWithdrawal(withdrawal_type="stcg", amount=d("5000"), basis=d("2000")),
+            ],
+        )
+        assert result["ira_distributions"] == d("8000")
+        assert result["other_investment_ordinary"] == d("3000")
+
     def test_executed_ltcg_added_to_fixed_ltcg(self):
         result = self._base(
             executed=[

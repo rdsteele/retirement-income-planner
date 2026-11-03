@@ -206,8 +206,11 @@ dividends), as these are passive investment income. IRA and RMD withdrawals
 are ordinary income and do not count toward NII, but they increase MAGI,
 which can push fixed NII into the NIIT range in ORDINARY mode.
 
-Internally, `investment_ordinary = interest + ordinary_dividends` is computed
-as the ordinary income component of NII. The full NII base is
+Internally, `investment_ordinary = interest + ordinary_dividends +
+other_investment_ordinary` is computed as the ordinary income component of NII.
+`other_investment_ordinary` is an optional input (default 0) for ordinary income
+that is also investment income: rental, royalties, non-qualified annuity
+earnings, and short-term capital gains. It is also part of fixed ordinary income. The full NII base is
 `investment_ordinary + total_preferential`.
 
 ```
@@ -340,13 +343,13 @@ niit_base = investment_ordinary + total_preferential
 ```
 
 Where:
-- `investment_ordinary = interest + ordinary_dividends` (passive investment
-  income that counts as NII; not IRA/RMD withdrawals)
+- `investment_ordinary = interest + ordinary_dividends + other_investment_ordinary`
+  (investment income that counts as NII; not pension or IRA/RMD withdrawals)
 - `total_preferential = qualified_dividends + fixed_ltcg` (ORDINARY mode)
   or `qualified_dividends + fixed_ltcg + sweep_value` (PREFERENTIAL mode)
 
 **Important:** IRA and RMD withdrawals are ordinary income and do **not** count toward NII.
-Only passive investment income (interest, dividends, LTCG) counts. This distinction matters
+Only investment income (interest, dividends, LTCG, short-term gains, rental/royalty/non-qualified annuity income) counts. This distinction matters
 for the EMR calculation — see interaction with sweep mode below.
 
 #### NIIT Calculation

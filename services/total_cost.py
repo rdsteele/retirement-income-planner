@@ -106,6 +106,7 @@ def calculate_total_cost(
     interest: Decimal = _ZERO,
     ordinary_dividends: Decimal = _ZERO,
     ira_distributions: Decimal = _ZERO,
+    other_investment_ordinary: Decimal = _ZERO,
     ss_benefit: Decimal = _ZERO,
     qualified_dividends: Decimal = _ZERO,
     fixed_ltcg: Decimal = _ZERO,
@@ -124,7 +125,9 @@ def calculate_total_cost(
     ohio_qualifying_retirement_income: Decimal = _ZERO,
     include_aca: bool = False,
 ) -> TotalCostResult:
-    fixed_ordinary = pension + interest + ordinary_dividends + ira_distributions
+    fixed_ordinary = (
+        pension + interest + ordinary_dividends + ira_distributions + other_investment_ordinary
+    )
     if sweep_mode == SweepMode.PREFERENTIAL:
         fixed_ordinary = fixed_ordinary + variable_ordinary
 
@@ -142,6 +145,7 @@ def calculate_total_cost(
             interest=interest,
             ordinary_dividends=ordinary_dividends,
             ira_distributions=ira_distributions,
+            other_investment_ordinary=other_investment_ordinary,
             ss_benefit=ss_benefit,
             qualified_dividends=qualified_dividends,
             fixed_ltcg=fixed_ltcg,
@@ -212,6 +216,7 @@ def calculate_total_cost(
         interest=interest,
         ordinary_dividends=ordinary_dividends,
         ira_distributions=ira_distributions,
+        other_investment_ordinary=other_investment_ordinary,
         ss_benefit=ss_benefit,
         qualified_dividends=qualified_dividends,
         fixed_ltcg=fixed_ltcg,

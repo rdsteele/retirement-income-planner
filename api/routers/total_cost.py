@@ -112,7 +112,8 @@ def _compute_planning_signals(
             request.pension
             + request.interest
             + request.ordinary_dividends
-            + request.ira_distributions,
+            + request.ira_distributions
+            + request.other_investment_ordinary,
         ),
         variable_ordinary=_to_decimal(request.variable_ordinary),
         qualified_dividends=_to_decimal(request.qualified_dividends),
@@ -159,6 +160,7 @@ def post_total_cost(request: TotalCostRequest):
             interest=_to_decimal(request.interest),
             ordinary_dividends=_to_decimal(request.ordinary_dividends),
             ira_distributions=_to_decimal(request.ira_distributions),
+            other_investment_ordinary=_to_decimal(request.other_investment_ordinary),
             ss_benefit=_to_decimal(request.ss_benefit),
             qualified_dividends=_to_decimal(request.qualified_dividends),
             fixed_ltcg=_to_decimal(request.fixed_ltcg),
