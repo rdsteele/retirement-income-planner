@@ -211,6 +211,10 @@ python3 tests/js/run_jsc.py
 The CI pipeline (GitHub Actions) runs ruff, mypy, pytest, the JavaScript tests,
 bandit, and pip-audit on every push to main.
 
+The automated tests do not judge how the pages look or feel. After changes to the pages
+or the shared scripts, run through [`docs/manual-browser-check.md`](docs/manual-browser-check.md)
+in a real browser (about 15 minutes).
+
 ---
 
 ## Tax Year Support
