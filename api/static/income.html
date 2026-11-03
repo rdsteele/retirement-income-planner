@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Income Planning</title>
   <script src="/static/plotly-2.26.0.min.js"></script>
+  <script src="/static/js/api.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -455,6 +456,11 @@
       border-bottom: 1px solid #dee2e6;
       margin-bottom: 14px;
     }
+    .scenario-bar { flex-wrap: wrap; }
+    .scenario-status { flex-basis: 100%; font-size: 12px; }
+    .scenario-status:empty { display: none; }
+    .scenario-status.ok    { color: #16a34a; }
+    .scenario-status.error { color: #dc2626; }
     .scenario-name { color: #495057; text-decoration: none; flex: 1; }
     .scenario-name:hover { color: #1a1a2e; }
     .scenario-btn {
@@ -502,6 +508,7 @@
     <a class="scenario-name" id="scenario-name-display" href="/static/scenarios.html">📋 No scenario loaded</a>
     <button class="scenario-btn" id="save-btn" disabled>Save</button>
     <button class="scenario-btn" id="save-as-btn">Save As</button>
+    <span class="scenario-status" id="scenario-status" role="status"></span>
   </div>
   <h1>Income Planning</h1>
 
@@ -1808,86 +1815,92 @@
     }
   }
 
+  let _scenarioStatusTimer = null;
+
+  // Shows the result of a scenario action beside the Save buttons. Success
+  // messages fade after a few seconds; errors stay until the next action.
+  function setScenarioStatus(message, isError = false) {
+    const status = el('scenario-status');
+    if (!status) return;
+    clearTimeout(_scenarioStatusTimer);
+    status.textContent = message;
+    status.className = 'scenario-status ' + (isError ? 'error' : 'ok');
+    if (!isError && message) {
+      _scenarioStatusTimer = setTimeout(() => { status.textContent = ''; }, 3000);
+    }
+  }
+
   async function loadCurrentScenario() {
     try {
-      const resp = await fetch('/api/scenarios/current');
-      if (!resp.ok) return;
-      const { name } = await resp.json();
+      const { name } = await apiRequest('/api/scenarios/current');
       currentScenarioName = name || null;
       updateScenarioBar();
       if (!currentScenarioName) return;
-      const sResp = await fetch(`/api/scenarios/${encodeURIComponent(currentScenarioName)}`);
-      if (!sResp.ok) return;
-      const scenario = await sResp.json();
+      const scenario = await fetchScenarioOrNull(currentScenarioName);
+      if (scenario === null) throw new Error('scenario file not found');
       populateSharedInputs(scenario);
       populatePageInputs(scenario);
-    } catch (_) {}
+    } catch (err) {
+      // Do not leave a scenario name showing over a blank form: Save would then
+      // overwrite the stored scenario with empty values.
+      const failedName = currentScenarioName;
+      currentScenarioName = null;
+      updateScenarioBar();
+      setScenarioStatus(
+        failedName
+          ? `Could not load "${failedName}": ${err.message}`
+          : `Could not check for a current scenario: ${err.message}`,
+        true,
+      );
+    }
+  }
+
+  function buildScenarioData(name, existing) {
+    const shared = gatherSharedInputs();
+    return {
+      ...existing,
+      name,
+      saved_at: new Date().toISOString().slice(0, 19),
+      version: '1.0',
+      inputs: { ...(existing.inputs || {}), ...shared.inputs },
+      aca:    { ...(existing.aca    || {}), ...shared.aca    },
+      ohio:   { ...(existing.ohio   || {}), ...shared.ohio   },
+      ...gatherPageInputs(),
+    };
   }
 
   async function saveCurrentScenario() {
     if (!currentScenarioName) return;
+    const name = currentScenarioName;
     try {
-      let existing = {};
-      try {
-        const r = await fetch(`/api/scenarios/${encodeURIComponent(currentScenarioName)}`);
-        if (r.ok) existing = await r.json();
-      } catch (_) {}
-      const shared = gatherSharedInputs();
-      const data = {
-        ...existing,
-        name: currentScenarioName,
-        saved_at: new Date().toISOString().slice(0, 19),
-        version: '1.0',
-        inputs: { ...(existing.inputs || {}), ...shared.inputs },
-        aca:    { ...(existing.aca    || {}), ...shared.aca    },
-        ohio:   { ...(existing.ohio   || {}), ...shared.ohio   },
-        ...gatherPageInputs(),
-      };
-      await fetch(`/api/scenarios/${encodeURIComponent(currentScenarioName)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-    } catch (_) {}
+      const existing = await fetchScenarioOrNull(name);
+      await saveScenarioFile(name, buildScenarioData(name, existing || {}));
+      setScenarioStatus(`Saved "${name}"`);
+    } catch (err) {
+      setScenarioStatus(`Could not save "${name}": ${err.message}`, true);
+    }
   }
 
   async function saveAsScenario() {
     const name = prompt('Enter scenario name:');
     if (!name || !name.trim()) return;
     const trimmed = name.trim();
-    let existing = {};
     try {
-      const r = await fetch(`/api/scenarios/${encodeURIComponent(trimmed)}`);
-      if (r.ok) {
-        existing = await r.json();
-        if (!confirm(`"${trimmed}" already exists. Overwrite?`)) return;
-      }
-    } catch (_) {}
+      const existing = await fetchScenarioOrNull(trimmed);
+      if (existing && !confirm(`"${trimmed}" already exists. Overwrite?`)) return;
+      await saveScenarioFile(trimmed, buildScenarioData(trimmed, existing || {}));
+    } catch (err) {
+      setScenarioStatus(`Could not save "${trimmed}": ${err.message}`, true);
+      return;
+    }
     try {
-      const shared = gatherSharedInputs();
-      const data = {
-        ...existing,
-        name: trimmed,
-        saved_at: new Date().toISOString().slice(0, 19),
-        version: '1.0',
-        inputs: { ...(existing.inputs || {}), ...shared.inputs },
-        aca:    { ...(existing.aca    || {}), ...shared.aca    },
-        ohio:   { ...(existing.ohio   || {}), ...shared.ohio   },
-        ...gatherPageInputs(),
-      };
-      await fetch(`/api/scenarios/${encodeURIComponent(trimmed)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      await fetch('/api/scenarios/current', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: trimmed }),
-      });
+      await setCurrentScenarioName(trimmed);
       currentScenarioName = trimmed;
       updateScenarioBar();
-    } catch (_) {}
+      setScenarioStatus(`Saved "${trimmed}"`);
+    } catch (err) {
+      setScenarioStatus(`Saved "${trimmed}", but could not make it the current scenario: ${err.message}`, true);
+    }
   }
 
   el('save-btn')?.addEventListener('click', saveCurrentScenario);

@@ -395,6 +395,7 @@
   </div><!-- /.two-col -->
 </div><!-- /.page -->
 
+<script src="/static/js/api.js"></script>
 <script>
   // ── App config — filing statuses and tax years ────────────────────────────
   const APP_CONFIG = {
@@ -717,18 +718,25 @@
 
   async function loadCurrentScenario() {
     try {
-      const resp = await fetch('/api/scenarios/current');
-      if (!resp.ok) return;
-      const { name } = await resp.json();
+      const { name } = await apiRequest('/api/scenarios/current');
       currentScenarioName = name || null;
       updateScenarioBar();
       if (!currentScenarioName) return;
-      const sResp = await fetch(`/api/scenarios/${encodeURIComponent(currentScenarioName)}`);
-      if (!sResp.ok) return;
-      const scenario = await sResp.json();
+      const scenario = await fetchScenarioOrNull(currentScenarioName);
+      if (scenario === null) throw new Error('scenario file not found');
       populateSharedInputs(scenario);
       populatePageInputs(scenario);
-    } catch (_) {}
+    } catch (err) {
+      // Do not leave a scenario name showing over a blank form.
+      const failedName = currentScenarioName;
+      currentScenarioName = null;
+      updateScenarioBar();
+      showError(
+        failedName
+          ? `Could not load scenario "${failedName}": ${err.message}`
+          : `Could not check for a current scenario: ${err.message}`
+      );
+    }
   }
 
   // ── Page load ─────────────────────────────────────────────────────────────

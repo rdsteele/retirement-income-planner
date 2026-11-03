@@ -199,6 +199,7 @@
     <div id="scenarios-list-container">
       <p class="empty-state">Loading…</p>
     </div>
+    <div id="action-message" class="message" role="status"></div>
   </div>
 
   <!-- Import -->
@@ -221,6 +222,7 @@
   </div>
 </div>
 
+<script src="/static/js/api.js"></script>
 <script>
   const el = id => document.getElementById(id);
 
@@ -249,38 +251,34 @@
     }
   }
 
+  // ── Action feedback ───────────────────────────────────────────────────
+  function setActionMessage(text, isError = false) {
+    const message = el('action-message');
+    message.textContent = text;
+    message.className = 'message ' + (isError ? 'error' : 'success');
+  }
+
   // ── Load current scenario name ────────────────────────────────────────
   async function loadCurrentName() {
-    console.log('[scenarios] loadCurrentName: fetching /api/scenarios/current');
     try {
-      const resp = await fetch('/api/scenarios/current');
-      if (!resp.ok) {
-        console.error('[scenarios] loadCurrentName: response not ok', resp.status);
-        return;
-      }
-      const { name } = await resp.json();
+      const { name } = await apiRequest('/api/scenarios/current');
       currentScenarioName = name || null;
       updateScenarioBar();
       updateCurrentSection();
-      console.log('[scenarios] loadCurrentName: current =', currentScenarioName);
-    } catch (e) {
-      console.error('[scenarios] loadCurrentName error:', e);
+    } catch (err) {
+      setActionMessage(`Could not check the current scenario: ${err.message}`, true);
     }
   }
 
   // ── Clear current scenario ────────────────────────────────────────────
   async function clearCurrentScenario() {
     try {
-      await fetch('/api/scenarios/current', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: null }),
-      });
+      await setCurrentScenarioName(null);
       currentScenarioName = null;
       updateScenarioBar();
       updateCurrentSection();
-    } catch (e) {
-      console.error('[scenarios] clearCurrentScenario error:', e);
+    } catch (err) {
+      setActionMessage(`Could not clear the current scenario: ${err.message}`, true);
     }
   }
 
@@ -344,23 +342,18 @@
   // ── Load scenario and navigate ────────────────────────────────────────
   async function loadAndGo(name) {
     try {
-      await fetch('/api/scenarios/current', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
-      });
-      window.location.href = '/static/income.html';
-    } catch (e) {
-      console.error('[scenarios] loadAndGo error:', e);
+      await setCurrentScenarioName(name);
+    } catch (err) {
+      setActionMessage(`Could not load "${name}": ${err.message}`, true);
+      return;
     }
+    window.location.href = '/static/income.html';
   }
 
   // ── Export scenario ───────────────────────────────────────────────────
   async function exportScenario(name) {
     try {
-      const resp = await fetch(`/api/scenarios/${encodeURIComponent(name)}`);
-      if (!resp.ok) return;
-      const data = await resp.json();
+      const data = await apiRequest(scenarioUrl(name));
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const url  = URL.createObjectURL(blob);
       const a    = document.createElement('a');
@@ -370,23 +363,25 @@
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-    } catch (_) {}
+    } catch (err) {
+      setActionMessage(`Could not export "${name}": ${err.message}`, true);
+    }
   }
 
   // ── Delete scenario ───────────────────────────────────────────────────
   async function deleteScenario(name) {
     if (!confirm(`Delete scenario "${name}"? This cannot be undone.`)) return;
     try {
-      const resp = await fetch(`/api/scenarios/${encodeURIComponent(name)}`, { method: 'DELETE' });
-      if (resp.ok || resp.status === 204) {
-        if (currentScenarioName === name) {
-          await clearCurrentScenario();
-        }
-        await loadScenarioList();
-      }
-    } catch (e) {
-      console.error('[scenarios] deleteScenario error:', e);
+      await deleteScenarioFile(name);
+    } catch (err) {
+      setActionMessage(`Could not delete "${name}": ${err.message}`, true);
+      return;
     }
+    setActionMessage(`Deleted "${name}"`);
+    if (currentScenarioName === name) {
+      await clearCurrentScenario();
+    }
+    await loadScenarioList();
   }
 
   // ── Import scenario ───────────────────────────────────────────────────
@@ -413,34 +408,18 @@
 
     const name = data.name;
 
-    // Check for name conflict
     try {
-      const check = await fetch(`/api/scenarios/${encodeURIComponent(name)}`);
-      if (check.ok) {
-        const overwrite = confirm(`Scenario "${name}" already exists. Overwrite?`);
-        if (!overwrite) {
-          el('import-file').value = '';
-          return;
-        }
+      const existing = await fetchScenarioOrNull(name);
+      if (existing && !confirm(`Scenario "${name}" already exists. Overwrite?`)) {
+        el('import-file').value = '';
+        return;
       }
-    } catch (_) {}
-
-    try {
-      const resp = await fetch(`/api/scenarios/${encodeURIComponent(name)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (resp.ok) {
-        msgEl.textContent = `Imported "${name}" successfully.`;
-        msgEl.className = 'message success';
-        await loadScenarioList();
-      } else {
-        msgEl.textContent = 'Import failed. Please try again.';
-        msgEl.className = 'message error';
-      }
-    } catch (_) {
-      msgEl.textContent = 'Import failed. Please try again.';
+      await saveScenarioFile(name, data);
+      msgEl.textContent = `Imported "${name}" successfully.`;
+      msgEl.className = 'message success';
+      await loadScenarioList();
+    } catch (err) {
+      msgEl.textContent = `Import failed: ${err.message}`;
       msgEl.className = 'message error';
     }
 
@@ -473,22 +452,23 @@
     };
 
     try {
-      await fetch(`/api/scenarios/${encodeURIComponent(name)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      await fetch('/api/scenarios/current', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
-      });
-      window.location.href = '/static/income.html';
-    } catch (e) {
-      console.error('[scenarios] createNewScenario error:', e);
-      msgEl.textContent = 'Failed to create scenario. Please try again.';
+      const existing = await fetchScenarioOrNull(name);
+      if (existing && !confirm(`"${name}" already exists. Replace it with an empty scenario?`)) return;
+      await saveScenarioFile(name, data);
+    } catch (err) {
+      msgEl.textContent = `Failed to create scenario: ${err.message}`;
       msgEl.className = 'message error';
+      return;
     }
+
+    try {
+      await setCurrentScenarioName(name);
+    } catch (err) {
+      msgEl.textContent = `Created "${name}", but could not make it the current scenario: ${err.message}`;
+      msgEl.className = 'message error';
+      return;
+    }
+    window.location.href = '/static/income.html';
   }
 
   // ── Page load ─────────────────────────────────────────────────────────
