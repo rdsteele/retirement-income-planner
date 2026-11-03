@@ -420,13 +420,13 @@
 <script src="/static/js/common.js"></script>
 <script src="/static/js/config.js"></script>
 <script src="/static/js/scenario-bar.js"></script>
+<script src="/static/js/emr-chart.js"></script>
 <script>
   // ── Config — populated from GET /api/config before first run ──────────────
   const CONFIG = {};
 
   // ── State ────────────────────────────────────────────────────────────────
   let lastResult = null;    // raw API response
-  let chartMode  = 'stacked'; // 'stacked' | 'lines'
 
   // ── App config loader ─────────────────────────────────────────────────────
   async function loadConfig() {
@@ -447,22 +447,11 @@
     el('sweep_ceiling').placeholder = `${ceiling} (${rate} bracket top)`;
   }
 
-  // Component metadata: key, label, color
-  const COMPONENTS = [
-    { key: 'ordinary',     label: 'Ordinary',      color: '#4a86c8' },
-    { key: 'ss_torpedo',   label: 'SS Torpedo',     color: '#f59e0b' },
-    { key: 'pref_stacking',label: 'Pref Stacking',  color: '#8b5cf6' },
-    { key: 'niit',         label: 'NIIT',           color: '#ef4444' },
-    { key: 'ohio',         label: 'Ohio',           color: '#0d9488' },
-  ];
-
   // ── DOM refs ─────────────────────────────────────────────────────────────
   const runBtn       = document.getElementById('run-btn');
   const signalsWrap  = document.getElementById('signals-wrap');
   const signalsBar   = document.getElementById('signals-bar');
   const chartSection = document.getElementById('chart-section');
-  const btnStacked   = document.getElementById('btn-stacked');
-  const btnLines     = document.getElementById('btn-lines');
   const irmaaToggle  = document.getElementById('irmaa-toggle');
 
   // ── Conditional field visibility ──────────────────────────────────────────
@@ -715,95 +704,16 @@
   }
 
   function buildLayout() {
-    const chartEl = document.getElementById('chart');
-    return {
-      width: chartEl.parentElement.offsetWidth || 800,
-      height: 500,
-      xaxis: {
-        title: {
-          text: lastResult && lastResult.sweep_mode === 'preferential'
-            ? 'Additional Preferential Income ($)'
-            : 'Additional Ordinary Income ($)',
-        },
-        tickformat: ',.0f',
-      },
-      yaxis: {
-        title: { text: 'Effective Marginal Rate' },
-        tickformat: '.1%',
-        range: [0, CONFIG.yAxisMaxEMR],
-        autorange: false,
-      },
-      legend: { orientation: 'h', y: -0.25 },
-      margin: { t: 20, b: 80, l: 60, r: 20 },
-      shapes: [],
-      annotations: [],
-      hovermode: 'x unified',
-    };
-  }
-
-  function buildStackedTraces(pts) {
-    const traces = [];
-    const x = pts.income;
-    let first = true;
-    for (const comp of COMPONENTS) {
-      const y = pts.components[comp.key];
-      if (allZero(y)) continue;
-      traces.push({
-        type: 'scatter',
-        x,
-        y,
-        name: comp.label,
-        fill: first ? 'tozeroy' : 'tonexty',
-        stackgroup: 'emr',
-        line: { color: comp.color, width: 0 },
-        fillcolor: comp.color,
-        hovertemplate: comp.label + ': %{y:.1%}<extra></extra>',
-      });
-      first = false;
-    }
-    return traces;
-  }
-
-  function buildLineTraces(pts) {
-    const traces = [];
-    const x = pts.income;
-
-    // Component lines
-    for (const comp of COMPONENTS) {
-      const y = pts.components[comp.key];
-      if (allZero(y)) continue;
-      traces.push({
-        type: 'scatter',
-        x,
-        y,
-        name: comp.label,
-        mode: 'lines',
-        line: { color: comp.color, width: 2 },
-        hovertemplate: comp.label + ': %{y:.1%}<extra></extra>',
-      });
-    }
-
-    // Total EMR bold line
-    traces.push({
-      type: 'scatter',
-      x,
-      y: pts.emr,
-      name: 'Total EMR',
-      mode: 'lines',
-      line: { color: '#212529', width: 3 },
-      hovertemplate: 'Total EMR: %{y:.1%}<extra></extra>',
-    });
-
-    return traces;
+    const xTitle = lastResult && lastResult.sweep_mode === 'preferential'
+      ? 'Additional Preferential Income ($)'
+      : 'Additional Ordinary Income ($)';
+    // IRMAA lines are drawn after the plot (see renderChart), so none are laid out here
+    return { ...buildBaseLayout(xTitle, CONFIG.yAxisMaxEMR), shapes: [], annotations: [] };
   }
 
   async function renderChart() {
     if (!lastResult) return;
-    const pts = lastResult.points;
-    const traces = chartMode === 'stacked'
-      ? buildStackedTraces(pts)
-      : buildLineTraces(pts);
-    await Plotly.newPlot('chart', traces, buildLayout(), { responsive: true });
+    await drawChart(lastResult.points, buildLayout());
     if (irmaaToggle.checked) {
       const { thresholds, adjusted } = effectiveIrmaaThresholds();
       const currentRange = document.getElementById('chart').layout.xaxis.range;
@@ -817,19 +727,7 @@
   }
 
   // ── Chart mode toggles ────────────────────────────────────────────────────
-  btnStacked.addEventListener('click', () => {
-    chartMode = 'stacked';
-    btnStacked.classList.add('active');
-    btnLines.classList.remove('active');
-    renderChart();
-  });
-
-  btnLines.addEventListener('click', () => {
-    chartMode = 'lines';
-    btnLines.classList.add('active');
-    btnStacked.classList.remove('active');
-    renderChart();
-  });
+  wireChartModeButtons(renderChart);
 
   // ── IRMAA toggle — relayout only, no re-render ────────────────────────────
   irmaaToggle.addEventListener('change', () => {

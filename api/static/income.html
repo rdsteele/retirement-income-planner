@@ -10,6 +10,7 @@
   <script src="/static/js/common.js"></script>
   <script src="/static/js/config.js"></script>
   <script src="/static/js/scenario-bar.js"></script>
+  <script src="/static/js/emr-chart.js"></script>
   <link rel="stylesheet" href="/static/css/scenario-bar.css">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -787,7 +788,6 @@
   // ── State ─────────────────────────────────────────────────────────────
   const CONFIG = {};
   let lastResult         = null;
-  let chartMode          = 'stacked';
   let accounts           = [];
   let executedWithdrawals = [];  // [{ id, description, amount, basis, type }]
   let acaCliffMagi    = 0;     // updated from Calculate response
@@ -795,15 +795,6 @@
   let estimatedOhioTaxes   = 0;  // ohio_tax at sweep_floor from last Calculate run
   let estimatedTaxes       = 0;  // total of both — used for shortfall/summary payload
   let taxesStale           = true;  // true until Calculate is clicked; reset to true on any input change
-
-  // ── EMR chart components (same palette as index.html) ─────────────────
-  const COMPONENTS = [
-    { key: 'ordinary',      label: 'Ordinary',      color: '#4a86c8' },
-    { key: 'ss_torpedo',    label: 'SS Torpedo',     color: '#f59e0b' },
-    { key: 'pref_stacking', label: 'Pref Stacking',  color: '#8b5cf6' },
-    { key: 'niit',          label: 'NIIT',           color: '#ef4444' },
-    { key: 'ohio',          label: 'Ohio',           color: '#0d9488' },
-  ];
 
   // ── Config loader ─────────────────────────────────────────────────────
   async function loadConfig() {
@@ -1335,7 +1326,6 @@
 
   // ── Chart ─────────────────────────────────────────────────────────────
   function buildLayout() {
-    const chartEl  = el('chart');
     const signals  = lastResult?.planning_signals;
     const shapes      = [];
     const annotations = [];
@@ -1381,113 +1371,18 @@
     }
 
     return {
-      width:  chartEl.parentElement.offsetWidth || 800,
-      height: 500,
-      xaxis: {
-        title:      { text: 'Additional Ordinary Income ($)' },
-        tickformat: ',.0f',
-      },
-      yaxis: {
-        title:     { text: 'Effective Marginal Rate' },
-        tickformat: '.1%',
-        range:     [0, CONFIG.yAxisMaxEMR ?? 0.5],
-        autorange: false,
-      },
-      legend:    { orientation: 'h', y: -0.25 },
-      margin:    { t: 20, b: 80, l: 60, r: 20 },
+      ...buildBaseLayout('Additional Ordinary Income ($)', CONFIG.yAxisMaxEMR),
       shapes,
       annotations,
-      hovermode: 'x unified',
     };
-  }
-
-  function buildStackedTraces(pts) {
-    const traces = [];
-    const x = pts.income;
-    let first = true;
-    for (const comp of COMPONENTS) {
-      const y = pts.components[comp.key];
-      if (allZero(y)) continue;
-      traces.push({
-        type: 'scatter', x, y,
-        name:          comp.label,
-        fill:          first ? 'tozeroy' : 'tonexty',
-        stackgroup:    'emr',
-        line:          { color: comp.color, width: 0 },
-        fillcolor:     comp.color,
-        hovertemplate: comp.label + ': %{y:.1%}<extra></extra>',
-      });
-      first = false;
-    }
-    // total_cost_emr as a separate dotted line (ACA spike excluded from stack)
-    if (!allZero(pts.total_cost_emr)) {
-      traces.push({
-        type: 'scatter', x, y: pts.total_cost_emr,
-        name:          'Total Cost EMR (incl. ACA)',
-        mode:          'lines',
-        line:          { color: '#dc2626', width: 2, dash: 'dot' },
-        hovertemplate: 'Total Cost EMR: %{y:.1%}<extra></extra>',
-      });
-    }
-    return traces;
-  }
-
-  function buildLineTraces(pts) {
-    const traces = [];
-    const x = pts.income;
-    for (const comp of COMPONENTS) {
-      const y = pts.components[comp.key];
-      if (allZero(y)) continue;
-      traces.push({
-        type: 'scatter', x, y,
-        name:          comp.label,
-        mode:          'lines',
-        line:          { color: comp.color, width: 2 },
-        hovertemplate: comp.label + ': %{y:.1%}<extra></extra>',
-      });
-    }
-    traces.push({
-      type: 'scatter', x, y: pts.emr,
-      name:          'Total EMR',
-      mode:          'lines',
-      line:          { color: '#212529', width: 3 },
-      hovertemplate: 'Total EMR: %{y:.1%}<extra></extra>',
-    });
-    if (!allZero(pts.total_cost_emr)) {
-      traces.push({
-        type: 'scatter', x, y: pts.total_cost_emr,
-        name:          'Total Cost EMR (incl. ACA)',
-        mode:          'lines',
-        line:          { color: '#dc2626', width: 2, dash: 'dot' },
-        hovertemplate: 'Total Cost EMR: %{y:.1%}<extra></extra>',
-      });
-    }
-    return traces;
   }
 
   async function renderChart() {
     if (!lastResult) return;
-    const pts    = lastResult.points;
-    const traces = chartMode === 'stacked'
-      ? buildStackedTraces(pts)
-      : buildLineTraces(pts);
-    await Plotly.newPlot('chart', traces, buildLayout(), { responsive: true });
+    await drawChart(lastResult.points, buildLayout());
   }
 
-  // Chart mode toggles
-  el('btn-stacked').addEventListener('click', () => {
-    chartMode = 'stacked';
-    el('btn-stacked').classList.add('active');
-    el('btn-lines').classList.remove('active');
-    renderChart();
-  });
-
-  el('btn-lines').addEventListener('click', () => {
-    chartMode = 'lines';
-    el('btn-lines').classList.add('active');
-    el('btn-stacked').classList.remove('active');
-    renderChart();
-  });
+  wireChartModeButtons(renderChart);
 
   el('irmaa-toggle').addEventListener('change', () => {
     if (lastResult) renderChart();

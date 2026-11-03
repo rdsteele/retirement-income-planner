@@ -28,8 +28,8 @@ def test_conditional_request_returns_not_modified():
 # break a page at load time, so each page's required scripts are asserted here.
 
 _SHARED_SCRIPTS_BY_PAGE = {
-    "income": ["api.js", "common.js", "config.js", "scenario-bar.js"],
-    "emr": ["api.js", "common.js", "config.js", "scenario-bar.js"],
+    "income": ["api.js", "common.js", "config.js", "scenario-bar.js", "emr-chart.js"],
+    "emr": ["api.js", "common.js", "config.js", "scenario-bar.js", "emr-chart.js"],
     "tax": ["api.js", "common.js", "config.js", "scenario-bar.js"],
     "scenarios": ["api.js", "common.js", "scenario-bar.js"],
     "accounts": ["common.js"],
@@ -38,7 +38,7 @@ _PAGES_WITH_SCENARIO_BAR = ["income", "emr", "tax", "scenarios"]
 
 
 def test_shared_scripts_are_served_without_caching():
-    for script in ("api.js", "common.js", "config.js", "scenario-bar.js"):
+    for script in ("api.js", "common.js", "config.js", "scenario-bar.js", "emr-chart.js"):
         resp = client.get(f"/static/js/{script}")
         assert resp.status_code == 200, script
         assert resp.headers["cache-control"] == "no-cache", script
@@ -70,10 +70,12 @@ def test_pages_no_longer_call_scenario_endpoints_with_bare_fetch():
 def test_pages_do_not_redefine_shared_helpers():
     """Shared helpers live in js/ only; a page-level copy would drift."""
     page_level = re.compile(
-        r"^  (?:const (?:el|fnum|fmt\$|SCENARIO_FORMAT_VERSION)\b|let currentScenarioName\b|"
+        r"^  (?:const (?:el|fnum|fmt\$|SCENARIO_FORMAT_VERSION|COMPONENTS|EMR_COMPONENTS)\b|"
+        r"let (?:currentScenarioName|chartMode)\b|"
         r"(?:async )?function (?:escHtml|populateSelect|setField|showError|clearError|loadTaxYears|"
         r"updateScenarioBar|setScenarioStatus|loadCurrentScenario|saveCurrentScenario|"
-        r"saveAsScenario|buildScenarioData|newEmptyScenario)\b)",
+        r"saveAsScenario|buildScenarioData|newEmptyScenario|buildStackedTraces|buildLineTraces|"
+        r"buildBaseLayout|drawChart|wireChartModeButtons)\b)",
         re.MULTILINE,
     )
     for page, scripts in _SHARED_SCRIPTS_BY_PAGE.items():

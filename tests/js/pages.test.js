@@ -16,6 +16,7 @@ function testFixtures() {
   ];
   fixtures.tax_years = { years: [2031, 2032], default_year: 2032 };
   fixtures.config.irmaa_lookback_years = 3;
+  fixtures.config.y_axis_max_emr = 0.41;
   fixtures.config.sweep_step_default = 250;
   fixtures.config.income_plan_sweep_ceiling = 123456;
   fixtures.emr.default_sweep_ceiling = 98765;
@@ -346,4 +347,92 @@ test('income: Save stores the page inputs under the current scenario', async () 
   assertEqual(saved.keep, 'other-page');
   assertEqual(saved.inputs.filing_status, FIRST_STATUS());
   assertEqual(barStatus(app).isError, false);
+});
+
+
+// ── Charts ────────────────────────────────────────────────────────────────
+
+// Arguments of the most recent Plotly.newPlot call: { traces, layout }.
+function lastPlot(app) {
+  const plots = app.page.plotly.calls.filter((c) => c.name === 'newPlot');
+  const args = plots[plots.length - 1].args;
+  return { traces: args[1], layout: args[2] };
+}
+
+const traceNames = (plot) => plot.traces.map((t) => t.name);
+
+test('emr: the chart uses the configured rate-axis maximum and the ordinary title', async () => {
+  const app = await startPage('emr');
+  const { layout } = lastPlot(app);
+  assertEqual(layout.yaxis.range, [0, 0.41]);
+  assertEqual(layout.xaxis.title.text, 'Additional Ordinary Income ($)');
+});
+
+test('emr: a preferential sweep is titled as preferential income', async () => {
+  const app = await startPage('emr', () => {
+    FX.emr.sweep_mode = 'preferential';
+  });
+  assertEqual(lastPlot(app).layout.xaxis.title.text, 'Additional Preferential Income ($)');
+});
+
+test('emr: the chart has no Total Cost line (its response has no total_cost_emr)', async () => {
+  const app = await startPage('emr');
+  assertEqual(traceNames(lastPlot(app)).indexOf('Total Cost EMR (incl. ACA)'), -1);
+});
+
+test('emr: the Lines button redraws with line traces', async () => {
+  const app = await startPage('emr');
+  assertEqual(traceNames(lastPlot(app)).indexOf('Total EMR'), -1);
+  await app.el('btn-lines').click();
+  await settle();
+  assertTrue(traceNames(lastPlot(app)).indexOf('Total EMR') !== -1);
+  assertEqual(app.el('btn-lines').classList.contains('active'), true);
+});
+
+test('emr: IRMAA lines are drawn after the plot when the toggle is on', async () => {
+  const app = await startPage('emr', () => {
+    document.getElementById('irmaa-toggle').checked = true;
+  });
+  const relayouts = app.page.plotly.calls.filter((c) => c.name === 'relayout');
+  assertTrue(relayouts.length >= 1, 'Plotly.relayout was not called');
+  assertEqual(relayouts[0].args[1]['xaxis.autorange'], false);
+});
+
+test('emr: no IRMAA relayout when the toggle is off', async () => {
+  const app = await startPage('emr');
+  assertEqual(app.page.plotly.calls.filter((c) => c.name === 'relayout').length, 0);
+});
+
+test('income: the chart uses the configured axis maximum, draws the ACA cliff and Total Cost line', async () => {
+  const app = await startPage('income', () => {
+    const response = FX.income_plan_calculate;
+    response.points.total_cost_emr = response.points.income.map(() => 0.3);
+    response.planning_signals.aca_cliff_sweep_value = 12345;
+  });
+  await app.el('calc-btn').click();
+  await settle();
+  const plot = lastPlot(app);
+  assertEqual(plot.layout.yaxis.range, [0, 0.41]);
+  assertEqual(plot.layout.xaxis.title.text, 'Additional Ordinary Income ($)');
+  assertTrue(traceNames(plot).indexOf('Total Cost EMR (incl. ACA)') !== -1, 'missing Total Cost trace');
+  assertTrue(plot.layout.shapes.some((s) => s.x0 === 12345), 'missing ACA cliff line');
+  assertTrue(plot.layout.annotations.some((a) => a.text === 'ACA Cliff $12,345'), 'missing ACA cliff label');
+});
+
+test('income: the chart has no ACA markers when the response has none', async () => {
+  const app = await startPage('income', () => {
+    FX.income_plan_calculate.planning_signals.aca_cliff_sweep_value = null;
+  });
+  await app.el('calc-btn').click();
+  await settle();
+  assertEqual(lastPlot(app).layout.shapes, []);
+});
+
+test('income: the Lines button redraws with line traces', async () => {
+  const app = await startPage('income');
+  await app.el('calc-btn').click();
+  await settle();
+  await app.el('btn-lines').click();
+  await settle();
+  assertTrue(traceNames(lastPlot(app)).indexOf('Total EMR') !== -1);
 });

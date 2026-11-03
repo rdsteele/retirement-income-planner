@@ -88,19 +88,61 @@ def _frontend_files() -> list[Path]:
     return pages + shared
 
 
-def _frontend_violations(path: Path) -> list[str]:
+# A non-zero number after || or ?? is a silent fallback value (zero is the normal
+# "blank field" default). A layout pixel width is presentation, not a configured value.
+_NUMERIC_FALLBACK = re.compile(r"(?:\?\?|\|\|)\s*-?(?:[1-9]\d*(?:\.\d+)?|0\.\d*[1-9]\d*)")
+_ALLOWED_FALLBACK_CONTEXT = "offsetWidth"
+
+
+def _line_violations(raw_line: str) -> list[str]:
+    """Return what is wrong with one line of frontend code (empty when clean)."""
+    line = raw_line.replace(_SVG_NAMESPACE, "")
     found: list[str] = []
-    for number, raw_line in enumerate(path.read_text().splitlines(), start=1):
-        line = raw_line.replace(_SVG_NAMESPACE, "")
-        where = f"{path.relative_to(_ROOT)}:{number}"
-        for status in _FILING_STATUSES:
-            if re.search(rf"""['"]{re.escape(status)}['"]""", line):
-                found.append(f"{where} filing status literal {status!r}")
-        if re.search(r"\b(19|20)\d\d\b", line):
-            found.append(f"{where} year literal: {line.strip()[:60]}")
+    for status in _FILING_STATUSES:
+        if re.search(rf"""['"]{re.escape(status)}['"]""", line):
+            found.append(f"filing status literal {status!r}")
+    if re.search(r"\b(19|20)\d\d\b", line):
+        found.append("year literal")
+    if _NUMERIC_FALLBACK.search(line) and _ALLOWED_FALLBACK_CONTEXT not in line:
+        found.append("hardcoded numeric fallback value")
     return found
+
+
+def _frontend_violations(path: Path) -> list[str]:
+    return [
+        f"{path.relative_to(_ROOT)}:{number} {problem}: {line.strip()[:60]}"
+        for number, line in enumerate(path.read_text().splitlines(), start=1)
+        for problem in _line_violations(line)
+    ]
 
 
 @pytest.mark.parametrize("path", _frontend_files(), ids=lambda p: str(p.relative_to(_ROOT)))
 def test_no_hardcoded_values_in_frontend(path: Path):
     assert _frontend_violations(path) == []
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "range: [0, CONFIG.yAxisMaxEMR ?? 0.5],",
+        "sweep_step: fnum('sweep_step') || 100,",
+        "const year = parseInt(el('tax_year').value) || 2031,",
+        "filing_status: el('filing_status').value || 'single',",
+        "tax_year: 2026,",
+    ],
+)
+def test_frontend_guard_flags_hardcoded_values(line: str):
+    assert _line_violations(line) != []
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "const fnum = (id) => parseFloat(el(id)?.value) || 0;",
+        "width: chartEl.parentElement.offsetWidth || 800,",
+        "range: [0, yMax],",
+        "const name = el('x')?.value ?? '';",
+    ],
+)
+def test_frontend_guard_allows_ordinary_code(line: str):
+    assert _line_violations(line) == []
