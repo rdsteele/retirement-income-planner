@@ -360,6 +360,39 @@ class TestComputePlanSummaryPaymentsTotals:
         assert s.total_all_withdrawals == d("44000")
 
 
+class TestMagiIncludesSocialSecurity:
+    """ACA MAGI = AGI + tax-exempt interest + nontaxable SS (IRS Pub. 974): the full benefit."""
+
+    def test_magi_counts_the_whole_benefit_not_just_the_taxable_part(self):
+        # provisional income 20,000 + 12,000 = 32,000 -> taxable SS 3,500, but MAGI adds all 24,000
+        s = _base_summary(pension_taxable=d("20000"), ss_benefit=d("24000"))
+        assert s.ss_taxable == d("3500")
+        assert s.magi == d("44000")
+
+    def test_taxable_ss_is_unchanged_and_still_feeds_forced_ordinary(self):
+        s = _base_summary(pension_taxable=d("20000"), ss_benefit=d("24000"))
+        assert s.forced_ordinary == d("23500")  # 20,000 + 3,500 taxable SS
+
+    def test_tax_exempt_interest_adds_to_magi(self):
+        s = _base_summary(ss_benefit=d("24000"), tax_exempt_interest=d("500"))
+        assert s.magi == d("24500")
+
+    def test_adjustments_reduce_magi(self):
+        s = _base_summary(
+            pension_taxable=d("20000"), ss_benefit=d("24000"), above_the_line_adjustments=d("4000")
+        )
+        assert s.magi == d("40000")
+
+    def test_aca_distance_uses_the_full_benefit_magi(self):
+        s = _base_summary(
+            pension_taxable=d("20000"), ss_benefit=d("24000"), aca_cliff_magi=d("62600")
+        )
+        assert s.aca_distance == d("18600")  # 62,600 - 44,000
+
+    def test_without_social_security_magi_is_unchanged(self):
+        assert _base_summary(pension_taxable=d("30000")).magi == d("30000")
+
+
 class TestWagesInPlanSummary:
     """Wages are ordinary income and cash received, even though no page sends them yet."""
 
@@ -403,7 +436,7 @@ class TestOtherInvestmentOrdinarySummary:
         s = _base_summary(ss_benefit=d("20000"), other_investment_ordinary=d("20000"))
         assert s.provisional_income == d("30000")
         assert s.ss_taxable > d("0")
-        assert s.magi == d("20000") + s.ss_taxable
+        assert s.magi == d("20000") + d("20000")  # ACA MAGI counts the whole benefit
 
     def test_counts_as_cash_received(self):
         s = _base_summary(other_investment_ordinary=d("10000"))

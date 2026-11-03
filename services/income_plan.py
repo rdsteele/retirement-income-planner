@@ -65,7 +65,7 @@ class WithdrawalTotals:
 class PlanSummary:
     """Live plan summary returned by compute_plan_summary."""
 
-    magi: Decimal
+    magi: Decimal  # ACA modified AGI: AGI excluding SS + full SS benefit + tax-exempt interest
 
     # Income breakdown
     forced_ordinary: Decimal  # pension_taxable + interest + ord_div + IRA dist + ss_taxable
@@ -201,11 +201,16 @@ def _compute_agi_excluding_ss(income: IncomeInputs, totals: WithdrawalTotals) ->
 
 def _compute_magi(
     agi_excluding_ss: Decimal,
-    ss_taxable: Decimal,
+    ss_benefit: Decimal,
     tax_exempt_interest: Decimal,
 ) -> Decimal:
-    """ACA MAGI = AGI + tax-exempt interest."""
-    return agi_excluding_ss + ss_taxable + tax_exempt_interest
+    """ACA modified AGI (IRS Pub. 974): AGI + tax-exempt interest + nontaxable SS.
+
+    AGI already holds the taxable part of Social Security, so adding the nontaxable
+    part means the whole benefit counts: AGI excluding SS + full benefit + tax-exempt
+    interest.
+    """
+    return agi_excluding_ss + ss_benefit + tax_exempt_interest
 
 
 def _compute_shortfall(
@@ -258,7 +263,7 @@ def compute_plan_summary(
         filing_status=filing_status,
     )
 
-    magi = _compute_magi(agi_excl_ss, ss_result.taxable_ss, income.tax_exempt_interest)
+    magi = _compute_magi(agi_excl_ss, income.ss_benefit, income.tax_exempt_interest)
 
     forced_ordinary = income.fixed_ordinary + ss_result.taxable_ss
     forced_preferential = income.fixed_preferential

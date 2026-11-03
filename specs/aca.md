@@ -232,7 +232,22 @@ Positive = dollars remaining before cliff. Negative = dollars over cliff.
 
 ACA MAGI = Federal AGI + tax-exempt interest + untaxed Social Security benefits
 
-For most retirees this equals federal AGI. Key items:
+(IRS Publication 974 and the Form 8962 instructions: modified AGI is AGI plus foreign
+earned income, tax-exempt interest, and the **nontaxable portion** of Social Security
+benefits.)
+
+AGI already includes the taxable portion of Social Security, so adding the nontaxable
+portion means the **whole benefit counts**:
+
+```
+ACA MAGI = AGI excluding Social Security + full SS benefit + tax-exempt interest
+```
+
+Consequences: ACA MAGI does not depend on how much SS is taxable, so it rises exactly
+one dollar per dollar of added income even while the SS tax torpedo is active, and
+no EMR result is needed to compute it.
+
+For retirees without Social Security this equals federal AGI. Key items:
 - HSA contributions: **reduce** ACA MAGI (above-the-line deduction) ✅
 - Roth IRA withdrawals: **do not** count toward ACA MAGI ✅
 - Traditional IRA/Roth conversions: **count** toward ACA MAGI
@@ -260,8 +275,8 @@ The ACA cliff must be inserted as an exact boundary point in the sweep.
 The cliff MAGI maps to a sweep_value via:
 
 ```
-sweep_value_at_cliff = cliff_magi - fixed_ordinary
-                       - ss_taxable_at_floor
+sweep_value_at_cliff = cliff_magi - fixed_ordinary - fixed_preferential
+                       - ss_benefit
                        + above_the_line_adjustments
                        - tax_exempt_interest
 ```

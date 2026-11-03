@@ -446,3 +446,22 @@ class TestWages:
             return resp.json()["points"]["total_tax"]
 
         assert total_tax(wages=40000.0) == total_tax(pension_taxable=40000.0)
+
+
+class TestMagiIncludesSocialSecurity:
+    def test_summary_magi_counts_the_whole_benefit(self):
+        body = {**_BASE, "pension_taxable": 20000.0, "ss_benefit": 24000.0}
+        resp = client.post("/api/income-plan/summary", json=body).json()
+        assert resp["ss_taxable"] == 3500.0
+        assert resp["magi"] == 44000.0
+
+    def test_calculate_reports_aca_magi_with_the_whole_benefit(self):
+        body = {
+            **_BASE,
+            "pension_taxable": 20000.0,
+            "ss_benefit": 24000.0,
+            "include_aca": True,
+            "sweep_floor": 0.0,
+        }
+        resp = client.post("/api/income-plan/calculate", json=body).json()
+        assert resp["points"]["aca_magi"][0] == 44000.0

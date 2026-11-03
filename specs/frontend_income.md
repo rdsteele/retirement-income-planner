@@ -209,51 +209,13 @@ All types: full `amount` contributes to total withdrawals and reduces shortfall.
 
 ### Section: Plan Summary Card
 
-Updates live (no API call) as any input changes.
+Updates live as any input changes: the page calls `POST /api/income-plan/summary`
+(debounced) and displays the response. The page does no tax arithmetic.
 
-**MAGI Calculation (client-side approximation):**
-
-```
-total_gain_withdrawals   = sum(gain portion from all taxable holdings)
-total_trad_withdrawals   = sum(trad withdrawal amounts)
-
-exec_ordinary            = sum(stcg gains + tax_deferred amounts from executed withdrawals)
-exec_pref                = sum(ltcg gains from executed withdrawals)
-
-provisional_income       = pension + interest + ordinary_dividends + ira_distributions
-                         + fixed_ltcg + total_gain_withdrawals
-                         + total_trad_withdrawals
-                         + exec_ordinary + exec_pref
-                         - above_the_line_adjustments
-                         + tax_exempt_interest
-                         + (ss_benefit × 0.50)
-
-ss_taxable_approx        = approximate_ss_taxable(ss_benefit, provisional_income)
-
-magi                     = pension + interest + ordinary_dividends + ira_distributions
-                         + fixed_ltcg + total_gain_withdrawals
-                         + total_trad_withdrawals
-                         + exec_ordinary + exec_pref
-                         + ss_taxable_approx
-                         + tax_exempt_interest
-                         - above_the_line_adjustments
-```
-
-SS taxability approximation (single filer, for live display only — exact
-calculation is performed server-side):
-```javascript
-function approximate_ss_taxable(ss_benefit, provisional_income) {
-    if (ss_benefit === 0) return 0;
-    const tier1 = Math.max(0, Math.min(provisional_income - 25000, 9000));
-    const tier2 = Math.max(0, provisional_income - 34000);
-    const included = Math.min(tier1 * 0.50 + tier2 * 0.85, ss_benefit * 0.85);
-    return Math.max(0, included);
-}
-```
-
-Note: This approximation uses single-filer thresholds and is sufficient for
-live display. The accurate SS taxability is computed server-side via the
-social security service when Calculate is clicked.
+**MAGI** is the ACA definition computed by `income_plan.compute_plan_summary`: AGI
+excluding Social Security + the **full** SS benefit + tax-exempt interest (IRS
+Pub. 974). Social Security taxability is computed server-side by the social security
+service for every filing status. See `specs/income_plan_spec.md` for the formulas.
 
 **Display fields:**
 

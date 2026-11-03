@@ -41,14 +41,19 @@ class TotalCostResult:
 def _compute_aca_magi(
     sweep_value: Decimal,
     fixed_ordinary: Decimal,
-    ss_taxable: Decimal,
     income: IncomeInputs,
 ) -> Decimal:
+    """ACA modified AGI at a sweep point (IRS Pub. 974).
+
+    AGI + tax-exempt interest + nontaxable Social Security. AGI holds the taxable part
+    of SS, so the whole benefit is counted and the taxable portion drops out: this is
+    linear in the sweep (no torpedo effect) and needs no EMR result.
+    """
     return (
         fixed_ordinary
         + income.fixed_preferential
         + sweep_value
-        + ss_taxable
+        + income.ss_benefit
         - income.above_the_line_adjustments
         + income.tax_exempt_interest
     )
@@ -57,14 +62,14 @@ def _compute_aca_magi(
 def _compute_cliff_sweep_value(
     cliff_magi: Decimal,
     fixed_ordinary: Decimal,
-    ss_taxable_at_floor: Decimal,
     income: IncomeInputs,
 ) -> Decimal:
+    """The sweep value at which ACA MAGI reaches ``cliff_magi`` (inverse of the above)."""
     return (
         cliff_magi
         - fixed_ordinary
         - income.fixed_preferential
-        - ss_taxable_at_floor
+        - income.ss_benefit
         + income.above_the_line_adjustments
         - income.tax_exempt_interest
     )
@@ -119,27 +124,9 @@ def calculate_total_cost(
     floor_aca_magi = _ZERO
 
     if include_aca:
-        # Approximate ss_taxable at floor using a quick single-point EMR call.
-        # We need it to compute cliff_sweep_value before the full sweep.
-        floor_result = calculate_emr(
-            income=income,
-            sweep_mode=sweep_mode,
-            variable_ordinary=variable_ordinary,
-            filing_status=filing_status,
-            tax_year=tax_year,
-            sweep_floor=sweep_floor,
-            sweep_ceiling=sweep_floor,  # single point
-            sweep_step=sweep_step,
-            include_ohio=include_ohio,
-            ohio_medical_deduction=ohio_medical_deduction,
-            ohio_qualifying_retirement_income=ohio_qualifying_retirement_income,
-        )
-        ss_taxable_at_floor = floor_result.points[0].ss_taxable if floor_result.points else _ZERO
-
         floor_aca_magi = _compute_aca_magi(
             sweep_value=sweep_floor,
             fixed_ordinary=fixed_ordinary,
-            ss_taxable=ss_taxable_at_floor,
             income=income,
         )
 
@@ -156,7 +143,6 @@ def calculate_total_cost(
         cliff_sweep_value = _compute_cliff_sweep_value(
             cliff_magi=cliff_magi,
             fixed_ordinary=fixed_ordinary,
-            ss_taxable_at_floor=ss_taxable_at_floor,
             income=income,
         )
 
@@ -167,7 +153,6 @@ def calculate_total_cost(
             sched_sweep = _compute_cliff_sweep_value(
                 cliff_magi=sched_magi,
                 fixed_ordinary=fixed_ordinary,
-                ss_taxable_at_floor=ss_taxable_at_floor,
                 income=income,
             )
             if sweep_floor <= sched_sweep <= effective_ceiling:
@@ -206,7 +191,6 @@ def calculate_total_cost(
         aca_magi = _compute_aca_magi(
             sweep_value=p.income,
             fixed_ordinary=fixed_ordinary,
-            ss_taxable=p.ss_taxable,
             income=income,
         )
         aca_result = calculate_aca_subsidy(

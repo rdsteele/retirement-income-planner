@@ -94,11 +94,13 @@ Provisional Income =
 SS Taxability → calculate_social_security_taxability(ss_benefit, AGI_excl_SS,
                     tax_exempt_interest, filing_status)
 
-MAGI =
-    AGI (excl. SS) + ss_taxable + tax_exempt_interest
+ACA MAGI (the summary's `magi`) =
+    AGI (excl. SS) + full ss_benefit + tax_exempt_interest
 ```
 
-ACA MAGI matches the definition used in `services/total_cost.py`.
+`ss_taxable` is part of AGI, so adding the nontaxable remainder counts the whole
+benefit (IRS Pub. 974). `ss_taxable` is still reported separately and still feeds
+`forced_ordinary`. ACA MAGI matches the definition used in `services/total_cost.py`.
 
 #### SS taxability method
 

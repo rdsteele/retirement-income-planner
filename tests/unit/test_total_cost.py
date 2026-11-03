@@ -424,3 +424,57 @@ class TestCliffSweepValueFormula:
             include_aca=True,
         )
         assert tc.cliff_sweep_value == D("23600")
+
+
+# ---------------------------------------------------------------------------
+# ACA MAGI counts the whole Social Security benefit (IRS Pub. 974: modified AGI is
+# AGI + tax-exempt interest + the NONTAXABLE part of SS benefits; AGI already holds
+# the taxable part, so together the full benefit is counted).
+# ---------------------------------------------------------------------------
+
+
+def _calculate_with_ss(**income_fields):
+    return calculate_total_cost(
+        income=IncomeInputs(**income_fields),
+        sweep_mode=SweepMode.ORDINARY,
+        filing_status="single",
+        tax_year=2026,
+        sweep_floor=D("0"),
+        sweep_ceiling=D("10000"),
+        sweep_step=D("5000"),
+        include_aca=True,
+    )
+
+
+class TestAcaMagiIncludesSocialSecurity:
+    # pension 20,000 + SS 24,000: taxable SS is only 3,500 (provisional income 32,000),
+    # but ACA MAGI counts all 24,000 -> 44,000
+    _INCOME = dict(pension=D("20000"), ss_benefit=D("24000"))
+
+    def test_floor_point_counts_the_full_benefit(self):
+        tc = _calculate_with_ss(**self._INCOME)
+        assert tc.points[0].aca_magi == D("44000")
+
+    def test_taxable_ss_is_still_only_the_taxable_part(self):
+        tc = _calculate_with_ss(**self._INCOME)
+        assert tc.points[0].ss_taxable == D("3500")
+
+    def test_aca_magi_rises_one_for_one_with_the_sweep_even_in_the_torpedo_zone(self):
+        tc = _calculate_with_ss(**self._INCOME)
+        assert all(p.aca_magi == D("44000") + p.income for p in tc.points)
+
+    def test_cliff_sweep_value_uses_the_full_benefit(self):
+        tc = _calculate_with_ss(**self._INCOME)
+        assert tc.cliff_sweep_value == tc.aca_cliff_magi - D("44000")
+
+    def test_tax_exempt_interest_still_counts(self):
+        tc = _calculate_with_ss(**self._INCOME, tax_exempt_interest=D("500"))
+        assert tc.points[0].aca_magi == D("44500")
+
+    def test_above_the_line_adjustments_still_reduce_it(self):
+        tc = _calculate_with_ss(**self._INCOME, above_the_line_adjustments=D("4000"))
+        assert tc.points[0].aca_magi == D("40000")
+
+    def test_without_social_security_nothing_changes(self):
+        tc = _calculate_with_ss(pension=D("30000"), qualified_dividends=D("2000"))
+        assert tc.points[0].aca_magi == D("32000")
