@@ -521,3 +521,28 @@ class TestNIIT:
     def test_federal_total_tax_excludes_niit(self):
         body = _tax(pension=150000.0, other_investment_ordinary=60000.0)
         assert body["federal"]["total_tax"] == pytest.approx(39134.0)
+
+
+# ── 15. Ohio uses the requested filing status ────────────────────────────
+#
+# MFJ and single filers have different Ohio personal exemptions at the same AGI.
+
+
+class TestOhioFilingStatus:
+    def _ohio(self, filing_status):
+        payload = {
+            "filing_status": filing_status,
+            "tax_year": 2026,
+            "pension": 60000.0,
+            "include_ohio": True,
+        }
+        return client.post("/api/tax", json=payload).json()["ohio"]
+
+    def test_mfj_uses_mfj_personal_exemption(self):
+        assert self._ohio("mfj")["personal_exemption"] == pytest.approx(4300.0)
+
+    def test_single_uses_single_personal_exemption(self):
+        assert self._ohio("single")["personal_exemption"] == pytest.approx(2150.0)
+
+    def test_mfj_ohio_tax_is_lower_than_single_at_same_income(self):
+        assert self._ohio("mfj")["ohio_tax"] < self._ohio("single")["ohio_tax"]

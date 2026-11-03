@@ -231,6 +231,12 @@ class TestCalculateTaxDetail:
         assert kwargs["gross_medical_expenses"] == dec("700")
         assert kwargs["qualifying_retirement_income"] == dec("1200")
 
+    @pytest.mark.parametrize("filing_status", ["single", "mfj"])
+    def test_ohio_receives_filing_status(self, filing_status):
+        with _Mocks() as m:
+            calculate_tax_detail(**{**_INCOME, "filing_status": filing_status}, include_ohio=True)
+        assert m["ohio"].call_args.kwargs["filing_status"] == filing_status
+
     def test_totals_combine_federal_niit_and_ohio(self):
         with _Mocks():
             result = calculate_tax_detail(**_INCOME, include_ohio=True)

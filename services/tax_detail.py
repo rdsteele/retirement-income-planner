@@ -133,6 +133,7 @@ def _calculate_ohio_if_included(
     qualifying_retirement_income: Decimal,
     ss_taxable: Decimal,
     tax_year: int,
+    filing_status: str,
 ) -> OhioTaxResult | None:
     if not include_ohio:
         return None
@@ -142,6 +143,7 @@ def _calculate_ohio_if_included(
         qualifying_retirement_income=qualifying_retirement_income,
         ss_taxable_federal=ss_taxable,
         tax_year=tax_year,
+        filing_status=filing_status,
     )
 
 
@@ -216,6 +218,7 @@ def calculate_tax_detail(
         ohio_qualifying_retirement_income,
         ss_taxable,
         tax_year,
+        filing_status,
     )
 
     total_federal_tax = federal.total_tax + niit.niit
