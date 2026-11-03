@@ -1,5 +1,20 @@
 {
   "irmaa_inflation_default": 0.025,
-  "y_axis_max_emr": 0.50,
-  "sweep_step_default": 100
+  "y_axis_max_emr": 0.5,
+  "sweep_step_default": 100,
+  "filing_statuses": [
+    {
+      "value": "single",
+      "label": "Single"
+    },
+    {
+      "value": "mfj",
+      "label": "Married Filing Jointly"
+    }
+  ],
+  "planning_bracket_rates": [
+    "0.22",
+    "0.24"
+  ],
+  "default_sweep_ceiling_bracket_rate": "0.24"
 }

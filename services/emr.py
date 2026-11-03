@@ -14,14 +14,22 @@ from enum import Enum
 from typing import TypedDict
 
 from services.common import round_rate, round_tax
-from services.data_loader import load_federal_data, load_ohio_data, load_ss_data
+from services.data_loader import (
+    get_default_sweep_ceiling_bracket_rate,
+    get_default_sweep_step,
+    get_planning_bracket_rates,
+    get_provisional_income_benefit_rate,
+    load_federal_data,
+    load_ohio_data,
+    load_ss_data,
+    require_supported_filing_status,
+)
 from services.federal_tax import calculate_federal_tax, split_taxable_income, unused_deduction
 from services.niit import compute_niit, load_niit_parameters
 from services.ohio_tax import calculate_ohio_tax
 from services.social_security import calculate_social_security_taxability
 
 _ZERO = Decimal("0")
-_HALF = Decimal("0.50")
 _EMR_COMPUTE_STEP = Decimal(
     "500"
 )  # smooths whole-dollar rounding noise while preserving bracket-edge precision
@@ -84,11 +92,12 @@ def _get_irmaa_thresholds(filing_status: str, tax_year: int) -> list[Decimal]:
 
 
 def _get_default_sweep_ceiling(filing_status: str, tax_year: int) -> Decimal:
-    """Return the top of the 24% ordinary bracket."""
+    """Return the top of the ordinary bracket configured as the default sweep ceiling."""
+    ceiling_rate = get_default_sweep_ceiling_bracket_rate()
     for bracket in load_federal_data(tax_year)["ordinary"][filing_status]:
-        if Decimal(bracket["rate"]) == Decimal("0.24"):
+        if Decimal(bracket["rate"]) == ceiling_rate:
             return Decimal(bracket["to"])
-    raise ValueError(f"No 24% bracket found for {filing_status} {tax_year}")
+    raise ValueError(f"No {ceiling_rate} ordinary bracket found for {filing_status} {tax_year}")
 
 
 # ---------------------------------------------------------------------------
@@ -183,7 +192,7 @@ def _compute_ohio_tax_at_point(
     ohio_medical_deduction: Decimal,
     ohio_qualifying_retirement_income: Decimal,
     tax_year: int,
-    filing_status: str = "single",
+    filing_status: str,
 ) -> Decimal:
     """Compute Ohio tax, reverse-engineering gross medical for fixed deduction."""
     ohio_floor_rate = Decimal(load_ohio_data(tax_year)["medical_expense_floor_rate"])
@@ -382,7 +391,7 @@ def _compute_ohio_boundaries(
     ohio_agi_base: Decimal,
     ohio_medical_deduction: Decimal,
     tax_year: int,
-    filing_status: str = "single",
+    filing_status: str,
 ) -> list[Decimal]:
     """Return Ohio-specific boundary sweep_values for zero-rate and MAGI credit thresholds.
 
@@ -391,9 +400,7 @@ def _compute_ohio_boundaries(
     threshold but personal exemption is taken from the expected tier at each boundary.
     """
     ohio_data = load_ohio_data(tax_year)
-    exemption_key = (
-        "personal_exemption_mfj" if filing_status == "mfj" else "personal_exemption_single"
-    )
+    exemption_key = f"personal_exemption_{filing_status}"
     boundaries: list[Decimal] = []
 
     # Zero-rate threshold: ohio_tax_base enters the first taxable bracket
@@ -454,7 +461,7 @@ def _compute_ordinary_boundaries(
 
     # SS torpedo boundaries
     if ss_benefit > _ZERO:
-        half_ss = ss_benefit * _HALF
+        half_ss = ss_benefit * get_provisional_income_benefit_rate()
         base_prov = (
             fixed_ordinary
             + total_preferential
@@ -524,7 +531,7 @@ def _compute_preferential_boundaries(
 
     # SS torpedo boundaries
     if ss_benefit > _ZERO:
-        half_ss = ss_benefit * _HALF
+        half_ss = ss_benefit * get_provisional_income_benefit_rate()
         base_prov = (
             total_ordinary + fixed_pref - above_the_line_adjustments + tax_exempt_interest + half_ss
         )
@@ -600,7 +607,7 @@ def calculate_emr(
     variable_ordinary: Decimal = _ZERO,
     sweep_floor: Decimal = _ZERO,
     sweep_ceiling: Decimal | None = None,
-    sweep_step: Decimal = Decimal("100"),
+    sweep_step: Decimal | None = None,
     include_ohio: bool = False,
     ohio_medical_deduction: Decimal = _ZERO,
     ohio_qualifying_retirement_income: Decimal = _ZERO,
@@ -615,8 +622,7 @@ def calculate_emr(
     income for NIIT (rental, royalties, non-qualified annuity earnings, short-term
     gains). Pension, IRA, and similar distributions are not net investment income.
     """
-    if filing_status not in ("single", "mfj"):
-        raise ValueError(f"Unsupported filing status: {filing_status!r}")
+    require_supported_filing_status(filing_status)
 
     # Load data-driven defaults
     std_deduction = _get_standard_deduction(filing_status, tax_year)
@@ -625,6 +631,8 @@ def calculate_emr(
 
     if sweep_ceiling is None:
         sweep_ceiling = _get_default_sweep_ceiling(filing_status, tax_year)
+    if sweep_step is None:
+        sweep_step = get_default_sweep_step()
 
     fixed_ordinary = _compute_fixed_ordinary(
         pension, interest, ordinary_dividends, ira_distributions, other_investment_ordinary
@@ -734,9 +742,13 @@ def calculate_emr(
 # Planning signals — computed from EMR results + input parameters
 # ---------------------------------------------------------------------------
 
-_INCLUSION_85 = Decimal("0.85")
-_EMR_22 = Decimal("0.22")
-_EMR_24 = Decimal("0.24")
+
+@dataclass
+class BracketDistance:
+    """Income needed, from the sweep floor, for ordinary EMR to reach a bracket rate."""
+
+    rate: Decimal
+    distance: Decimal | None
 
 
 @dataclass
@@ -746,8 +758,7 @@ class PlanningSignals:
     ltcg_0pct_ordinary_runway: Decimal | None
     torpedo_active: bool
     ss_fully_taxable: bool
-    distance_to_22pct: Decimal | None
-    distance_to_24pct: Decimal | None
+    bracket_distances: list[BracketDistance]
 
 
 def _get_ltcg_0pct_ceiling(filing_status: str, tax_year: int) -> Decimal:
@@ -784,7 +795,7 @@ def _compute_ltcg_0pct_ordinary_runway(
     filing_status: str,
     tax_year: int,
 ) -> Decimal | None:
-    """Additional ordinary income before existing LTCG enters the 15% bracket."""
+    """Additional ordinary income before existing LTCG leaves the 0% LTCG bracket."""
     if not points:
         return None
     if sweep_mode == SweepMode.ORDINARY and ltcg_already_used == _ZERO:
@@ -827,26 +838,24 @@ def _compute_zero_ordinary_space(
     )
 
 
-def _compute_bracket_distances(
-    points: list[EMRPoint],
-) -> tuple[Decimal | None, Decimal | None]:
-    if not points:
-        return None, None
+def _distance_to_rate(points: list[EMRPoint], rate: Decimal) -> Decimal | None:
+    """Return income above the floor at which ordinary EMR first reaches the rate, if ahead."""
     floor_income = points[0].income
-    first_ordinary = points[0].emr_ordinary
-    distance_to_22pct = None
-    distance_to_24pct = None
-    if first_ordinary < _EMR_22:
-        for p in points:
-            if p.emr_ordinary >= _EMR_22:
-                distance_to_22pct = p.income - floor_income
-                break
-    if first_ordinary < _EMR_24:
-        for p in points:
-            if p.emr_ordinary >= _EMR_24:
-                distance_to_24pct = p.income - floor_income
-                break
-    return distance_to_22pct, distance_to_24pct
+    if points[0].emr_ordinary >= rate:
+        return None  # already at or past this bracket
+    for p in points:
+        if p.emr_ordinary >= rate:
+            return p.income - floor_income
+    return None
+
+
+def _compute_bracket_distances(
+    points: list[EMRPoint], rates: list[Decimal]
+) -> list[BracketDistance]:
+    return [
+        BracketDistance(rate=rate, distance=_distance_to_rate(points, rate) if points else None)
+        for rate in rates
+    ]
 
 
 def compute_planning_signals(
@@ -898,9 +907,10 @@ def compute_planning_signals(
     )
 
     torpedo_active = any(p.emr_ss_torpedo > _ZERO for p in pts)
-    ss_fully_taxable = pts[0].ss_inclusion_rate >= _INCLUSION_85 if pts else False
+    max_inclusion_rate = Decimal(load_ss_data()["maximum_inclusion_rate"])
+    ss_fully_taxable = pts[0].ss_inclusion_rate >= max_inclusion_rate if pts else False
 
-    distance_to_22pct, distance_to_24pct = _compute_bracket_distances(pts)
+    bracket_distances = _compute_bracket_distances(pts, get_planning_bracket_rates())
 
     return PlanningSignals(
         zero_ordinary_space=zero_ordinary_space,
@@ -908,6 +918,5 @@ def compute_planning_signals(
         ltcg_0pct_ordinary_runway=ltcg_0pct_ordinary_runway,
         torpedo_active=torpedo_active,
         ss_fully_taxable=ss_fully_taxable,
-        distance_to_22pct=distance_to_22pct,
-        distance_to_24pct=distance_to_24pct,
+        bracket_distances=bracket_distances,
     )

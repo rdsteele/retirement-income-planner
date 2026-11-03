@@ -1,7 +1,5 @@
 """Pydantic models for the tax detail route."""
 
-from typing import Literal
-
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -23,7 +21,7 @@ class TaxRequest(BaseModel):
     additional_deductions: float = Field(default=0.0, ge=0)
 
     # Settings
-    filing_status: Literal["single", "mfj"]
+    filing_status: str
     tax_year: int = Field(gt=0)
 
     # Ohio fields

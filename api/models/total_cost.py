@@ -2,6 +2,8 @@
 
 from pydantic import BaseModel, Field
 
+from api.models.emr import BracketDistance
+
 
 class TotalCostRequest(BaseModel):
     # Fixed income fields
@@ -22,7 +24,7 @@ class TotalCostRequest(BaseModel):
     variable_ordinary: float = Field(default=0.0, ge=0)
     sweep_floor: float = Field(default=0.0, ge=0)
     sweep_ceiling: float | None = Field(default=None, gt=0)
-    sweep_step: float = Field(default=100.0, gt=0)
+    sweep_step: float | None = Field(default=None, gt=0)
     filing_status: str
     tax_year: int = Field(gt=0)
 
@@ -77,8 +79,7 @@ class TotalCostPlanningSignals(BaseModel):
     ltcg_0pct_ordinary_runway: float | None
     torpedo_active: bool
     ss_fully_taxable: bool
-    distance_to_22pct: float | None
-    distance_to_24pct: float | None
+    bracket_distances: list[BracketDistance]
 
 
 class TotalCostResponse(BaseModel):

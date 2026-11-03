@@ -13,6 +13,7 @@ from api.models.total_cost import (
     TotalCostRequest,
     TotalCostResponse,
 )
+from api.routers.emr import _to_bracket_distance_responses
 from services.emr import SweepMode
 from services.emr import compute_planning_signals as _compute_service_signals
 from services.total_cost import TotalCostResult, calculate_total_cost
@@ -138,8 +139,7 @@ def _compute_planning_signals(
         ltcg_0pct_ordinary_runway=_to_float_or_none(shared.ltcg_0pct_ordinary_runway),
         torpedo_active=shared.torpedo_active,
         ss_fully_taxable=shared.ss_fully_taxable,
-        distance_to_22pct=_to_float_or_none(shared.distance_to_22pct),
-        distance_to_24pct=_to_float_or_none(shared.distance_to_24pct),
+        bracket_distances=_to_bracket_distance_responses(shared.bracket_distances),
     )
 
 
@@ -173,7 +173,7 @@ def post_total_cost(request: TotalCostRequest):
             tax_year=request.tax_year,
             sweep_floor=_to_decimal(request.sweep_floor),
             sweep_ceiling=_to_decimal_or_none(request.sweep_ceiling),
-            sweep_step=_to_decimal(request.sweep_step),
+            sweep_step=_to_decimal_or_none(request.sweep_step),
             include_ohio=request.include_ohio,
             ohio_medical_deduction=_to_decimal(request.ohio_medical_deduction),
             ohio_qualifying_retirement_income=_to_decimal(

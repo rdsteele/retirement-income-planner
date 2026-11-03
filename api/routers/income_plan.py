@@ -145,7 +145,7 @@ def post_income_plan_calculate(request: IncomePlanRequest):
             tax_year=request.tax_year,
             sweep_floor=_D(str(request.sweep_floor)),
             sweep_ceiling=_to_decimal_or_none(request.sweep_ceiling),
-            sweep_step=_D(str(request.sweep_step)),
+            sweep_step=_to_decimal_or_none(request.sweep_step),
             include_ohio=request.include_ohio,
             ohio_medical_deduction=_D(str(request.ohio_medical_deduction)),
             ohio_qualifying_retirement_income=_D(str(request.ohio_qualifying_retirement_income)),

@@ -42,6 +42,7 @@ class TestScenarioOhioSingleFiler2025Proxy:
             qualifying_retirement_income=Decimal("47089"),
             ss_taxable_federal=Decimal("0"),
             tax_year=2025,
+            filing_status="single",
         )
 
     def test_ohio_agi(self, result):

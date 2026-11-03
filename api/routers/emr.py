@@ -6,12 +6,14 @@ from decimal import Decimal
 from fastapi import APIRouter, HTTPException
 
 from api.models.emr import (
+    BracketDistance,
     EMRComponents,
     EMRPoints,
     EMRRequest,
     EMRResponse,
     PlanningSignals,
 )
+from services.emr import BracketDistance as ServiceBracketDistance
 from services.emr import EMRResult, SweepMode, calculate_emr
 from services.emr import compute_planning_signals as _compute_service_signals
 
@@ -30,6 +32,18 @@ def _to_decimal_or_none(value: float | None) -> Decimal | None:
     if value is None:
         return None
     return _D(str(value))
+
+
+def _to_bracket_distance_responses(
+    distances: list[ServiceBracketDistance],
+) -> list[BracketDistance]:
+    return [
+        BracketDistance(
+            rate=float(d.rate),
+            distance=float(d.distance) if d.distance is not None else None,
+        )
+        for d in distances
+    ]
 
 
 def _build_points(result: EMRResult) -> EMRPoints:
@@ -78,8 +92,7 @@ def _compute_planning_signals(result: EMRResult, request: EMRRequest) -> Plannin
         ltcg_0pct_ordinary_runway=_to_float_or_none(signals.ltcg_0pct_ordinary_runway),
         torpedo_active=signals.torpedo_active,
         ss_fully_taxable=signals.ss_fully_taxable,
-        distance_to_22pct=_to_float_or_none(signals.distance_to_22pct),
-        distance_to_24pct=_to_float_or_none(signals.distance_to_24pct),
+        bracket_distances=_to_bracket_distance_responses(signals.bracket_distances),
     )
 
 
@@ -111,7 +124,7 @@ def post_emr(request: EMRRequest):
             variable_ordinary=_to_decimal(request.variable_ordinary),
             sweep_floor=_to_decimal(request.sweep_floor),
             sweep_ceiling=_to_decimal_or_none(request.sweep_ceiling),
-            sweep_step=_to_decimal(request.sweep_step),
+            sweep_step=_to_decimal_or_none(request.sweep_step),
             include_ohio=request.include_ohio,
             ohio_medical_deduction=_to_decimal(request.ohio_medical_deduction),
             ohio_qualifying_retirement_income=_to_decimal(

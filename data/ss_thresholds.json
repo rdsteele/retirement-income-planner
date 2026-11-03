@@ -9,5 +9,6 @@
   },
   "tier_1_inclusion_rate": "0.50",
   "tier_2_inclusion_rate": "0.85",
-  "maximum_inclusion_rate": "0.85"
+  "maximum_inclusion_rate": "0.85",
+  "provisional_income_benefit_rate": "0.50"
 }

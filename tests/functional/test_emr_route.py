@@ -9,8 +9,15 @@ import pytest
 from fastapi.testclient import TestClient
 
 from api.main import app
+from services.data_loader import get_planning_bracket_rates
 
 client = TestClient(app)
+
+
+def _distance_to(signals, rate):
+    """Return the planning-signal distance for a bracket rate."""
+    return next(d["distance"] for d in signals["bracket_distances"] if abs(d["rate"] - rate) < 1e-9)
+
 
 # ── Shared request builders ──────────────────────────────────────────────
 
@@ -101,16 +108,19 @@ class TestOrdinarySweep:
         assert "torpedo_active" in signals
         assert "ss_fully_taxable" in signals
         assert "ltcg_0pct_remaining" in signals
-        assert "distance_to_22pct" in signals
-        assert "distance_to_24pct" in signals
+        assert "bracket_distances" in signals
+
+    def test_bracket_distances_follow_configured_rates(self):
+        distances = self.body["planning_signals"]["bracket_distances"]
+        assert [d["rate"] for d in distances] == [float(r) for r in get_planning_bracket_rates()]
 
     def test_planning_signals_types(self):
         signals = self.body["planning_signals"]
         assert isinstance(signals["torpedo_active"], bool)
         assert isinstance(signals["ss_fully_taxable"], bool)
-        # distance fields are float or null
-        d22 = signals["distance_to_22pct"]
-        assert d22 is None or isinstance(d22, (int, float))
+        # each distance is a float or null
+        for d in signals["bracket_distances"]:
+            assert d["distance"] is None or isinstance(d["distance"], (int, float))
 
     def test_torpedo_inactive_when_no_ss(self):
         assert self.body["planning_signals"]["torpedo_active"] is False
@@ -240,7 +250,7 @@ class TestPlanningSignals:
         }
         resp = client.post("/api/emr", json=payload)
         body = resp.json()
-        d22 = body["planning_signals"]["distance_to_22pct"]
+        d22 = _distance_to(body["planning_signals"], 0.22)
         assert d22 is not None
         assert d22 > 0
 
@@ -254,7 +264,7 @@ class TestPlanningSignals:
         }
         resp = client.post("/api/emr", json=payload)
         body = resp.json()
-        assert body["planning_signals"]["distance_to_22pct"] is None
+        assert _distance_to(body["planning_signals"], 0.22) is None
 
     def test_torpedo_active_with_ss(self):
         payload = {

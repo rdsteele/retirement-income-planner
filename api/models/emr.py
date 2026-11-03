@@ -24,7 +24,7 @@ class EMRRequest(BaseModel):
     variable_ordinary: float = Field(default=0.0, ge=0)
     sweep_floor: float = Field(default=0.0, ge=0)
     sweep_ceiling: float | None = Field(default=None, gt=0)
-    sweep_step: float = Field(default=100.0, gt=0)
+    sweep_step: float | None = Field(default=None, gt=0)
 
     # Ohio fields
     include_ohio: bool = False
@@ -51,14 +51,18 @@ class EMRPoints(BaseModel):
     ohio_tax: list[float]
 
 
+class BracketDistance(BaseModel):
+    rate: float
+    distance: float | None
+
+
 class PlanningSignals(BaseModel):
     zero_ordinary_space: float | None
     ltcg_0pct_remaining: float | None
     ltcg_0pct_ordinary_runway: float | None
     torpedo_active: bool
     ss_fully_taxable: bool
-    distance_to_22pct: float | None
-    distance_to_24pct: float | None
+    bracket_distances: list[BracketDistance]
 
 
 class EMRResponse(BaseModel):

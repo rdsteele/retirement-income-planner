@@ -735,6 +735,8 @@
   });
 
   // ── Planning signals ──────────────────────────────────────────────────────
+  const formatRatePercent = rate => (rate * 100).toFixed(2).replace(/\.?0+$/, '') + '%';
+
   function fmt$(n) {
     return '$' + Math.round(n).toLocaleString('en-US');
   }
@@ -775,18 +777,14 @@
       badges.push({ cls: 'badge-gray', text: 'LTCG Bump Ordinary Runway: None' });
     }
 
-    // Distance to 22%
-    if (s.distance_to_22pct !== null) {
-      badges.push({ cls: 'badge-blue', text: 'To 22%: ' + fmt$(s.distance_to_22pct) });
-    } else {
-      badges.push({ cls: 'badge-gray', text: 'At 22%+' });
-    }
-
-    // Distance to 24%
-    if (s.distance_to_24pct !== null) {
-      badges.push({ cls: 'badge-blue', text: 'To 24%: ' + fmt$(s.distance_to_24pct) });
-    } else {
-      badges.push({ cls: 'badge-gray', text: 'At 24%+' });
+    // Distance to each planning bracket rate (rates come from the API)
+    for (const { rate, distance } of s.bracket_distances) {
+      const pct = formatRatePercent(rate);
+      if (distance !== null) {
+        badges.push({ cls: 'badge-blue', text: `To ${pct}: ${fmt$(distance)}` });
+      } else {
+        badges.push({ cls: 'badge-gray', text: `At ${pct}+` });
+      }
     }
 
     signalsBar.innerHTML = badges

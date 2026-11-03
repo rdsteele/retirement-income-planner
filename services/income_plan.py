@@ -263,9 +263,8 @@ def compute_plan_summary(
 ) -> PlanSummary:
     """Compute a live plan summary without running the full EMR sweep.
 
-    Uses the real social_security service for SS taxability — accurate for both
-    single and MFJ filers, unlike the single-filer approximation that previously
-    lived in income.html JavaScript.
+    Uses the real social_security service for SS taxability, so the live summary and
+    the EMR sweep share one formula for every configured filing status.
     """
     totals = classify_withdrawals(planned, executed)
 

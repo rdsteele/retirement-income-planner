@@ -325,3 +325,20 @@ class TestTaxTorpedoTable:
         assert r.taxable_ss == dec("20400")
         assert r.inclusion_rate == dec("0.8500")
         assert r.tier == "eighty_five_percent"
+
+
+def test_provisional_income_uses_configured_benefit_fraction():
+    from unittest.mock import patch
+
+    with patch(
+        "services.social_security.get_provisional_income_benefit_rate",
+        return_value=Decimal("0.25"),
+    ):
+        result = calculate_social_security_taxability(
+            ss_benefit=Decimal("20000"),
+            agi_excluding_ss=Decimal("10000"),
+            tax_exempt_interest=Decimal("0"),
+            filing_status="single",
+        )
+    # 10,000 + 25% x 20,000 = 15,000
+    assert result.provisional_income == Decimal("15000")

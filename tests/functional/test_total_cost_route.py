@@ -12,6 +12,12 @@ from api.main import app
 
 client = TestClient(app)
 
+
+def _distance_to(signals, rate):
+    """Return the planning-signal distance for a bracket rate."""
+    return next(d["distance"] for d in signals["bracket_distances"] if abs(d["rate"] - rate) < 1e-9)
+
+
 # ── Shared request builders ──────────────────────────────────────────────
 
 _BASE = {
@@ -103,8 +109,7 @@ class TestHappyPathNoACA:
         assert "ltcg_0pct_remaining" in signals
         assert "torpedo_active" in signals
         assert "ss_fully_taxable" in signals
-        assert "distance_to_22pct" in signals
-        assert "distance_to_24pct" in signals
+        assert "bracket_distances" in signals
 
     def test_aca_cliff_sweep_value_null_when_no_aca(self):
         assert self.body["planning_signals"]["aca_cliff_sweep_value"] is None
@@ -452,13 +457,14 @@ class TestDistanceTo24Pct:
 
     def test_distance_to_24pct_set(self):
         # Sweep starts in 22% bracket and crosses into 24% within the range
-        dist = self.body["planning_signals"]["distance_to_24pct"]
+        dist = _distance_to(self.body["planning_signals"], 0.24)
         assert dist is not None
         assert dist > 0.0
 
     def test_distance_to_24pct_is_reasonable(self):
         # Should be somewhere between 0 and 50000 (within the sweep range)
-        dist = self.body["planning_signals"]["distance_to_24pct"]
+        dist = _distance_to(self.body["planning_signals"], 0.24)
+        assert dist is not None
         assert 0.0 < dist <= 50000.0
 
 

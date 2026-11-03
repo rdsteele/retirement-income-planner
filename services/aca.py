@@ -15,6 +15,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from services.common import round_tax
+from services.data_loader import require_supported_filing_status
 
 _DATA_DIR = Path(__file__).parent.parent / "data" / "aca"
 _ZERO = Decimal("0")
@@ -29,7 +30,7 @@ class ACAResult:
     aptc_annual: Decimal  # annual subsidy at this MAGI
     aptc_monthly: Decimal  # monthly subsidy at this MAGI
     subsidy_loss: Decimal  # subsidy lost vs baseline MAGI
-    cliff_magi: Decimal  # 400% FPL cliff for this filing status
+    cliff_magi: Decimal  # FPL-based subsidy cliff for this filing status
     distance_to_cliff: Decimal  # cliff_magi - magi (negative if over)
     is_eligible: bool  # True if magi < cliff_magi and above schedule min
     marginal_subsidy_loss: Decimal  # annual APTC dollars lost per $1,000 of additional
@@ -47,7 +48,7 @@ def _load_aca_data(tax_year: int) -> dict:
 
 
 def _cliff_from_fpl(fpl_100pct: Decimal) -> Decimal:
-    """Return the 400% FPL cliff MAGI."""
+    """Return the subsidy cliff MAGI as a multiple of the poverty line."""
     return fpl_100pct * _FOUR
 
 
@@ -156,7 +157,7 @@ def calculate_aca_subsidy(
 
     Args:
         magi: Modified adjusted gross income for ACA purposes.
-        filing_status: "single" or "mfj".
+        filing_status: A configured filing status (see config.json).
         tax_year: Coverage year (determines FPL cliff and schedule).
         baseline_magi: MAGI for subsidy_loss reference. Defaults to the lowest
             schedule point MAGI (schedule-based) or no loss (formula fallback).
@@ -165,8 +166,7 @@ def calculate_aca_subsidy(
     """
     data = _load_aca_data(tax_year)
 
-    if filing_status not in ("single", "mfj"):
-        raise ValueError(f"Unsupported filing status: {filing_status!r}")
+    require_supported_filing_status(filing_status)
 
     if "filing_status_cliffs" in data and filing_status in data["filing_status_cliffs"]:
         cliff_magi = Decimal(str(data["filing_status_cliffs"][filing_status]))

@@ -9,7 +9,11 @@ from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 
 from services.common import round_rate, round_tax
-from services.data_loader import load_ss_data
+from services.data_loader import (
+    get_provisional_income_benefit_rate,
+    load_ss_data,
+    require_supported_filing_status,
+)
 
 _TWO_PLACES = Decimal("0.01")
 
@@ -31,8 +35,8 @@ def _compute_provisional_income(
     tax_exempt_interest: Decimal,
     ss_benefit: Decimal,
 ) -> Decimal:
-    half_ss = _round2(ss_benefit * Decimal("0.50"))
-    return agi_excluding_ss + tax_exempt_interest + half_ss
+    counted_benefit = _round2(ss_benefit * get_provisional_income_benefit_rate())
+    return agi_excluding_ss + tax_exempt_interest + counted_benefit
 
 
 def _compute_taxable_ss(
@@ -69,8 +73,7 @@ def calculate_social_security_taxability(
     tax_exempt_interest: Decimal,
     filing_status: str,
 ) -> SocialSecurityResult:
-    if filing_status not in ("single", "mfj"):
-        raise ValueError(f"Unsupported filing status: {filing_status!r}")
+    require_supported_filing_status(filing_status)
 
     provisional_income = _compute_provisional_income(
         agi_excluding_ss, tax_exempt_interest, ss_benefit

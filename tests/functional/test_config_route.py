@@ -5,8 +5,9 @@ Uses FastAPI TestClient with real config.json — no mocks.
 
 from fastapi.testclient import TestClient
 
-import api.routers.config as config_mod
+import services.data_loader as loader
 from api.main import app
+from services.data_loader import supported_filing_statuses
 
 client = TestClient(app)
 
@@ -26,12 +27,24 @@ def test_response_shape():
     assert "irmaa_inflation_default" in data
     assert "y_axis_max_emr" in data
     assert "sweep_step_default" in data
-    assert all(isinstance(data[k], float) for k in data)
+    numeric = ["irmaa_inflation_default", "y_axis_max_emr", "sweep_step_default"]
+    assert all(isinstance(data[k], float) for k in numeric)
+
+
+def test_returns_filing_statuses_for_dropdowns():
+    statuses = client.get("/api/config").json()["filing_statuses"]
+    assert statuses
+    assert all(set(s) == {"value", "label"} for s in statuses)
+    assert [s["value"] for s in statuses] == supported_filing_statuses()
 
 
 def test_missing_config_returns_500(monkeypatch, tmp_path):
-    monkeypatch.setattr(config_mod, "_CONFIG_PATH", tmp_path / "nonexistent.json")
-    resp = client.get("/api/config")
+    monkeypatch.setattr(loader, "_CONFIG_PATH", tmp_path / "nonexistent.json")
+    loader.load_config.cache_clear()
+    try:
+        resp = client.get("/api/config")
+    finally:
+        loader.load_config.cache_clear()
     assert resp.status_code == 500
     assert "config.json" in resp.json()["detail"]
 

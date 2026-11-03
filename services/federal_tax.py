@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 
 from services.common import round_rate, round_tax
-from services.data_loader import load_federal_data
+from services.data_loader import load_federal_data, require_supported_filing_status
 
 
 @dataclass
@@ -128,8 +128,7 @@ def calculate_federal_tax(
     filing_status: str,
     tax_year: int,
 ) -> FederalTaxResult:
-    if filing_status not in ("single", "mfj"):
-        raise ValueError(f"Unsupported filing status: {filing_status!r}")
+    require_supported_filing_status(filing_status)
 
     data = load_federal_data(tax_year)
     ordinary_tax, marginal_rate, breakdown = _apply_ordinary_brackets(

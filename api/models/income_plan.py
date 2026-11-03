@@ -52,7 +52,7 @@ class IncomePlanRequest(BaseModel):
     # Sweep parameters (used by calculate endpoint only)
     sweep_floor: float = Field(default=0.0, ge=0)
     sweep_ceiling: float = Field(default=150000.0, gt=0)
-    sweep_step: float = Field(default=100.0, gt=0)
+    sweep_step: float | None = Field(default=None, gt=0)
     include_ohio: bool = True
     ohio_medical_deduction: float = Field(default=0.0, ge=0)
     ohio_qualifying_retirement_income: float = Field(default=0.0, ge=0)

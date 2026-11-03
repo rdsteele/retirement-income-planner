@@ -1199,7 +1199,7 @@ class TestSweepCeilingDefault:
 
 
 def test_get_default_sweep_ceiling_missing_bracket():
-    """_get_default_sweep_ceiling raises ValueError when no 24% bracket exists."""
+    """_get_default_sweep_ceiling raises ValueError when the configured bracket is absent."""
     fake_data = {
         "ordinary": {
             "single": [
@@ -1220,7 +1220,7 @@ def test_get_default_sweep_ceiling_missing_bracket():
         "irmaa_thresholds": {"single": []},
     }
     with patch("services.emr.load_federal_data", return_value=fake_data):
-        with pytest.raises(ValueError, match="No 24% bracket"):
+        with pytest.raises(ValueError, match="ordinary bracket found"):
             _get_default_sweep_ceiling("single", 2025)
 
 
@@ -1454,3 +1454,94 @@ class TestPlanningSignalsNoLTCG:
 
     def test_ltcg_0pct_ordinary_runway_none(self):
         assert self.signals.ltcg_0pct_ordinary_runway is None
+
+
+# ---------------------------------------------------------------------------
+# Data-driven planning rates, default sweep ceiling, and default sweep step
+# ---------------------------------------------------------------------------
+
+from services.emr import (  # noqa: E402
+    BracketDistance,
+    EMRPoint,
+    _compute_bracket_distances,
+)
+
+
+def _point(income: str, emr_ordinary: str) -> EMRPoint:
+    zero = dec("0")
+    return EMRPoint(
+        income=dec(income),
+        total_tax=zero,
+        emr=zero,
+        emr_ordinary=dec(emr_ordinary),
+        emr_ss_torpedo=zero,
+        emr_pref_stacking=zero,
+        emr_niit=zero,
+        emr_ohio=zero,
+        ohio_tax=zero,
+        ss_taxable=zero,
+        ss_inclusion_rate=zero,
+        taxable_ordinary=zero,
+        taxable_preferential=zero,
+    )
+
+
+_RISING = [
+    _point("0", "0.12"),
+    _point("1000", "0.12"),
+    _point("2000", "0.22"),
+    _point("3000", "0.24"),
+]
+
+
+class TestBracketDistances:
+    def test_distance_per_configured_rate_in_order(self):
+        result = _compute_bracket_distances(_RISING, [dec("0.24"), dec("0.22")])
+        assert result == [
+            BracketDistance(rate=dec("0.24"), distance=dec("3000")),
+            BracketDistance(rate=dec("0.22"), distance=dec("2000")),
+        ]
+
+    def test_distance_is_none_when_floor_already_at_rate(self):
+        points = [_point("0", "0.22"), _point("1000", "0.24")]
+        result = _compute_bracket_distances(points, [dec("0.22"), dec("0.24")])
+        assert result[0].distance is None
+        assert result[1].distance == dec("1000")
+
+    def test_distance_is_none_when_rate_never_reached(self):
+        result = _compute_bracket_distances(_RISING, [dec("0.35")])
+        assert result == [BracketDistance(rate=dec("0.35"), distance=None)]
+
+    def test_no_points_gives_none_for_every_rate(self):
+        result = _compute_bracket_distances([], [dec("0.22"), dec("0.24")])
+        assert [d.distance for d in result] == [None, None]
+
+    def test_no_rates_gives_empty_list(self):
+        assert _compute_bracket_distances(_RISING, []) == []
+
+
+def test_default_sweep_ceiling_uses_configured_bracket_rate():
+    # 2025 single: the 22% ordinary bracket ends at 103350 (see federal_2025.json)
+    with patch("services.emr.get_default_sweep_ceiling_bracket_rate", return_value=dec("0.22")):
+        assert _get_default_sweep_ceiling("single", 2025) == dec("103350")
+
+
+def test_default_sweep_step_comes_from_config():
+    with patch("services.emr.get_default_sweep_step", return_value=dec("2500")):
+        result = calculate_emr(
+            pension=dec("0"),
+            interest=dec("0"),
+            ordinary_dividends=dec("0"),
+            ira_distributions=dec("0"),
+            ss_benefit=dec("0"),
+            qualified_dividends=dec("0"),
+            fixed_ltcg=dec("0"),
+            tax_exempt_interest=dec("0"),
+            sweep_mode=SweepMode.ORDINARY,
+            filing_status="single",
+            tax_year=2025,
+            sweep_floor=dec("0"),
+            sweep_ceiling=dec("10000"),
+        )
+    incomes = {p.income for p in result.points}
+    assert {dec("0"), dec("2500"), dec("5000"), dec("7500"), dec("10000")} <= incomes

@@ -339,8 +339,7 @@ class TestCalculatePlanningSignals:
             "ltcg_0pct_remaining",
             "torpedo_active",
             "ss_fully_taxable",
-            "distance_to_22pct",
-            "distance_to_24pct",
+            "bracket_distances",
         }
         assert required.issubset(signals.keys())
 

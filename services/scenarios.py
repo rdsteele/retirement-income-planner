@@ -27,7 +27,7 @@ def scenario_name_to_filename(name: str) -> str:
     """Convert a scenario name to a safe filename.
 
     Spaces become underscores; characters outside [a-zA-Z0-9_.-] are removed.
-    Example: "2026 Base Plan" → "2026_Base_Plan.json"
+    Example: "My Base Plan" → "My_Base_Plan.json"
     """
     slug = name.strip().replace(" ", "_")
     slug = re.sub(r"[^\w\-.]", "", slug)

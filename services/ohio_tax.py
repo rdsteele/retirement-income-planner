@@ -1,18 +1,18 @@
 """Ohio state income tax calculation service.
 
 Handles Ohio-specific rules: AGI-tiered personal exemption, medical expense
-deduction with 7.5% AGI floor, Social Security exemption, progressive bracket
+deduction with an AGI floor, Social Security exemption, progressive bracket
 tax using Ohio's cumulative formula, and retirement income credit.
 
 Ohio starts from federal AGI and applies its own adjustments before applying
-the bracket schedule. Supports single and MFJ filing statuses.
+the bracket schedule. Supports every configured filing status.
 """
 
 from dataclasses import dataclass
 from decimal import Decimal
 
 from services.common import round_rate, round_tax
-from services.data_loader import load_ohio_data
+from services.data_loader import load_ohio_data, require_supported_filing_status
 
 
 @dataclass
@@ -44,7 +44,7 @@ def _lookup_personal_exemption(ohio_agi: Decimal, tiers: list[dict]) -> Decimal:
 def _compute_medical_deduction(
     ohio_agi: Decimal, gross_medical: Decimal, floor_rate: Decimal
 ) -> Decimal:
-    """Return the allowable medical deduction after applying the 7.5% AGI floor."""
+    """Return the allowable medical deduction after applying the AGI floor."""
     medical_floor = round_tax(ohio_agi * floor_rate)
     return max(Decimal("0"), gross_medical - medical_floor)
 
@@ -97,17 +97,14 @@ def calculate_ohio_tax(
     qualifying_retirement_income: Decimal,
     ss_taxable_federal: Decimal,
     tax_year: int,
-    filing_status: str = "single",
+    filing_status: str,
 ) -> OhioTaxResult:
-    if filing_status not in ("single", "mfj"):
-        raise ValueError(f"Unsupported filing status: {filing_status!r}")
+    require_supported_filing_status(filing_status)
 
     data = load_ohio_data(tax_year)
 
     ohio_agi = _compute_ohio_agi(federal_agi, ss_taxable_federal)
-    exemption_key = (
-        "personal_exemption_mfj" if filing_status == "mfj" else "personal_exemption_single"
-    )
+    exemption_key = f"personal_exemption_{filing_status}"
     personal_exemption = _lookup_personal_exemption(ohio_agi, data[exemption_key])
     medical_deduction = _compute_medical_deduction(
         ohio_agi, gross_medical_expenses, Decimal(data["medical_expense_floor_rate"])
