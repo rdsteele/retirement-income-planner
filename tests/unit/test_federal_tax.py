@@ -219,3 +219,33 @@ class TestFederal2026Data:
         assert result.bracket_breakdown[0].rate == dec("0.10")
         assert result.bracket_breakdown[0].income_taxed == dec("12400")
         assert result.bracket_breakdown[0].tax_amount == dec("1240")
+
+
+# ---------------------------------------------------------------------------
+# split_taxable_income — unused deductions offset preferential income
+# ---------------------------------------------------------------------------
+
+from services.federal_tax import split_taxable_income  # noqa: E402
+
+
+class TestSplitTaxableIncome:
+    def test_deduction_smaller_than_ordinary_leaves_preferential_untouched(self):
+        ordinary, pref = split_taxable_income(dec("30000"), dec("10000"), dec("16100"))
+        assert ordinary == dec("13900")
+        assert pref == dec("10000")
+
+    def test_deduction_exceeding_ordinary_reduces_preferential(self):
+        # RR scenario: ordinary 330 after adjustments, deduction 16,100, pref 39,947
+        ordinary, pref = split_taxable_income(dec("330"), dec("39947"), dec("16100"))
+        assert ordinary == dec("0")
+        assert pref == dec("24177")
+
+    def test_deduction_exceeding_all_income_gives_zero_taxable(self):
+        ordinary, pref = split_taxable_income(dec("1000"), dec("2000"), dec("16100"))
+        assert ordinary == dec("0")
+        assert pref == dec("0")
+
+    def test_zero_ordinary_all_deduction_applies_to_preferential(self):
+        ordinary, pref = split_taxable_income(dec("0"), dec("60000"), dec("16100"))
+        assert ordinary == dec("0")
+        assert pref == dec("43900")

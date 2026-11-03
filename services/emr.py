@@ -15,7 +15,7 @@ from typing import TypedDict
 
 from services.common import round_rate, round_tax
 from services.data_loader import load_federal_data, load_ohio_data, load_ss_data
-from services.federal_tax import calculate_federal_tax
+from services.federal_tax import calculate_federal_tax, split_taxable_income, unused_deduction
 from services.ohio_tax import calculate_ohio_tax
 from services.social_security import calculate_social_security_taxability
 
@@ -45,6 +45,7 @@ class EMRPoint:
     ss_taxable: Decimal
     ss_inclusion_rate: Decimal
     taxable_ordinary: Decimal
+    taxable_preferential: Decimal
 
 
 @dataclass
@@ -64,6 +65,7 @@ class _TaxSnapshot:
     ss_inclusion_rate: Decimal
     agi: Decimal
     taxable_ordinary: Decimal
+    taxable_preferential: Decimal
     ordinary_tax: Decimal
     preferential_tax: Decimal
     marginal_bracket_rate: Decimal
@@ -162,18 +164,18 @@ def _compute_agi_and_taxable(
     std_deduction: Decimal,
     above_the_line_adjustments: Decimal = _ZERO,
     additional_deductions: Decimal = _ZERO,
-) -> tuple[Decimal, Decimal]:
-    """Return (agi, taxable_ordinary)."""
+) -> tuple[Decimal, Decimal, Decimal]:
+    """Return (agi, taxable_ordinary, taxable_preferential).
+
+    Deductions that exceed ordinary income reduce preferential income.
+    """
     agi = total_ordinary + ss_taxable + total_preferential - above_the_line_adjustments
-    taxable_ordinary = max(
-        _ZERO,
-        total_ordinary
-        + ss_taxable
-        - std_deduction
-        - additional_deductions
-        - above_the_line_adjustments,
+    taxable_ordinary, taxable_preferential = split_taxable_income(
+        total_ordinary + ss_taxable,
+        total_preferential,
+        std_deduction + additional_deductions + above_the_line_adjustments,
     )
-    return agi, taxable_ordinary
+    return agi, taxable_ordinary, taxable_preferential
 
 
 # ---------------------------------------------------------------------------
@@ -289,7 +291,7 @@ def _compute_tax_snapshot(
         above_the_line_adjustments=above_the_line_adjustments,
     )
 
-    agi, taxable_ordinary = _compute_agi_and_taxable(
+    agi, taxable_ordinary, taxable_preferential = _compute_agi_and_taxable(
         total_ordinary,
         ss_taxable,
         total_preferential,
@@ -300,7 +302,7 @@ def _compute_tax_snapshot(
 
     fed_result = calculate_federal_tax(
         ordinary_income=taxable_ordinary,
-        preferential_income=total_preferential,
+        preferential_income=taxable_preferential,
         filing_status=filing_status,
         tax_year=tax_year,
     )
@@ -328,6 +330,7 @@ def _compute_tax_snapshot(
         ss_inclusion_rate=ss_inclusion_rate,
         agi=agi,
         taxable_ordinary=taxable_ordinary,
+        taxable_preferential=taxable_preferential,
         ordinary_tax=fed_result.ordinary_income_tax,
         preferential_tax=fed_result.preferential_income_tax,
         marginal_bracket_rate=fed_result.marginal_bracket_rate,
@@ -531,17 +534,16 @@ def _compute_preferential_boundaries(
     boundaries: list[Decimal] = []
 
     total_ordinary = fixed_ordinary + variable_ordinary
-    taxable_ordinary = max(
-        _ZERO,
-        total_ordinary - std_deduction - additional_deductions - above_the_line_adjustments,
-    )
+    total_deduction = std_deduction + additional_deductions + above_the_line_adjustments
+    taxable_ordinary, _ = split_taxable_income(total_ordinary, _ZERO, total_deduction)
+    excess_deduction = unused_deduction(total_ordinary, total_deduction)
     fixed_pref = qualified_dividends + fixed_ltcg
 
     # Preferential bracket boundaries
     for bracket in data["preferential"][filing_status]:
         if bracket["to"] is not None:
             p_to = Decimal(bracket["to"])
-            boundaries.append(p_to - taxable_ordinary - fixed_pref)
+            boundaries.append(p_to - taxable_ordinary - fixed_pref + excess_deduction)
 
     # SS torpedo boundaries
     if ss_benefit > _ZERO:
@@ -732,6 +734,7 @@ def calculate_emr(
                 ss_taxable=lo.ss_taxable,
                 ss_inclusion_rate=lo.ss_inclusion_rate,
                 taxable_ordinary=lo.taxable_ordinary,
+                taxable_preferential=lo.taxable_preferential,
             )
         )
 
@@ -781,8 +784,8 @@ def _compute_ltcg_0pct_remaining(
     if sweep_mode == SweepMode.ORDINARY and ltcg_already_used == _ZERO:
         return None
     ceiling = _get_ltcg_0pct_ceiling(filing_status, tax_year)
-    taxable_ordinary_at_floor = points[0].taxable_ordinary
-    remaining = ceiling - taxable_ordinary_at_floor - ltcg_already_used
+    taxable_income_at_floor = points[0].taxable_ordinary + points[0].taxable_preferential
+    remaining = ceiling - taxable_income_at_floor
     return remaining if remaining > _ZERO else None
 
 

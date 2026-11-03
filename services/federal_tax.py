@@ -95,6 +95,28 @@ def _apply_preferential_brackets(
     return pref_tax
 
 
+def unused_deduction(ordinary_income: Decimal, deductions: Decimal) -> Decimal:
+    """Return the portion of deductions that exceeds ordinary income (never negative)."""
+    return max(Decimal("0"), deductions - ordinary_income)
+
+
+def split_taxable_income(
+    ordinary_income: Decimal,
+    preferential_income: Decimal,
+    deductions: Decimal,
+) -> tuple[Decimal, Decimal]:
+    """Return (taxable_ordinary, taxable_preferential) after applying deductions.
+
+    Deductions reduce ordinary income first. Any excess then reduces preferential
+    income (LTCG + qualified dividends), as in the IRS Qualified Dividends and
+    Capital Gain Tax Worksheet. Neither result is ever negative.
+    """
+    taxable_ordinary = max(Decimal("0"), ordinary_income - deductions)
+    excess = unused_deduction(ordinary_income, deductions)
+    taxable_preferential = max(Decimal("0"), preferential_income - excess)
+    return taxable_ordinary, taxable_preferential
+
+
 def calculate_federal_tax(
     ordinary_income: Decimal,
     preferential_income: Decimal,

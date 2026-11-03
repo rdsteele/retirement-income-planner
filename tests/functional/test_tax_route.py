@@ -410,3 +410,53 @@ class TestTopPrefBracket:
 
     def test_pref_tax_amount(self):
         assert self.rows[0]["tax_amount"] == pytest.approx(10000.0)
+
+
+# ── 13. Unused deduction offsets preferential income ────────────────────
+#
+# RR 2026 single scenario: ordinary AGI portion 330, deduction 16,100,
+# qualified dividends 2,500 + LTCG 37,447. Taxable income = 40,277 - 16,100.
+
+
+class TestUnusedDeductionOffsetsPreferential:
+    def setup_method(self):
+        payload = {
+            "filing_status": "single",
+            "tax_year": 2026,
+            "interest": 40.0,
+            "pension": 1600.0,
+            "ordinary_dividends": 1410.0,
+            "qualified_dividends": 2500.0,
+            "ira_distributions": 2680.0,
+            "fixed_ltcg": 37447.0,
+            "above_the_line_adjustments": 5400.0,
+        }
+        self.body = client.post("/api/tax", json=payload).json()
+
+    def test_agi(self):
+        assert self.body["inputs_summary"]["agi"] == pytest.approx(40277.0)
+
+    def test_taxable_ordinary(self):
+        assert self.body["inputs_summary"]["taxable_ordinary"] == pytest.approx(0.0)
+
+    def test_taxable_preferential(self):
+        assert self.body["inputs_summary"]["taxable_preferential"] == pytest.approx(24177.0)
+
+    def test_federal_tax_zero(self):
+        assert self.body["federal"]["total_tax"] == pytest.approx(0.0)
+
+    def test_preferential_breakdown_uses_taxable_amount(self):
+        rows = self.body["federal"]["preferential_breakdown"]
+        assert sum(r["income_taxed"] for r in rows) == pytest.approx(24177.0)
+
+
+def test_large_preferential_with_no_ordinary_is_reduced_by_deduction():
+    """Pref 60,000, no ordinary: taxable 43,900 stays in the 0% band (ceiling 49,450)."""
+    payload = {
+        "filing_status": "single",
+        "tax_year": 2026,
+        "fixed_ltcg": 60000.0,
+    }
+    body = client.post("/api/tax", json=payload).json()
+    assert body["inputs_summary"]["taxable_preferential"] == pytest.approx(43900.0)
+    assert body["federal"]["total_tax"] == pytest.approx(0.0)

@@ -16,7 +16,7 @@ from api.models.tax import (
 )
 from services.common import round_rate, round_tax
 from services.data_loader import load_federal_data
-from services.federal_tax import calculate_federal_tax
+from services.federal_tax import calculate_federal_tax, split_taxable_income
 from services.ohio_tax import calculate_ohio_tax
 from services.social_security import calculate_social_security_taxability
 
@@ -140,10 +140,12 @@ def _calculate_tax(request: TaxRequest) -> TaxResponse:
     data = load_federal_data(tax_year)
     standard_deduction = _D(data["standard_deduction"][filing_status])
     total_ordinary = gross_ordinary + ss_taxable - above_the_line
-    taxable_ordinary = max(_ZERO, total_ordinary - standard_deduction - additional_deductions)
+    taxable_ordinary, taxable_preferential = split_taxable_income(
+        total_ordinary, total_preferential, standard_deduction + additional_deductions
+    )
     federal_result = calculate_federal_tax(
         ordinary_income=taxable_ordinary,
-        preferential_income=total_preferential,
+        preferential_income=taxable_preferential,
         filing_status=filing_status,
         tax_year=tax_year,
     )
@@ -178,7 +180,7 @@ def _calculate_tax(request: TaxRequest) -> TaxResponse:
     ordinary_brackets = data["ordinary"][filing_status]
     pref_brackets = data["preferential"][filing_status]
     bracket_breakdown = _build_ordinary_breakdown(taxable_ordinary, ordinary_brackets)
-    pref_breakdown = _build_pref_breakdown(taxable_ordinary, total_preferential, pref_brackets)
+    pref_breakdown = _build_pref_breakdown(taxable_ordinary, taxable_preferential, pref_brackets)
 
     # inputs_summary
     agi = float(federal_agi)
@@ -190,7 +192,7 @@ def _calculate_tax(request: TaxRequest) -> TaxResponse:
         standard_deduction=float(standard_deduction),
         additional_deductions=float(additional_deductions),
         taxable_ordinary=float(taxable_ordinary),
-        taxable_preferential=float(total_preferential),
+        taxable_preferential=float(taxable_preferential),
     )
 
     # Federal detail

@@ -1343,7 +1343,11 @@ class TestPlanningSignalsOrdinaryWithLTCG:
 
 
 class TestPlanningSignalsOrdinaryWithDeductionCushion:
-    """When fixed_ordinary < std_deduction, runway exceeds remaining."""
+    """When fixed_ordinary < std_deduction, the unused deduction offsets LTCG.
+
+    Remaining 0% room is measured against total taxable income, so the unused
+    deduction cushion is already reflected and remaining equals the runway.
+    """
 
     def setup_method(self):
         self.fed_patcher = patch(_PATCH_FED, side_effect=_mock_federal_single)
@@ -1356,8 +1360,9 @@ class TestPlanningSignalsOrdinaryWithDeductionCushion:
         # pension=5000 → fixed_ordinary=5000
         # std_deduction=15750 → taxable_ordinary at floor = 0
         # qualified_dividends=3000, fixed_ltcg=10000 → ltcg_already_used=13000
+        # unused deduction 10750 offsets LTCG → taxable_preferential = 2250
         # 0% pref ceiling = 48350
-        # ltcg_0pct_remaining = 48350 - 0 - 13000 = 35350
+        # ltcg_0pct_remaining = 48350 - 0 - 2250 = 46100
         # zero_ordinary_space = max(0, 15750 - 5000 - 0) = 10750
         # ordinary_runway = 48350 - 13000 + 15750 - 5000 - 0 = 46100
         self.result = calculate_emr(
@@ -1391,16 +1396,13 @@ class TestPlanningSignalsOrdinaryWithDeductionCushion:
         self.ohio_patcher.stop()
 
     def test_ltcg_0pct_remaining(self):
-        assert self.signals.ltcg_0pct_remaining == dec("35350")
+        assert self.signals.ltcg_0pct_remaining == dec("46100")
 
     def test_ltcg_0pct_ordinary_runway(self):
         assert self.signals.ltcg_0pct_ordinary_runway == dec("46100")
 
-    def test_runway_equals_remaining_plus_deduction_cushion(self):
-        assert (
-            self.signals.ltcg_0pct_ordinary_runway
-            == self.signals.ltcg_0pct_remaining + self.signals.zero_ordinary_space
-        )
+    def test_runway_equals_remaining_because_cushion_already_applied(self):
+        assert self.signals.ltcg_0pct_ordinary_runway == self.signals.ltcg_0pct_remaining
 
     def test_zero_ordinary_space(self):
         assert self.signals.zero_ordinary_space == dec("10750")
