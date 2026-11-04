@@ -716,14 +716,11 @@ def _get_ltcg_0pct_ceiling(filing_status: str, tax_year: int) -> Decimal:
 
 def _compute_ltcg_0pct_remaining(
     points: list[EMRPoint],
-    sweep_mode: SweepMode,
-    ltcg_already_used: Decimal,
     filing_status: str,
     tax_year: int,
 ) -> Decimal | None:
+    """Room left under the 0% gains bracket, whether or not gains are already entered."""
     if not points:
-        return None
-    if sweep_mode == SweepMode.ORDINARY and ltcg_already_used == _ZERO:
         return None
     ceiling = _get_ltcg_0pct_ceiling(filing_status, tax_year)
     taxable_income_at_floor = points[0].taxable_ordinary + points[0].taxable_preferential
@@ -825,8 +822,6 @@ def compute_planning_signals(
 
     ltcg_0pct_remaining = _compute_ltcg_0pct_remaining(
         pts,
-        result.sweep_mode,
-        ltcg_already_used,
         result.filing_status,
         result.tax_year,
     )

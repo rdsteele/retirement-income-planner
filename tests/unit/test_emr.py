@@ -1459,7 +1459,7 @@ class TestPlanningSignalsOrdinaryWithDeductionCushion:
 
 
 class TestPlanningSignalsNoLTCG:
-    """Ordinary sweep with no LTCG — signals return None."""
+    """Ordinary sweep with no LTCG: the 0% space is still reported, the bump runway is not."""
 
     def setup_method(self):
         self.fed_patcher = patch(_PATCH_FED, side_effect=_mock_federal_single)
@@ -1503,8 +1503,10 @@ class TestPlanningSignalsNoLTCG:
         self.ss_patcher.stop()
         self.ohio_patcher.stop()
 
-    def test_ltcg_0pct_remaining_none(self):
-        assert self.signals.ltcg_0pct_remaining is None
+    def test_ltcg_0pct_remaining_is_space_above_taxable_income(self):
+        # pension 20,000 less the standard deduction 15,750 leaves 4,250 taxable;
+        # the 0% bracket tops out at 48,350, so 44,100 of gains fit.
+        assert self.signals.ltcg_0pct_remaining == dec("44100")
 
     def test_ltcg_0pct_ordinary_runway_none(self):
         assert self.signals.ltcg_0pct_ordinary_runway is None

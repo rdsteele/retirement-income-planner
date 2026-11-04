@@ -633,13 +633,20 @@ class TestLtcg0pctRemainingSignal:
         assert resp.status_code == 200
         assert resp.json()["planning_signals"]["ltcg_0pct_remaining"] is None
 
-    def test_no_preferential_income_returns_null(self):
-        # ordinary sweep with no fixed_ltcg and no qualified_dividends
-        # ltcg_already_used == 0 → null
+    def test_no_preferential_income_still_reports_space(self):
+        # no gains entered: the room to harvest at 0% is still reported
+        # remaining = 48,350 − 4,250 = 44,100
         payload = {**_LTCG_BASE, "fixed_ltcg": 0.0, "qualified_dividends": 0.0}
         resp = client.post("/api/emr", json=payload)
         assert resp.status_code == 200
-        assert resp.json()["planning_signals"]["ltcg_0pct_remaining"] is None
+        remaining = resp.json()["planning_signals"]["ltcg_0pct_remaining"]
+        assert remaining == pytest.approx(44100.0)
+
+    def test_no_preferential_income_has_no_bump_runway(self):
+        # with no gains there is nothing for ordinary income to bump
+        payload = {**_LTCG_BASE, "fixed_ltcg": 0.0, "qualified_dividends": 0.0}
+        resp = client.post("/api/emr", json=payload)
+        assert resp.json()["planning_signals"]["ltcg_0pct_ordinary_runway"] is None
 
 
 # ── sweep_ceiling=null uses service default ───────────────────────────────
