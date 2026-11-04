@@ -287,7 +287,7 @@ Provisional income (PI) = other income + tax-exempt interest + half the benefit.
 | Taxable income | $0 |
 | Federal ordinary tax | $0 |
 | Federal preferential tax | $0 |
-| Roth Conversion Amount (read the "To 24%" badge; RR runs through the torpedo, so expect RR to be smaller) | see badge |
+| Roth Conversion Amount ("To 24%" badge) | see badge |
 | LTCG Harvest Amount (0% space) | $49,450 |
 
 ### SS2 (P1): Social Security: the 85% zone
@@ -312,7 +312,7 @@ PI 40,000: 4,500 + 85% x 6,000.
 | Taxable income | $18,500 |
 | Federal ordinary tax | $1,972 |
 | Federal preferential tax | $0 |
-| Roth Conversion Amount (read the "To 24%" badge; RR runs through the torpedo, so expect RR to be smaller) | see badge |
+| Roth Conversion Amount ("To 24%" badge) | see badge |
 | LTCG Harvest Amount (0% space) | $30,950 |
 
 ### SS3 (P1): Social Security: capped at 85% of the benefit
@@ -337,8 +337,10 @@ PI 78,000 would give 41,900, but the cap is 85% x 36,000.
 | Taxable income | $74,500 |
 | Federal ordinary tax | $11,102 |
 | Federal preferential tax | $0 |
-| Roth Conversion Amount (read the "To 24%" badge; RR runs through the torpedo, so expect RR to be smaller) | see badge |
+| Roth Conversion Amount ("To 24%" badge) | see badge |
 | LTCG Harvest Amount (0% space) | already past ($0) |
+
+**Result (run):** every figure matched, including the 85% cap ($30,600) and both runways ($31,200 and $0).
 
 ### SS4 (P1): Social Security: the tax torpedo
 
@@ -362,8 +364,10 @@ PI 32,000: 50% x 7,000. RR's Roth conversion amount here runs through the torped
 | Taxable income | $7,400 |
 | Federal ordinary tax | $740 |
 | Federal preferential tax | $0 |
-| Roth Conversion Amount (read the "To 24%" badge; RR runs through the torpedo, so expect RR to be smaller) | see badge |
+| Roth Conversion Amount ("To 24%" badge) | see badge |
 | LTCG Harvest Amount (0% space) | $42,050 |
+
+**Result (run):** every figure matched. RR Roth Conversion Amount $81,400 equals the "To 24%" badge; RR runs through the torpedo because the torpedo's marginal rate (about 15% to 22%) stays within the 22% target, and stops where taxable income reaches the 24% bracket. With the 0% gains target, the torpedo cost on harvested gains exceeds the target, hence $0. RR's LTCG Harvest Amount was $0 while this tool shows 0% LTCG Space $42,050: harvested gains raise provisional income and make more Social Security taxable, so RR counts a cost the badge (bracket space only) does not.
 
 ### SS5 (P2): Social Security with tax-exempt interest
 
@@ -389,7 +393,7 @@ PI 10,000 + 8,000 + 12,000 = 30,000: 50% x 5,000 (it would be $0 without the mun
 | Taxable income | $0 |
 | Federal ordinary tax | $0 |
 | Federal preferential tax | $0 |
-| Roth Conversion Amount (read the "To 24%" badge; RR runs through the torpedo, so expect RR to be smaller) | see badge |
+| Roth Conversion Amount ("To 24%" badge) | see badge |
 | LTCG Harvest Amount (0% space) | $49,450 |
 
 ### SS6 (P2): Social Security with adjustments
@@ -416,7 +420,7 @@ PI 26,000 + 15,000 = 41,000: 4,500 + 85% x 7,000.
 | Taxable income | $20,350 |
 | Federal ordinary tax | $2,194 |
 | Federal preferential tax | $0 |
-| Roth Conversion Amount (read the "To 24%" badge; RR runs through the torpedo, so expect RR to be smaller) | see badge |
+| Roth Conversion Amount ("To 24%" badge) | see badge |
 | LTCG Harvest Amount (0% space) | $29,100 |
 
 ### SS7 (P1): Social Security and the ACA
@@ -447,7 +451,14 @@ In RR: ACA subsidies **Yes**, household **1**, full premium **$12,456**, benchma
 
 ### A2 (P1): Mid-range, MAGI $55,000
 
-**Enter in RR:** Additional Ordinary Income [Not Investment] **$55,000**.
+**Enter in RR:**
+
+- Additional Ordinary Income [Not Investment]: **$55,000**
+- Do you Qualify for ACA Premium Subsidies: **Yes**
+- Household size: **1**; location: **Contiguous 48 states & DC**
+- Full (pre-subsidy) premium per year: **$12,456**
+- Benchmark plan full subsidy amount per year: **$12,456**
+- Targets: Ordinary **22%**, Preferential **0%**
 
 **Enter in this tool** (Single, 2026; all other fields $0):
 
@@ -462,9 +473,16 @@ In RR: ACA subsidies **Yes**, household **1**, full premium **$12,456**, benchma
 
 ### A3 (P1): Exactly 400% of the poverty level, MAGI $62,600
 
-Exactly at the cutoff. The IRS table says "not more than 400%", so this is still eligible; this tool zeroes the subsidy at the cliff dollar.
+Exactly at the cutoff. The IRS table says "not more than 400%", so this is still eligible; this tool now agrees (it zeroes the subsidy only above the cliff dollar).
 
-**Enter in RR:** Additional Ordinary Income [Not Investment] **$62,600**.
+**Enter in RR:**
+
+- Additional Ordinary Income [Not Investment]: **$62,600**
+- Do you Qualify for ACA Premium Subsidies: **Yes**
+- Household size: **1**; location: **Contiguous 48 states & DC**
+- Full (pre-subsidy) premium per year: **$12,456**
+- Benchmark plan full subsidy amount per year: **$12,456**
+- Targets: Ordinary **22%**, Preferential **0%**
 
 **Enter in this tool** (Single, 2026; all other fields $0):
 
@@ -475,11 +493,20 @@ Exactly at the cutoff. The IRS table says "not more than 400%", so this is still
 |---|---|
 | Federal tax | $5,332 |
 | **Lost ACA Subsidy** (IRS formula) | **$6,234.96** |
-| Tool's annual subsidy | $0 (implied lost $12,456) |
+| Tool's annual subsidy | $6,240 (implied lost $6,216) |
+
+**Result (run):** RR counts MAGI $62,600 as eligible (lost subsidy $6,234.96), as the IRS reads it. This tool showed $0 APTC before the fix; it now shows $6,240 a year. Federal tax $5,332 matched. RR Roth/harvest were $0 because the next dollar loses the whole remaining subsidy.
 
 ### A4 (P1): $400 over the cutoff, MAGI $63,000
 
-**Enter in RR:** Additional Ordinary Income [Not Investment] **$63,000**.
+**Enter in RR:**
+
+- Additional Ordinary Income [Not Investment]: **$63,000**
+- Do you Qualify for ACA Premium Subsidies: **Yes**
+- Household size: **1**; location: **Contiguous 48 states & DC**
+- Full (pre-subsidy) premium per year: **$12,456**
+- Benchmark plan full subsidy amount per year: **$12,456**
+- Targets: Ordinary **22%**, Preferential **0%**
 
 **Enter in this tool** (Single, 2026; all other fields $0):
 
@@ -492,9 +519,18 @@ Exactly at the cutoff. The IRS table says "not more than 400%", so this is still
 | **Lost ACA Subsidy** (IRS formula) | **$12,456.00** |
 | Tool's annual subsidy | $0 (implied lost $12,456) |
 
+**Result (run):** Lost ACA Subsidy matched ($12,456, full loss, MAGI $400 over the cliff). RR runways: Roth $58,800, harvest $2,550 (the tool should show "To 24%" $58,800 and 0% LTCG Space $2,550 for taxable income $46,900). The saved EMR and Tax Detail PDFs showed no income, so rerun those from the saved scenario.
+
 ### A1 (P2): Lower range, MAGI $25,000
 
-**Enter in RR:** Additional Ordinary Income [Not Investment] **$25,000**.
+**Enter in RR:**
+
+- Additional Ordinary Income [Not Investment]: **$25,000**
+- Do you Qualify for ACA Premium Subsidies: **Yes**
+- Household size: **1**; location: **Contiguous 48 states & DC**
+- Full (pre-subsidy) premium per year: **$12,456**
+- Benchmark plan full subsidy amount per year: **$12,456**
+- Targets: Ordinary **22%**, Preferential **0%**
 
 **Enter in this tool** (Single, 2026; all other fields $0):
 
@@ -511,7 +547,14 @@ Exactly at the cutoff. The IRS table says "not more than 400%", so this is still
 
 This tool's schedule starts at 22,000 (below that is the Medicaid range), so it returns no subsidy; RR's formula should give a full subsidy.
 
-**Enter in RR:** Additional Ordinary Income [Not Investment] **$18,000**.
+**Enter in RR:**
+
+- Additional Ordinary Income [Not Investment]: **$18,000**
+- Do you Qualify for ACA Premium Subsidies: **Yes**
+- Household size: **1**; location: **Contiguous 48 states & DC**
+- Full (pre-subsidy) premium per year: **$12,456**
+- Benchmark plan full subsidy amount per year: **$12,456**
+- Targets: Ordinary **22%**, Preferential **0%**
 
 **Enter in this tool** (Single, 2026; all other fields $0):
 

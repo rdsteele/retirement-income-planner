@@ -229,13 +229,12 @@ class TestEmrAca:
             if p.aca_magi > self.cliff_magi:
                 assert p.aptc_annual == D("0"), f"Expected aptc=0 above cliff at income={p.income}"
 
-    def test_aptc_zero_at_and_above_cliff(self):
-        # Schedule-based APTC varies by MAGI below cliff; zero at and above cliff.
-        for p in self.tc.points:
-            if p.aca_magi >= self.cliff_magi:
-                assert p.aptc_annual == D("0"), (
-                    f"Expected 0 at/above cliff, got {p.aptc_annual} at magi={p.aca_magi}"
-                )
+    def test_aptc_kept_at_cliff_and_zero_above(self):
+        # The cliff MAGI itself is still eligible; only MAGI above it loses everything.
+        at_cliff = [p for p in self.tc.points if p.aca_magi == self.cliff_magi]
+        assert at_cliff, "sweep should include a point exactly at the cliff"
+        for p in at_cliff:
+            assert p.aptc_annual > D("0")
 
 
 # ---------------------------------------------------------------------------

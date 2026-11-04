@@ -131,12 +131,12 @@ class TestBelowScheduleMinimum:
 
 
 # ---------------------------------------------------------------------------
-# 4. At cliff MAGI → aptc=0, is_eligible=False, distance=0, marginal=spike
+# 4. At cliff MAGI → still eligible (IRS: not more than 400%), marginal=spike
 # ---------------------------------------------------------------------------
 
 
 class TestAtCliff:
-    """At exactly cliff MAGI: aptc drops to zero; marginal = full last APTC."""
+    """At exactly cliff MAGI: still eligible; the next dollar loses the whole subsidy."""
 
     def setup_method(self):
         # Cliff at 62600; last non-zero schedule point: {62500, 520} → 6240/yr
@@ -146,11 +146,11 @@ class TestAtCliff:
             tax_year=TAX_YEAR,
         )
 
-    def test_is_eligible_false(self):
-        assert self.result.is_eligible is False
+    def test_is_eligible_true(self):
+        assert self.result.is_eligible is True
 
-    def test_aptc_annual_zero(self):
-        assert self.result.aptc_annual == D("0")
+    def test_aptc_annual_is_last_nonzero_schedule_value(self):
+        assert self.result.aptc_annual == D("6240")
 
     def test_distance_to_cliff_zero(self):
         assert self.result.distance_to_cliff == D("0")
@@ -261,6 +261,16 @@ class TestGradualSlope:
             tax_year=TAX_YEAR,
         )
         assert result.marginal_subsidy_loss == D("0")
+
+    def test_subsidy_holds_until_the_cliff(self):
+        # The cliff entry marks where the subsidy ends, not a slope toward zero.
+        result = calculate_aca_subsidy(
+            magi=D("62550"),
+            filing_status="single",
+            tax_year=TAX_YEAR,
+        )
+        assert result.aptc_annual == D("6240")
+        assert result.is_eligible is True
 
 
 # ---------------------------------------------------------------------------
@@ -408,10 +418,10 @@ class TestFormulaFallback:
         assert result.subsidy_loss == D("0")
 
     def test_at_cliff_marginal_equals_cliff_aptc(self):
-        # At exactly cliff_magi: aptc=0, marginal = cliff_aptc (formula spike)
+        # At exactly cliff_magi: still eligible, marginal = cliff_aptc (formula spike)
         result = self._calc(D("62600"))
-        assert result.is_eligible is False
-        assert result.aptc_annual == D("0")
+        assert result.is_eligible is True
+        assert result.aptc_annual == D("3765")
         assert result.marginal_subsidy_loss == D("3765")
 
     def test_above_cliff_ineligible_marginal_zero(self):

@@ -32,7 +32,7 @@ class ACAResult:
     subsidy_loss: Decimal  # subsidy lost vs baseline MAGI
     cliff_magi: Decimal  # FPL-based subsidy cliff for this filing status
     distance_to_cliff: Decimal  # cliff_magi - magi (negative if over)
-    is_eligible: bool  # True if magi < cliff_magi and above schedule min
+    is_eligible: bool  # True if magi <= cliff_magi and above schedule min
     marginal_subsidy_loss: Decimal  # annual APTC dollars lost per $1,000 of additional
     # MAGI (consistent with emr_aca = this / 1000 in
     # total_cost.py); spikes to full APTC at cliff crossing
@@ -78,6 +78,28 @@ def _interpolate_monthly_aptc(schedule: list[dict], magi: Decimal) -> Decimal:
             upper_monthly = Decimal(str(upper["monthly_aptc"]))
             return lower_monthly + fraction * (upper_monthly - lower_monthly)
     return _ZERO
+
+
+def _last_nonzero_point(schedule: list[dict]) -> dict | None:
+    """Return the last schedule point with non-zero monthly APTC."""
+    for pt in reversed(schedule):
+        if Decimal(str(pt["monthly_aptc"])) > _ZERO:
+            return pt
+    return None
+
+
+def _monthly_aptc_through_cliff(
+    schedule: list[dict], magi: Decimal, cliff_magi: Decimal
+) -> Decimal:
+    """Monthly APTC, holding the last non-zero value from there up to the cliff.
+
+    The schedule's closing zero entry marks the cliff, not a slope down to zero: a
+    household is eligible at the cliff MAGI itself and loses everything just above it.
+    """
+    last = _last_nonzero_point(schedule)
+    if last is not None and Decimal(str(last["magi"])) <= magi <= cliff_magi:
+        return Decimal(str(last["monthly_aptc"]))
+    return _interpolate_monthly_aptc(schedule, magi)
 
 
 def _last_nonzero_annual(schedule: list[dict]) -> Decimal:
@@ -179,14 +201,14 @@ def calculate_aca_subsidy(
     if schedule:
         min_schedule_magi = Decimal(str(schedule[0]["magi"]))
 
-        if magi >= cliff_magi:
+        if magi > cliff_magi:
             aptc_annual = _ZERO
             is_eligible = False
         elif magi < min_schedule_magi:
             aptc_annual = _ZERO
             is_eligible = False
         else:
-            monthly = _interpolate_monthly_aptc(schedule, magi)
+            monthly = _monthly_aptc_through_cliff(schedule, magi, cliff_magi)
             aptc_annual = round_tax(monthly * _TWELVE)
             is_eligible = True
 
@@ -198,7 +220,7 @@ def calculate_aca_subsidy(
     else:
         # Formula fallback for filing statuses with no schedule
         applicable_percentage = Decimal(data["applicable_percentage_400pct"])
-        if magi >= cliff_magi:
+        if magi > cliff_magi:
             aptc_annual = _ZERO
             is_eligible = False
         else:
