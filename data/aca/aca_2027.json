@@ -1,0 +1,16 @@
+{
+  "tax_year": 2027,
+  "filing_status_cliffs": {
+    "single": 63840,
+    "mfj": 86560
+  },
+  "fpl_100pct": {
+    "single": 15960,
+    "mfj": 21640
+  },
+  "applicable_percentage_400pct": "0.0996",
+  "aptc_schedule": {
+    "single": [],
+    "mfj": []
+  }
+}

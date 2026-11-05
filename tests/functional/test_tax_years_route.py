@@ -33,3 +33,12 @@ def test_response_shape():
     assert isinstance(data["default_year"], int)
     assert all(isinstance(y, int) for y in data["years"])
     assert data["years"] == sorted(data["years"])
+
+
+def test_only_years_with_federal_ohio_and_aca_files_are_listed():
+    from api.routers.tax_years import _ACA_DIR, _BRACKETS_DIR
+
+    for year in client.get("/api/tax-years").json()["years"]:
+        assert (_BRACKETS_DIR / f"federal_{year}.json").exists()
+        assert (_BRACKETS_DIR / f"ohio_{year}.json").exists()
+        assert (_ACA_DIR / f"aca_{year}.json").exists()
