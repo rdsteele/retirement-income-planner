@@ -1,5 +1,40 @@
 # RR comparison worksheet
 
+## Summary of results
+
+Compared this tool with the Retirement Researcher (RR) Tax Calculator for a single filer, age 61 (62 for the Social Security runs), tax year 2026. Federal figures only; RR has no state tax.
+
+**Result:** every figure compared agrees with RR, apart from the two RR differences below. Nothing found in this tool's tax or ACA calculations needed changing except one edge case, fixed during the comparison.
+
+| Area | Runs | Result |
+|---|---|---|
+| Ordinary brackets, standard deduction, above-the-line adjustments | S1, S7 | Match exactly |
+| Gains stacking (0% / 15% / 20%) and NIIT | S1, S4, S8 | Match exactly |
+| Social Security taxability: 50% tier, 85% tier, 85% cap, tax-exempt interest | SS1, SS2, SS3, SS4, SS5 | Match exactly |
+| ACA subsidy (full range, cliff, over the cliff) | A1, A2, A3, A4 | Within $6 (schedule rounding); cliff edge fixed |
+| ACA with Social Security (whole benefit counts in ACA income) | SS7 | Match: RR counts the whole benefit |
+| Poverty-level formula at low income | A5 | Match with RR's formula ($378) |
+
+**Not run (repeat confirmed areas):** S5, S2, S3, SS6.
+
+### Differences, and which tool is right
+
+1. **Medical-expense floor (S6).** RR deducts medical expenses over 8% of AGI. The IRS floor is 7.5%. RR's deduction was $300 lower and its tax $36 higher. This tool follows the IRS. RR's 8% also shaped its runway amounts in that run.
+2. **Medicaid range (A5).** This tool returns no ACA subsidy below the start of its schedule (the Medicaid range); RR has no such range and applies its formula down to 100% of the poverty level.
+
+### Fixed during the comparison
+
+- **ACA cliff dollar (A3).** A household at exactly 400% of the poverty level is still eligible under the IRS wording ("not more than 400%"); this tool had treated that dollar as ineligible. It now agrees with RR, and the subsidy holds up to the cliff instead of sloping to zero.
+- **0% LTCG space (S7).** The badge now shows the space whenever it exists, including when no gains are entered.
+
+### Runways are not like-for-like
+
+RR's Roth Conversion and LTCG Harvest amounts are suggestions based on the effective marginal rate (EMR) target you type. This tool's badges only show the space left in the brackets. Differences always trace to a rate effect the badges leave out: the Social Security torpedo, gains pushed into 15%, the ACA subsidy, or the itemized medical floor. This tool's EMR sweep reproduces RR's stopping point in 11 of the 12 cases checked (see "EMR sweep versus RR's amounts"); the exception is a 0.2-point plateau in SS4 that RR converts through.
+
+### Known limitation
+
+With itemized medical expenses, this tool treats Additional Deductions as fixed, so its runway is too long when the medical floor is binding (see "Known limitation" at the end). It does not change the tax at a given income.
+
 Scenarios for checking this tool against the Retirement Researcher (RR) Tax Calculator. All use **Single, tax year 2026**. Expected values come from this tool (federal only; RR has no state tax).
 
 ## How RR works (and what to enter)
