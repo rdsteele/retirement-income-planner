@@ -19,9 +19,9 @@ function testFixtures() {
   fixtures.config.y_axis_max_emr = 0.41;
   fixtures.config.sweep_step_default = 250;
   fixtures.config.income_plan_sweep_ceiling = 123456;
-  fixtures.emr.default_sweep_ceiling = 98765;
-  fixtures.emr.default_sweep_ceiling_rate = 0.31;
-  fixtures.emr.planning_signals.bracket_distances = [
+  fixtures.total_cost.default_sweep_ceiling = 98765;
+  fixtures.total_cost.default_sweep_ceiling_rate = 0.31;
+  fixtures.total_cost.planning_signals.bracket_distances = [
     { rate: 0.11, distance: 1500 },
     { rate: 0.33, distance: null },
   ];
@@ -112,7 +112,7 @@ test('tax: shows the server error when the calculation fails', async () => {
 
 test('emr: runs on load with API-provided status, year, and the configured sweep step', async () => {
   const app = await startPage('emr');
-  const posts = app.server.callsMatching('POST', '/api/emr');
+  const posts = app.server.callsMatching('POST', '/api/total-cost');
   assertEqual(posts.length, 1);
   assertEqual(posts[0].body.filing_status, FIRST_STATUS());
   assertEqual(posts[0].body.tax_year, DEFAULT_YEAR());
@@ -126,7 +126,7 @@ test('emr: a blank sweep step is sent as null so the server applies its default'
   app.server.calls.length = 0;
   await app.el('run-btn').click();
   await settle();
-  const posts = app.server.callsMatching('POST', '/api/emr');
+  const posts = app.server.callsMatching('POST', '/api/total-cost');
   assertEqual(posts.length, 1);
   assertEqual(posts[0].body.sweep_step, null);
 });
@@ -134,13 +134,13 @@ test('emr: a blank sweep step is sent as null so the server applies its default'
 test('emr: renders one badge per configured bracket rate and the default ceiling hint', async () => {
   const app = await startPage('emr');
   const badges = app.el('signals-bar').innerHTML;
-  for (const d of FX.emr.planning_signals.bracket_distances) {
+  for (const d of FX.total_cost.planning_signals.bracket_distances) {
     const pct = formatRatePercent(d.rate);
     const expected = d.distance === null ? `At ${pct}+` : `To ${pct}: ${fmt$(d.distance)}`;
     assertTrue(badges.indexOf(expected) !== -1, `missing badge "${expected}" in ${badges}`);
   }
-  const ceiling = Math.round(FX.emr.default_sweep_ceiling).toLocaleString('en-US');
-  const rate = formatRatePercent(FX.emr.default_sweep_ceiling_rate);
+  const ceiling = Math.round(FX.total_cost.default_sweep_ceiling).toLocaleString('en-US');
+  const rate = formatRatePercent(FX.total_cost.default_sweep_ceiling_rate);
   assertEqual(app.el('sweep_ceiling').placeholder, `${ceiling} (${rate} bracket top)`);
 });
 
@@ -168,7 +168,7 @@ test('emr: draws the chart', async () => {
 });
 
 test('emr: shows the server error when the analysis fails', async () => {
-  const app = await startPage('emr', (server) => server.failOn('POST', '/api/emr', 500));
+  const app = await startPage('emr', (server) => server.failOn('POST', '/api/total-cost', 500));
   assertEqual(errorShown(app), 'disk full');
 });
 
@@ -310,7 +310,7 @@ for (const name of ['emr', 'tax']) {
       loadSavedScenario(server);
       server.failOn('GET', '/sweep-inputs', 500);
     });
-    const endpoint = name === 'emr' ? '/api/emr' : '/api/tax';
+    const endpoint = name === 'emr' ? '/api/total-cost' : '/api/tax';
     assertEqual(app.server.callsMatching('POST', endpoint).length, 0);
     const status = barStatus(app);
     assertTrue(status !== null && status.isError, 'the error must still be visible in the scenario bar');
@@ -373,14 +373,68 @@ test('emr: the chart uses the configured rate-axis maximum and the ordinary titl
 
 test('emr: a preferential sweep is titled as preferential income', async () => {
   const app = await startPage('emr', () => {
-    FX.emr.sweep_mode = 'preferential';
+    FX.total_cost.sweep_mode = 'preferential';
   });
   assertEqual(lastPlot(app).layout.xaxis.title.text, 'Additional Preferential Income ($)');
 });
 
-test('emr: the chart has no Total Cost line (its response has no total_cost_emr)', async () => {
+test('emr: the chart has no Total Cost line when ACA is off (the subsidy loss is all zero)', async () => {
   const app = await startPage('emr');
   assertEqual(traceNames(lastPlot(app)).indexOf('Total Cost EMR (incl. ACA)'), -1);
+});
+
+test('emr: ACA is off by default and the request says so', async () => {
+  const app = await startPage('emr');
+  const posts = app.server.callsMatching('POST', '/api/total-cost');
+  assertEqual(posts[0].body.include_aca, false);
+});
+
+test('emr: ticking Include ACA subsidy sends include_aca on the next run', async () => {
+  const app = await startPage('emr');
+  app.el('include_aca').checked = true;
+  app.server.calls.length = 0;
+  await app.el('run-btn').click();
+  await settle();
+  assertEqual(app.server.callsMatching('POST', '/api/total-cost')[0].body.include_aca, true);
+});
+
+test('emr: a saved scenario with ACA on ticks Include ACA subsidy', async () => {
+  const app = await startPage('emr', (server) => {
+    loadSavedScenario(server);
+    document.getElementById('include_aca').type = 'checkbox';
+    server.scenarios['Plan A'].aca = { include_aca: true };
+  });
+  assertEqual(app.el('include_aca').checked, true);
+});
+
+test('emr: the ACA cliff is drawn and labeled when the response has one', async () => {
+  const app = await startPage('emr', () => {
+    FX.total_cost.planning_signals.aca_cliff_sweep_value = 12345;
+  });
+  const { layout } = lastPlot(app);
+  assertEqual(layout.shapes.map((sh) => sh.x0), [12345]);
+  assertTrue(layout.annotations.some((a) => a.text === 'ACA Cliff $12,345'), 'missing ACA cliff label');
+});
+
+test('emr: no ACA cliff marker when the response has none', async () => {
+  const app = await startPage('emr');
+  const { layout } = lastPlot(app);
+  assertEqual(layout.shapes, []);
+  assertEqual(layout.annotations, []);
+});
+
+test('emr: turning IRMAA lines on keeps the ACA cliff marker', async () => {
+  const app = await startPage('emr', () => {
+    document.getElementById('irmaa-toggle').checked = true;
+    const r = FX.total_cost;
+    r.planning_signals.aca_cliff_sweep_value = 12345;
+    r.irmaa_thresholds = [50000];
+    r.points.irmaa_magi = r.points.income.map((x) => x + 40000);
+  });
+  const update = app.page.plotly.calls.filter((c) => c.name === 'relayout')[0].args[1];
+  assertEqual(update.shapes.map((sh) => sh.x0).sort((a, b) => a - b), [10000, 12345]);
+  assertTrue(update.annotations.some((a) => a.text === 'ACA Cliff $12,345'), 'ACA label lost');
+  assertTrue(update.annotations.some((a) => a.text === 'IRMAA 1'), 'IRMAA label lost');
 });
 
 test('emr: the Lines button redraws with line traces', async () => {
@@ -404,7 +458,7 @@ test('emr: IRMAA lines are drawn after the plot when the toggle is on', async ()
 test('emr: an IRMAA line sits where the sweep MAGI reaches the threshold, not at the raw threshold', async () => {
   const app = await startPage('emr', () => {
     document.getElementById('irmaa-toggle').checked = true;
-    const r = FX.emr;
+    const r = FX.total_cost;
     r.irmaa_thresholds = [50000];
     r.points.irmaa_magi = r.points.income.map((x) => x + 40000); // 40,000 of fixed income
   });
@@ -422,6 +476,7 @@ test('income: the chart uses the configured axis maximum, draws the ACA cliff an
   const app = await startPage('income', () => {
     const response = FX.income_plan_calculate;
     response.points.total_cost_emr = response.points.income.map(() => 0.3);
+    response.points.emr_aca = response.points.income.map(() => 0.1);
     response.planning_signals.aca_cliff_sweep_value = 12345;
   });
   await app.el('calc-btn').click();

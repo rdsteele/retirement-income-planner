@@ -50,6 +50,13 @@ the answers) and update this file.
 - [ ] **IRMAA:** turn the IRMAA option on. The x-axis is *additional* income, so the
       first gray dashed line, labeled "IRMAA 1", should sit at **$69,000** (the first
       IRMAA threshold, $109,000, minus your $40,000 of fixed income).
+- [ ] **ACA:** with Wages `40000`, tick **Include ACA subsidy** and run. A red dotted line
+      labeled "ACA Cliff $22,600" appears (the $62,600 cliff minus your $40,000), and a
+      dotted red **Total Cost EMR (incl. ACA)** line appears in the legend. Untick it and
+      run again: both disappear and the chart is as before.
+- [ ] With ACA ticked and the IRMAA option on, **both** the IRMAA lines and the ACA cliff
+      show. Turn IRMAA off: the ACA cliff stays.
+- [ ] Load a saved scenario that has ACA on: the **Include ACA subsidy** box is ticked.
 
 ## 4. Income Planning
 

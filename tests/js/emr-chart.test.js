@@ -1,6 +1,6 @@
 // Tests for api/static/js/emr-chart.js
 
-// The points an EMR response carries (no total_cost_emr: that exists only for Income).
+// The points of a sweep response with ACA off (total_cost_emr absent).
 function emrPoints() {
   return {
     income: [0, 1000, 2000],
@@ -38,12 +38,17 @@ test('stacked traces work when the response has no total_cost_emr (the EMR page)
 });
 
 test('stacked traces ignore an all-zero total_cost_emr', () => {
-  const pts = { ...emrPoints(), total_cost_emr: [0, 0, 0] };
+  const pts = { ...emrPoints(), total_cost_emr: [0, 0, 0], emr_aca: [0, 0, 0] };
+  assertEqual(names(buildStackedTraces(pts)).indexOf('Total Cost EMR (incl. ACA)'), -1);
+});
+
+test('stacked traces skip the total-cost line when ACA adds nothing (it would only repeat the total)', () => {
+  const pts = { ...emrPoints(), total_cost_emr: [0.1, 0.12, 0.22], emr_aca: [0, 0, 0] };
   assertEqual(names(buildStackedTraces(pts)).indexOf('Total Cost EMR (incl. ACA)'), -1);
 });
 
 test('stacked traces add the ACA total-cost line, dotted and unstacked, when present', () => {
-  const pts = { ...emrPoints(), total_cost_emr: [0.1, 0.5, 0.22] };
+  const pts = { ...emrPoints(), total_cost_emr: [0.1, 0.5, 0.22], emr_aca: [0, 0.4, 0] };
   const traces = buildStackedTraces(pts);
   const last = traces[traces.length - 1];
   assertEqual(last.name, 'Total Cost EMR (incl. ACA)');
@@ -62,7 +67,7 @@ test('line traces: components, then the bold Total EMR line', () => {
 
 test('line traces add the ACA total-cost line last, only when present', () => {
   assertEqual(names(buildLineTraces(emrPoints())).indexOf('Total Cost EMR (incl. ACA)'), -1);
-  const traces = buildLineTraces({ ...emrPoints(), total_cost_emr: [0.1, 0.5, 0.22] });
+  const traces = buildLineTraces({ ...emrPoints(), total_cost_emr: [0.1, 0.5, 0.22], emr_aca: [0, 0.4, 0] });
   assertEqual(names(traces).slice(-2), ['Total EMR', 'Total Cost EMR (incl. ACA)']);
 });
 
@@ -170,4 +175,18 @@ test('irmaa lines: thresholds out of range are dropped and the rest keep their n
 test('irmaa lines: empty without thresholds or points', () => {
   assertEqual(irmaaLines([], { income: [0], irmaa_magi: [0] }), []);
   assertEqual(irmaaLines([100], { income: [], irmaa_magi: [] }), []);
+});
+
+test('aca cliff markers: a dotted red line and a label at the cliff', () => {
+  const { shapes, annotations } = acaCliffMarkers({ aca_cliff_sweep_value: 12345 });
+  assertEqual(shapes.length, 1);
+  assertEqual([shapes[0].x0, shapes[0].x1, shapes[0].yref], [12345, 12345, 'paper']);
+  assertEqual(shapes[0].line.dash, 'dot');
+  assertEqual(annotations.map((a) => [a.x, a.text]), [[12345, 'ACA Cliff $12,345']]);
+});
+
+test('aca cliff markers: none without a cliff in the sweep', () => {
+  assertEqual(acaCliffMarkers({ aca_cliff_sweep_value: null }), { shapes: [], annotations: [] });
+  assertEqual(acaCliffMarkers({}), { shapes: [], annotations: [] });
+  assertEqual(acaCliffMarkers(undefined), { shapes: [], annotations: [] });
 });

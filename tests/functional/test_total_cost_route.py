@@ -51,6 +51,18 @@ _BASE_ACA = {
 }
 
 
+# ── Default sweep ceiling: same hint fields the EMR route returns ─────────
+
+
+class TestDefaultSweepCeilingFields:
+    def test_matches_the_emr_route(self):
+        emr = client.post("/api/emr", json={k: v for k, v in _BASE.items() if k != "include_aca"})
+        total = client.post("/api/total-cost", json=_BASE)
+        assert total.status_code == 200
+        assert total.json()["default_sweep_ceiling"] == emr.json()["default_sweep_ceiling"]
+        assert total.json()["default_sweep_ceiling_rate"] == emr.json()["default_sweep_ceiling_rate"]
+
+
 # ── Test 1: Happy path — include_aca=False ───────────────────────────────
 
 

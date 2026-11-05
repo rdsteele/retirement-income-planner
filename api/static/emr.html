@@ -361,6 +361,12 @@
               <input type="number" id="sweep_step" min="1" step="100">
             </div>
 
+            <!-- ACA toggle -->
+            <div class="checkbox-row">
+              <input type="checkbox" id="include_aca">
+              <label for="include_aca">Include ACA subsidy</label>
+            </div>
+
             <!-- Ohio toggle -->
             <div class="checkbox-row">
               <input type="checkbox" id="include_ohio">
@@ -552,6 +558,7 @@
       sweep_ceiling:                    ceilVal ? parseFloat(ceilVal) : null,
       sweep_step:                       fnum('sweep_step') || null,
       include_ohio:                     el('include_ohio').checked,
+      include_aca:                      el('include_aca').checked,
       ohio_medical_deduction:           fnum('ohio_medical_deduction'),
       ohio_qualifying_retirement_income: fnum('ohio_qualifying_retirement_income'),
     };
@@ -564,7 +571,7 @@
     runBtn.textContent = 'Running…';
 
     try {
-      lastResult = await postJson('/api/emr', buildPayload());
+      lastResult = await postJson('/api/total-cost', buildPayload());
       updateSweepCeilingHint();
       renderSignals(lastResult.planning_signals);
       chartSection.style.display = 'block';
@@ -678,17 +685,24 @@
     }));
   }
 
+  // The shapes and annotations for a re-layout: the IRMAA lines (when shown) plus the
+  // ACA cliff, which stays on the chart either way.
+  function overlayMarkers(showIrmaa) {
+    const cliff = acaCliffMarkers(lastResult?.planning_signals);
+    const { lines, adjusted } = effectiveIrmaaLines();
+    return {
+      shapes:      [...buildIrmaaShapes(lines, showIrmaa), ...cliff.shapes],
+      annotations: [...buildIrmaaAnnotations(lines, showIrmaa, adjusted), ...cliff.annotations],
+    };
+  }
+
   // Re-applies IRMAA shapes/annotations to an already-rendered chart.
   function rerenderIrmaa() {
     if (!lastResult) return;
     const show = irmaaToggle.checked;
     if (!show) return;
-    const { lines, adjusted } = effectiveIrmaaLines();
     const currentRange = document.getElementById('chart').layout?.xaxis?.range;
-    const update = {
-      shapes:      buildIrmaaShapes(lines, true),
-      annotations: buildIrmaaAnnotations(lines, true, adjusted),
-    };
+    const update = overlayMarkers(true);
     if (currentRange) {
       update['xaxis.range']     = currentRange;
       update['xaxis.autorange'] = false;
@@ -700,19 +714,18 @@
     const xTitle = lastResult && lastResult.sweep_mode === 'preferential'
       ? 'Additional Preferential Income ($)'
       : 'Additional Ordinary Income ($)';
-    // IRMAA lines are drawn after the plot (see renderChart), so none are laid out here
-    return { ...buildBaseLayout(xTitle, CONFIG.yAxisMaxEMR), shapes: [], annotations: [] };
+    // IRMAA lines are drawn after the plot (see renderChart); the ACA cliff is laid out here
+    const cliff = acaCliffMarkers(lastResult?.planning_signals);
+    return { ...buildBaseLayout(xTitle, CONFIG.yAxisMaxEMR), ...cliff };
   }
 
   async function renderChart() {
     if (!lastResult) return;
     await drawChart(lastResult.points, buildLayout());
     if (irmaaToggle.checked) {
-      const { lines, adjusted } = effectiveIrmaaLines();
       const currentRange = document.getElementById('chart').layout.xaxis.range;
       Plotly.relayout('chart', {
-        shapes:            buildIrmaaShapes(lines, true),
-        annotations:       buildIrmaaAnnotations(lines, true, adjusted),
+        ...overlayMarkers(true),
         'xaxis.range':     currentRange,
         'xaxis.autorange': false,
       });
@@ -727,18 +740,15 @@
     if (!lastResult) return;
     const show = irmaaToggle.checked;
     if (show) {
-      const { lines, adjusted } = effectiveIrmaaLines();
       const currentRange = document.getElementById('chart').layout.xaxis.range;
       Plotly.relayout('chart', {
-        shapes:              buildIrmaaShapes(lines, true),
-        annotations:         buildIrmaaAnnotations(lines, true, adjusted),
+        ...overlayMarkers(true),
         'xaxis.range':       currentRange,
         'xaxis.autorange':   false,
       });
     } else {
       Plotly.relayout('chart', {
-        shapes:            [],
-        annotations:       [],
+        ...overlayMarkers(false),
         'xaxis.autorange': true,
       });
     }

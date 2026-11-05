@@ -334,7 +334,7 @@ function makeAppServer(F = __FIXTURES) {
     return scenarioRoutes(method, url, body);
   };
   server.handle('POST', '/api/tax', ok(F.tax));
-  server.handle('POST', '/api/emr', ok(F.emr));
+  server.handle('POST', '/api/total-cost', ok(F.total_cost));
   server.handle('POST', '/api/income-plan/summary', ok(F.income_plan_summary));
   server.handle('POST', '/api/income-plan/calculate', ok(F.income_plan_calculate));
   return server;

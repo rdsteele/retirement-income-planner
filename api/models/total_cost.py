@@ -77,6 +77,8 @@ class TotalCostResponse(BaseModel):
     tax_year: int
     points: TotalCostPoints
     irmaa_thresholds: list[float]
+    default_sweep_ceiling: float
+    default_sweep_ceiling_rate: float
     aca_cliff_magi: float
     aptc_annual_max: float
     cliff_sweep_value: float

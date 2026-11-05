@@ -2,6 +2,8 @@
  "aca_cliff_magi": 62600.0,
  "aptc_annual_max": 7489.0,
  "cliff_sweep_value": 12700.0,
+ "default_sweep_ceiling": 201775.0,
+ "default_sweep_ceiling_rate": 0.24,
  "filing_status": "single",
  "irmaa_thresholds": [
   109000.0,

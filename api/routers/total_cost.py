@@ -14,7 +14,8 @@ from api.models.total_cost import (
     TotalCostResponse,
 )
 from api.routers.emr import _to_bracket_distance_responses
-from services.emr import SweepMode
+from services.data_loader import get_default_sweep_ceiling_bracket_rate
+from services.emr import SweepMode, get_default_sweep_ceiling
 from services.emr import compute_planning_signals as _compute_service_signals
 from services.income_inputs import IncomeInputs
 from services.total_cost import TotalCostResult, calculate_total_cost
@@ -25,6 +26,14 @@ router = APIRouter()
 
 _D = Decimal
 _ZERO = 0.0
+
+
+def _default_sweep_ceiling_fields(filing_status: str, tax_year: int) -> dict[str, float]:
+    """The default sweep ceiling and its bracket rate, for the pages' ceiling hint."""
+    return {
+        "default_sweep_ceiling": float(get_default_sweep_ceiling(filing_status, tax_year)),
+        "default_sweep_ceiling_rate": float(get_default_sweep_ceiling_bracket_rate()),
+    }
 
 
 def _to_decimal(value: float) -> Decimal:
@@ -180,6 +189,7 @@ def post_total_cost(request: TotalCostRequest):
         tax_year=request.tax_year,
         points=_build_points(result),
         irmaa_thresholds=[float(t) for t in result.irmaa_thresholds],
+        **_default_sweep_ceiling_fields(request.filing_status, request.tax_year),
         aca_cliff_magi=float(result.aca_cliff_magi),
         aptc_annual_max=float(result.aptc_annual_max),
         cliff_sweep_value=float(result.cliff_sweep_value),

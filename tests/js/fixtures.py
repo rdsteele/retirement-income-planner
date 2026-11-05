@@ -83,8 +83,8 @@ def build_fixtures() -> dict[str, object]:
         "config": client.get("/api/config").json(),
         "tax_years": client.get("/api/tax-years").json(),
         "tax": client.post("/api/tax", json={**_INCOME, **ctx, "include_ohio": True}).json(),
-        "emr": client.post(
-            "/api/emr", json={**_INCOME, **ctx, **sweep, "sweep_mode": "ordinary"}
+        "total_cost": client.post(
+            "/api/total-cost", json={**_INCOME, **ctx, **sweep, "sweep_mode": "ordinary"}
         ).json(),
         "income_plan_summary": client.post("/api/income-plan/summary", json=plan).json(),
         "income_plan_calculate": client.post("/api/income-plan/calculate", json=plan).json(),

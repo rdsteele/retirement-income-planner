@@ -9,6 +9,7 @@ from api.models.income_plan import IncomePlanRequest, PlanSummaryResponse
 from api.models.total_cost import TotalCostResponse
 from api.routers.total_cost import (
     _build_points,
+    _default_sweep_ceiling_fields,
     _compute_planning_signals,
     _to_decimal_or_none,
 )
@@ -146,6 +147,7 @@ def post_income_plan_calculate(request: IncomePlanRequest):
         tax_year=request.tax_year,
         points=_build_points(result),
         irmaa_thresholds=[float(t) for t in result.irmaa_thresholds],
+        **_default_sweep_ceiling_fields(request.filing_status, request.tax_year),
         aca_cliff_magi=float(result.aca_cliff_magi),
         aptc_annual_max=float(result.aptc_annual_max),
         cliff_sweep_value=float(result.cliff_sweep_value),

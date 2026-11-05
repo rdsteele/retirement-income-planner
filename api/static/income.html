@@ -1348,20 +1348,9 @@
     }
 
     // ACA cliff vertical line
-    if (signals?.aca_cliff_sweep_value != null) {
-      const c = signals.aca_cliff_sweep_value;
-      shapes.push({
-        type: 'line', x0: c, x1: c, y0: 0, y1: 1, yref: 'paper',
-        line: { color: '#dc2626', dash: 'dot', width: 2 },
-      });
-      annotations.push({
-        x: c, y: 0.97, yref: 'paper',
-        text: 'ACA Cliff ' + fmt$(c),
-        showarrow: false,
-        font: { size: 11, color: '#dc2626', weight: 'bold' },
-        xanchor: 'left', yanchor: 'top',
-      });
-    }
+    const cliff = acaCliffMarkers(signals);
+    shapes.push(...cliff.shapes);
+    annotations.push(...cliff.annotations);
 
     return {
       ...buildBaseLayout('Additional Ordinary Income ($)', CONFIG.yAxisMaxEMR),

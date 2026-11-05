@@ -3,7 +3,7 @@
 // The effective-marginal-rate chart pieces shared by the Income and EMR pages: the
 // component list, the stacked-area and line trace builders, the base layout, drawing,
 // and the Stacked/Lines toggle. Each page adds what is specific to it (Income draws
-// IRMAA and ACA markers into the layout; EMR draws IRMAA after the plot).
+// IRMAA markers into the layout; EMR draws them after the plot).
 // Depends on common.js. Declarations only: nothing runs at load time.
 
 // Component metadata: response key, legend label, color.
@@ -23,10 +23,10 @@ function visibleComponents(pts) {
   return EMR_COMPONENTS.filter((comp) => !allZero(pts.components[comp.key]));
 }
 
-// The ACA-inclusive total as a dotted line (its spike is kept out of the stack). Only
-// Income's response carries total_cost_emr; null when it is absent or all zero.
+// The ACA-inclusive total as a dotted line (its spike is kept out of the stack). Null
+// unless the subsidy loss adds something: with ACA off it would only repeat the total.
 function totalCostTrace(pts) {
-  if (!pts.total_cost_emr || allZero(pts.total_cost_emr)) return null;
+  if (!pts.total_cost_emr || !pts.emr_aca || allZero(pts.emr_aca)) return null;
   return {
     type: 'scatter',
     x: pts.income,
@@ -93,6 +93,26 @@ function buildBaseLayout(xTitle, yMax) {
     legend: { orientation: 'h', y: -0.25 },
     margin: { t: 20, b: 80, l: 60, r: 20 },
     hovermode: 'x unified',
+  };
+}
+
+// The ACA cliff as a dotted red line with a label, from the response's planning signals.
+// Empty when ACA is off or the cliff is outside the sweep.
+function acaCliffMarkers(signals) {
+  const cliff = signals?.aca_cliff_sweep_value;
+  if (cliff === null || cliff === undefined) return { shapes: [], annotations: [] };
+  return {
+    shapes: [{
+      type: 'line', x0: cliff, x1: cliff, y0: 0, y1: 1, yref: 'paper',
+      line: { color: '#dc2626', dash: 'dot', width: 2 },
+    }],
+    annotations: [{
+      x: cliff, y: 0.97, yref: 'paper',
+      text: 'ACA Cliff ' + fmt$(cliff),
+      showarrow: false,
+      font: { size: 11, color: '#dc2626', weight: 'bold' },
+      xanchor: 'left', yanchor: 'top',
+    }],
   };
 }
 
