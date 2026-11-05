@@ -29,7 +29,12 @@ Scenarios for checking this tool against the Retirement Researcher (RR) Tax Calc
 
 ### What the runways mean here
 
-For an ordinary target of 22%, RR lets ordinary income fill the 22% bracket (a marginal rate equal to the target is allowed, above it is not), so the matching runway is the "To 24%" badge, unless something raises the rate first (gains pushed into 15%, the torpedo, or the itemized medical floor). For the first run (S4) both are $0, and S1 matched on the "LTCG Bump Ordinary Runway" badge. For a preferential target of 0%, it is the "0% LTCG Space" badge. These are the bracket-only runways. RR's amounts may be smaller when other costs push the marginal rate over a target first: the 3.8% NIIT, gains pushed into the 15% bracket, the Social Security torpedo, or ACA. A difference there is expected; the *reason* is what we want to learn.
+The two tools' runways are different things, so they are not expected to match:
+
+- **RR's Roth Conversion and LTCG Harvest amounts** are *suggestions*. They are the amount you can add before the effective marginal rate (EMR) passes the target you typed, and the EMR includes everything that moves tax: the Social Security torpedo, gains pushed into the 15% bracket, NIIT, the ACA subsidy, and the itemized medical floor.
+- **This tool's badges** ("To 22%", "To 24%", "0% LTCG Space", "LTCG Bump Ordinary Runway") are *helpers that show the space left* in the brackets. They do not recommend an amount. The decision (cap AGI to avoid a high EMR, or push through to the next step) is made from the EMR chart.
+
+So the comparison is: (1) the Initial column must match exactly; (2) where the two runways differ, the reason should be an EMR effect the badges don't include; (3) the other two columns are checked by running this tool at RR's amounts.
 
 ## Tax scenarios
 
@@ -290,6 +295,8 @@ Provisional income (PI) = other income + tax-exempt interest + half the benefit.
 | Roth Conversion Amount ("To 24%" badge) | see badge |
 | LTCG Harvest Amount (0% space) | $49,450 |
 
+**Result (run):** every figure matched (taxable Social Security $500, AGI $14,500, tax $0). RR Roth $87,400 equals "To 24%". RR LTCG Harvest $3,200 versus this tool's bracket-only space $49,450: harvested gains pull in half as much Social Security, which fills the unused $1,600 of standard deduction after $3,200 of gains; beyond that each gain dollar adds taxable benefit at 10%, above the 0% target.
+
 ### SS2 (P1): Social Security: the 85% zone
 
 PI 40,000: 4,500 + 85% x 6,000.
@@ -314,6 +321,8 @@ PI 40,000: 4,500 + 85% x 6,000.
 | Federal preferential tax | $0 |
 | Roth Conversion Amount ("To 24%" badge) | see badge |
 | LTCG Harvest Amount (0% space) | $30,950 |
+
+**Result (run):** every figure matched (taxable Social Security $9,600, AGI $34,600, tax $1,972). RR runways $0 and $0: in the 85% zone the 12% bracket costs about 22.2% per dollar, just over the 22% target. This tool shows "To 24%" $71,300 and 0% LTCG Space $30,950, bracket-only ceilings. Note SS4 passed through the same zone; RR appears to test the rate where it starts (15% in SS4, 22.2% here).
 
 ### SS3 (P1): Social Security: capped at 85% of the benefit
 
@@ -396,6 +405,8 @@ PI 10,000 + 8,000 + 12,000 = 30,000: 50% x 5,000 (it would be $0 without the mun
 | Roth Conversion Amount ("To 24%" badge) | see badge |
 | LTCG Harvest Amount (0% space) | $49,450 |
 
+**Result (run):** every figure matched (taxable Social Security $2,500, AGI $12,500, tax $0; RR shows taxable income $-3,600, this tool floors it at $0). RR Roth $91,400 equals "To 24%". RR LTCG Harvest $5,882 versus bracket-only $49,450: the same torpedo effect as SS1 (3,600 of unused deduction absorbed by the added taxable benefit: 2,000 over the first 4,000 of gains, then 85 cents per dollar).
+
 ### SS6 (P2): Social Security with adjustments
 
 PI 26,000 + 15,000 = 41,000: 4,500 + 85% x 7,000.
@@ -425,25 +436,58 @@ PI 26,000 + 15,000 = 41,000: 4,500 + 85% x 7,000.
 
 ### SS7 (P1): Social Security and the ACA
 
-The ACA counts the **whole** benefit in MAGI, taxable or not (IRS Pub. 974); this tool does. Same inputs as SS4, but with ACA **Yes**, household 1, full premium **$12,456**, benchmark **$12,456**.
+**Why this run:** the IRS counts the *whole* Social Security benefit in ACA MAGI, taxable or not (IRS Pub. 974). This tool does. The run shows whether RR does too.
 
-**Enter in RR:** Household Social Security Benefits **$24,000**; Additional Ordinary Income [Not Investment] **$20,000**; Targets Ordinary **22%**, Preferential **0%**.
+Same income as SS4, with the ACA turned on.
+
+**Enter in RR:**
+
+| Field | Value |
+|---|---|
+| Filing status | Single |
+| Age | 61 |
+| Medicare months in 2028 | 0 |
+| Do you qualify for ACA premium subsidies | **Yes** |
+| Household size | **1** |
+| Household location | **Contiguous 48 states & DC** |
+| Full (pre-subsidy) premium per year | **$12,456** |
+| Benchmark plan full subsidy amount per year | **$12,456** |
+| Household Social Security Benefits | **$24,000** |
+| Additional Ordinary Income [Not Investment] | **$20,000** |
+| Proposed EMR target, ordinary | **22%** |
+| Proposed EMR target, preferential | **0%** |
+
+Everything else stays $0.
 
 **Enter in this tool** (Single, 2026; all other fields $0):
 
-- Social Security Benefit: **$24,000**
-- Wages / Pension: **$20,000**
-- Income Planning page: ACA on (the tool uses its own schedule; no premium or benchmark to enter)
+| Field | Value |
+|---|---|
+| Social Security Benefit | **$24,000** |
+| Wages / Pension | **$20,000** |
+| Include ACA subsidy calculation (Income Planning page) | **On** (the tool uses its own schedule; no premium or benchmark to enter) |
 
-| Expected, Initial column | This tool |
+**What to expect:**
+
+| Item | Expected |
 |---|---|
 | Taxable Social Security | $3,500 |
-| ACA MAGI (whole benefit) | $44,000 |
-| **Lost ACA Subsidy** (IRS formula) | **$4,130.26** |
-| Tool's annual subsidy | $8,321 (implied lost $4,135) |
-| If RR counted only the taxable benefit: MAGI / Lost subsidy | $23,500 / $986.46 |
+| AGI | $23,500 |
+| Federal tax | $740 |
+| ACA MAGI (includes the whole benefit) | **$44,000** |
 
-If RR matches the last row, RR counts only taxable Social Security in ACA MAGI. That would be a defect in RR, not here: the IRS adds the nontaxable portion back.
+**The key row, Lost ACA Subsidy in RR's Initial column:**
+
+| If RR... | Lost ACA Subsidy | ACA MAGI |
+|---|---|---|
+| counts the whole benefit (the IRS rule) | **$4,130.26** | $44,000 |
+| counts only the taxable $3,500 | $986.46 | $23,500 |
+
+This tool: annual subsidy $8,321, so $4,135 lost, within $5 of the IRS figure.
+
+A result of $986.46 would mean RR leaves out the nontaxable part of the benefit. That would be a defect in RR, not in this tool.
+
+**Result (run):** RR Lost ACA Subsidy **$4,130.26**, so RR counts the whole benefit, as the IRS does. This tool: APTC $693 a month, ACA MAGI $44,000, about $4,140 lost (within $10). Taxable Social Security, AGI ($23,500), taxable income ($7,400) and federal tax ($740) matched. RR runways were $0 and $0 (the subsidy cost is over the targets); this tool shows "To 24%" $81,400 and 0% LTCG Space $42,050 as bracket-only ceilings.
 
 ## ACA runs
 
@@ -471,6 +515,10 @@ In RR: ACA subsidies **Yes**, household **1**, full premium **$12,456**, benchma
 | **Lost ACA Subsidy** (IRS formula) | **$5,478.00** |
 | Tool's annual subsidy | $6,984 (implied lost $5,472) |
 
+**Result (run):** Lost ACA Subsidy RR $5,478.00 versus this tool $5,472 (annual subsidy $6,984), a $6 difference. RR Roth Conversion Amount $7,600 equals the distance to the cliff (above 300% of the poverty level the subsidy costs 9.96% plus the 12% bracket = 21.96%, within the 22% target).
+
+Re-run: federal tax $4,420 and taxable income $38,900 matched; this tool shows Distance to Cliff $7,600, 0% LTCG Space $10,550 (RR harvest $0 because of the ACA cost).
+
 ### A3 (P1): Exactly 400% of the poverty level, MAGI $62,600
 
 Exactly at the cutoff. The IRS table says "not more than 400%", so this is still eligible; this tool now agrees (it zeroes the subsidy only above the cliff dollar).
@@ -496,6 +544,8 @@ Exactly at the cutoff. The IRS table says "not more than 400%", so this is still
 | Tool's annual subsidy | $6,240 (implied lost $6,216) |
 
 **Result (run):** RR counts MAGI $62,600 as eligible (lost subsidy $6,234.96), as the IRS reads it. This tool showed $0 APTC before the fix; it now shows $6,240 a year. Federal tax $5,332 matched. RR Roth/harvest were $0 because the next dollar loses the whole remaining subsidy.
+
+**Re-run after the fix:** APTC $520 a month and "Distance to Cliff $0 under" (RR still eligible, lost $6,234.96; this tool about $6,216). Federal tax $5,332 matched.
 
 ### A4 (P1): $400 over the cutoff, MAGI $63,000
 
@@ -543,6 +593,8 @@ Exactly at the cutoff. The IRS table says "not more than 400%", so this is still
 | **Lost ACA Subsidy** (IRS formula) | **$1,164.92** |
 | Tool's annual subsidy | $11,292 (implied lost $1,164) |
 
+**Result (run):** Lost ACA Subsidy RR $1,164.92 versus this tool $1,164 (annual subsidy $11,292); federal tax $890 matched; RR runways $0 and $0 because the subsidy phase-out cost is over the targets.
+
 ### A5 (P2): Below the schedule, MAGI $18,000
 
 This tool's schedule starts at 22,000 (below that is the Medicaid range), so it returns no subsidy; RR's formula should give a full subsidy.
@@ -567,9 +619,32 @@ This tool's schedule starts at 22,000 (below that is the Medicaid range), so it 
 | **Lost ACA Subsidy** (IRS formula) | **$378.00** |
 | Tool's annual subsidy | $0 (implied lost $12,456) |
 
+**Result (run):** the first RR run had $8,000 of tax-exempt interest left over from SS5 (RR showed $1,291.59, the formula value at ACA income $26,000). Clean re-run: RR Lost ACA Subsidy **$378.00** (2.10% of $18,000), federal tax $190 matched, AGI $18,000. This tool returns no subsidy below the start of its schedule; RR has no Medicaid range. RR's Roth amount stopped at $2,814 (AGI $20,814, about 133% of the poverty level, where the applicable percentage starts rising).
+
 ## Exploratory: IRMAA (P3)
 
 This tool draws IRMAA threshold lines but does not price the surcharge, so there is nothing to match. The goal is to learn which thresholds RR uses. **Enter in RR:** Additional Ordinary Income [Not Investment] **$110,000**, Medicare months in 2028 **12**, ACA **No**, then **$105,000**. Record whether and how much IRMAA RR charges at each. This tool's first 2026 threshold is $109,000.
+
+## EMR sweep versus RR's amounts
+
+I ran this tool's EMR sweep (ordinary mode for conversions, preferential mode for harvests, ACA runs through total cost) at each scenario's inputs and compared where the EMR crosses the target against RR's amounts. The EMR is smoothed over a 500 look-ahead, so a step shows as a ramp that ends at the true point.
+
+| Run | RR amount | This tool's EMR sweep | Agree |
+|---|---|---|---|
+| SS1 harvest | $3,200 | 0% until 3,200, then 5% (10% bracket x 0.5 torpedo) | yes |
+| SS5 harvest | $5,882 | 0% until about 5,900, then climbs | yes |
+| SS4 harvest | $0 | 5% from the first dollar | yes |
+| S7 harvest | $5,050 | 0% until 5,050, then 15% | yes |
+| S1 convert | $17,050 | 12%, then 27% from 17,050 | yes |
+| S7 convert | $61,300 | 12%, 22% from 6,000, 24% bracket from 61,300 | yes |
+| SS2 convert | $0 | 22.2% from the first dollar | yes |
+| SS4 convert | $81,400 | 15% rising to 22.2% (plateau to 20,000), then 12% | RR passes the plateau |
+| A2 convert | $7,600 | about 21.8%, spike at 7,600 (the cliff) | yes |
+| A1 convert | $0 | about 22.4% from the first dollar | yes |
+| SS7 convert | $0 | about 32% from the first dollar | yes |
+| SS7 harvest | $0 | about 22% from the first dollar | yes |
+
+One case differs in a small way: in SS4 the EMR sits at 22.2% (12% x 1.85) across the torpedo, just over the 22% target, and RR still converts through it, while in SS2 the same 22.2% from the start gives RR $0. RR appears to react to the rate at the start (SS4 starts at 15%) and to jumps, not to a plateau a fraction of a point over the target.
 
 ## Known limitation (found in S6)
 
