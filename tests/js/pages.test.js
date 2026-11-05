@@ -195,6 +195,72 @@ test('income: Calculate sends the configured ceiling, lets the server pick the s
   assertTrue(app.page.plotly.calls.some((c) => c.name === 'newPlot'), 'Plotly.newPlot was not called');
 });
 
+// A ticked Include Ohio State Tax box, as in the real page's markup.
+const ohioTicked = () => {
+  document.getElementById('include_ohio').type = 'checkbox';
+  document.getElementById('include_ohio').checked = true;
+};
+
+test('income: Calculate includes Ohio tax while the box is ticked', async () => {
+  const app = await startPage('income', ohioTicked);
+  await app.el('calc-btn').click();
+  await settle();
+  assertEqual(app.server.callsMatching('POST', '/api/income-plan/calculate')[0].body.include_ohio, true);
+});
+
+test('income: unticking Include Ohio State Tax leaves Ohio out of Calculate', async () => {
+  const app = await startPage('income', ohioTicked);
+  app.el('include_ohio').checked = false;
+  await app.el('calc-btn').click();
+  await settle();
+  assertEqual(app.server.callsMatching('POST', '/api/income-plan/calculate')[0].body.include_ohio, false);
+});
+
+test('income: the Ohio retirement income field is hidden while Ohio tax is off', async () => {
+  const app = await startPage('income', ohioTicked);
+  app.el('include_ohio').checked = false;
+  await app.el('include_ohio').dispatch('change');
+  assertEqual(app.el('ohio-retirement-wrap').classList.contains('hidden'), true);
+  app.el('include_ohio').checked = true;
+  await app.el('include_ohio').dispatch('change');
+  assertEqual(app.el('ohio-retirement-wrap').classList.contains('hidden'), false);
+});
+
+test('income: changing the Ohio box makes the estimated taxes stale until Calculate', async () => {
+  const app = await startPage('income', ohioTicked);
+  await app.el('calc-btn').click();
+  await settle();
+  app.timers.runPending(); // the summary refresh is debounced
+  await settle();
+  assertTrue(app.el('ohio-taxes-display').textContent !== '—', 'taxes should show after Calculate');
+  app.el('include_ohio').checked = false;
+  await app.el('include_ohio').dispatch('change');
+  app.timers.runPending();
+  await settle();
+  assertEqual(app.el('ohio-taxes-display').textContent, '—');
+});
+
+test('income: a saved scenario with Ohio tax off unticks the box', async () => {
+  const app = await startPage('income', (server) => {
+    ohioTicked();
+    server.scenarios['Plan A'] = { name: 'Plan A', ohio: { include_ohio: false } };
+    server.current = 'Plan A';
+  });
+  assertEqual(app.el('include_ohio').checked, false);
+  assertEqual(app.el('ohio-retirement-wrap').classList.contains('hidden'), true);
+});
+
+test('income: Save As stores the Ohio setting', async () => {
+  const app = await startPage('income', () => {
+    ohioTicked();
+    globalThis.prompt = () => 'Plan B';
+  });
+  app.el('include_ohio').checked = false;
+  await app.el('save-as-btn').click();
+  await settle();
+  assertEqual(app.server.scenarios['Plan B'].ohio.include_ohio, false);
+});
+
 test('income: Calculate shows the server error on failure and re-enables the button', async () => {
   const app = await startPage('income', (server) => server.failOn('POST', '/api/income-plan/calculate', 500));
   await app.el('calc-btn').click();

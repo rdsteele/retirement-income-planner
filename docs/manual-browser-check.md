@@ -78,6 +78,11 @@ the answers) and update this file.
 - [ ] Reload the page. ZZ Test loads again with your fields filled.
 - [ ] Open **EMR** and **Tax Detail**. Both show `📋 ZZ Test` and pre-fill from it (EMR's
       pension field shows 20000 and its Social Security field shows 24000).
+- [ ] **Ohio toggle:** open **Adjustments**. **Include Ohio State Tax** is ticked and the
+      Ohio Qualifying Retirement Income field shows. Click Calculate, then untick the box:
+      the field disappears and the Federal/Ohio tax figures in Expenses go back to "—".
+      Calculate again: Ohio Taxes reads $0 and the chart has no Ohio band.
+- [ ] Save a scenario with the box unticked, reload the page: it is still unticked.
 
 ## 5. Scenarios page
 
