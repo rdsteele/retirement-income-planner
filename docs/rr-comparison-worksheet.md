@@ -35,7 +35,7 @@ RR's Roth Conversion and LTCG Harvest amounts are suggestions based on the effec
 
 With itemized medical expenses, this tool treats Additional Deductions as fixed, so its runway is too long when the medical floor is binding (see "Known limitation" at the end). It does not change the tax at a given income.
 
-Scenarios for checking this tool against the Retirement Researcher (RR) Tax Calculator. All use **Single, tax year 2026**. Expected values come from this tool (federal only; RR has no state tax).
+Scenarios for checking this tool against the Retirement Researcher (RR) Tax Calculator. All use **Single, tax year 2026**, except the "Married filing jointly scenarios" section. Expected values come from this tool (federal only; RR has no state tax).
 
 ## How RR works (and what to enter)
 
@@ -655,6 +655,177 @@ This tool's schedule starts at 22,000 (below that is the Medicaid range), so it 
 | Tool's annual subsidy | $0 (implied lost $12,456) |
 
 **Result (run):** the first RR run had $8,000 of tax-exempt interest left over from SS5 (RR showed $1,291.59, the formula value at ACA income $26,000). Clean re-run: RR Lost ACA Subsidy **$378.00** (2.10% of $18,000), federal tax $190 matched, AGI $18,000. This tool returns no subsidy below the start of its schedule; RR has no Medicaid range. RR's Roth amount stopped at $2,814 (AGI $20,814, about 133% of the poverty level, where the applicable percentage starts rising).
+
+## Married filing jointly scenarios
+
+The scenarios above are all Single. These repeat the areas where the MFJ numbers differ (different bracket, deduction, NIIT, Social Security and ACA data) so the joint data and its wiring are checked against RR too. The calculation code is shared with Single; only the data behind each filing status differs.
+
+**How to read the tables:** the expected values are this tool's own output, hand-checked. Compare RR's Initial column to the tax lines (AGI, taxable income, ordinary tax, preferential tax, NIIT, taxable Social Security) and expect them to match exactly. The runway rows are this tool's bracket-only badges; RR's Roth Conversion and LTCG Harvest amounts are EMR-based and are expected to differ (often $0), so record RR's amounts in the result but don't expect them to equal the badges.
+
+**Setup:** in RR choose Filing Status **Married Filing Jointly**, both spouses age **61** (**62** for the Social Security runs), Medicare months in 2028 **0**, ACA **No** (except the ACA-runs), everything not listed **$0**. In this tool choose **Married Filing Jointly**, tax year 2026, all other fields $0. Targets: Ordinary **22%**, Preferential **0%**. Not modeled, and not tested: the extra 65+ deduction and the senior deduction. All expected values were hand-checked against the 2026 joint brackets (standard deduction 32,200; 10% to 24,800; 12% to 100,800; 22% to 211,400; 0% gains to 98,900; NIIT above 250,000; Social Security thresholds 32,000 and 44,000).
+
+### M1 (P1): Gains stacking across the joint 0%/15% line
+
+Taxable ordinary income is 8,800, which leaves 90,100 of 0% space; gains of 106,000 put 15,900 into the 15% bracket.
+
+**Inputs** (everything not listed is $0)
+
+| Income | RR field | Enter in RR | This tool field | Enter in this tool |
+|---|---|---|---|---|
+| Wages / pension | Additional Ordinary Income [Not Investment] | $40,000 | Pension / Annuity (Taxable) on Income Planning; Wages / Pension elsewhere | $40,000 |
+| Interest | Taxable Interest | $1,000 | Taxable Interest | $1,000 |
+| Total dividends | Ordinary Dividends (total, qualified included) | $6,000 | Non-Qualified Dividends | $0 |
+| Qualified dividends | Qualified Dividends | $6,000 | Qualified Dividends | $6,000 |
+| Long-term gains | Realized Long-Term Capital Gains | $100,000 | Capital Gains (LT) | $100,000 |
+
+**Expected, Initial column** (this tool)
+
+| Line | Expected |
+|---|---|
+| AGI | $147,000 |
+| Taxable income | $114,800 (ordinary $8,800 + preferential $106,000) |
+| Federal ordinary tax | $880 |
+| Federal preferential tax | $2,385 (15% of $15,900) |
+| NIIT | $0 |
+| Roth Conversion Amount ("To 22%" badge) | $92,000 |
+| LTCG Harvest Amount (0% space) | already past ($0) |
+
+**Result (run):** every figure matched, with both tools set to Married Filing Jointly (age 61 each). RR: AGI $147,000, taxable income $114,800, ordinary tax $880, preferential tax $2,385, total $3,265, NIIT and lost ACA subsidy $0. This tool: the same figures (taxable ordinary $8,800, preferential $106,000, 0% gains space used $90,100 and $15,900 taxed at 15%).
+
+Runways differ for the usual reason. RR's Roth Conversion Amount is **$0** and LTCG Harvest **-$1**: its ordinary EMR starts at 25% (10% bracket plus 15% from pushing gains out of the 0% bracket), above the 22% target. This tool's badges are bracket-only space ("To 22%" $92,000, "To 24%" $202,600), and its EMR sweep shows the same 25% from the first dollar and 27% from about $16,000. A first run with the tool set to Single (and Ohio ticked) differed only because of the setup; the Ohio tax ($3,554 here) is not part of the RR comparison.
+
+### M2 (P2): Ordinary income through the 22% bracket
+
+**Inputs** (everything not listed is $0)
+
+| Income | RR field | Enter in RR | This tool field | Enter in this tool |
+|---|---|---|---|---|
+| Wages / pension | Additional Ordinary Income [Not Investment] | $150,000 | Wages / Pension | $150,000 |
+
+**Expected, Initial column** (this tool)
+
+| Line | Expected |
+|---|---|
+| AGI | $150,000 |
+| Taxable income | $117,800 |
+| Federal ordinary tax | $15,340 (2,480 + 9,120 + 3,740) |
+| Federal preferential tax | $0 |
+| Roth Conversion Amount ("To 24%" badge) | $93,600 |
+| LTCG Harvest Amount (0% space) | already past ($0) |
+
+**Result (run):** _fill in_
+
+### M3 (P1): NIIT: crossing the joint 250,000
+
+NII is 130,000 (interest, qualified dividends, other investment, gains) and MAGI is 310,000, so NIIT is 3.8% of the 60,000 excess.
+
+**Inputs** (everything not listed is $0)
+
+| Income | RR field | Enter in RR | This tool field | Enter in this tool |
+|---|---|---|---|---|
+| Wages / pension | Additional Ordinary Income [Not Investment] | $180,000 | Wages / Pension (not Other Investment Income) | $180,000 |
+| Interest | Taxable Interest | $20,000 | Taxable Interest | $20,000 |
+| Other investment income | Additional Ordinary Income [Investment] | $20,000 | Other Investment Income | $20,000 |
+| Total dividends | Ordinary Dividends (total, qualified included) | $20,000 | Non-Qualified Dividends | $0 |
+| Qualified dividends | Qualified Dividends | $20,000 | Qualified Dividends | $20,000 |
+| Long-term gains | Realized Long-Term Capital Gains | $70,000 | Capital Gains (LT) | $70,000 |
+
+**Expected, Initial column** (this tool)
+
+| Line | Expected |
+|---|---|
+| AGI | $310,000 |
+| Taxable income | $277,800 (ordinary $187,800 + preferential $90,000) |
+| Federal ordinary tax | $30,740 |
+| Federal preferential tax | $13,500 (15% of $90,000) |
+| NIIT | $2,280 |
+| Roth Conversion Amount ("To 24%" badge) | $23,600 |
+| LTCG Harvest Amount (0% space) | already past ($0) |
+
+**Result (run):** every tax figure matched (Married Filing Jointly, both age 61, Ohio unticked in this tool). RR and this tool: AGI $310,000, taxable income $277,800, ordinary tax $30,740, preferential tax $13,500, NIIT $2,280, total $46,520. Runways differ for the usual reason: RR's Roth Conversion and LTCG Harvest are both **$0** because the ordinary rate is already 25.8% (22% bracket plus 3.8% NIIT), above the 22% target. This tool's EMR chart shows the same stack (22% ordinary plus NIIT), and its badges show the bracket-only space ("At 22%+", "To 24%" $23,600).
+
+### SS-M1 (P1): Social Security: the 85% zone, joint thresholds
+
+Use RR age **62** for both spouses. Provisional income = 35,000 + 20,000 (half the benefit) = 55,000, which is 11,000 over the second threshold (44,000): 6,000 + 85% x 11,000 = 15,350.
+
+**Inputs** (everything not listed is $0)
+
+| Income | RR field | Enter in RR | This tool field | Enter in this tool |
+|---|---|---|---|---|
+| Social Security | Household Social Security Benefits (annual) | $40,000 | Social Security Benefit | $40,000 |
+| Wages / pension | Additional Ordinary Income [Not Investment] | $35,000 | Pension / Annuity (Taxable) and (Gross) on Income Planning; Wages / Pension elsewhere | $35,000 |
+
+**Expected, Initial column** (this tool)
+
+| Line | Expected |
+|---|---|
+| **Taxable Social Security** (hand-checked) | **$15,350** |
+| AGI | $50,350 |
+| Taxable income | $18,150 |
+| Federal ordinary tax | $1,815 |
+| Federal preferential tax | $0 |
+| Roth Conversion Amount ("To 22%" badge) | $64,000 |
+| LTCG Harvest Amount (0% space) | $80,750 |
+
+RR's runways will differ from the badges (the torpedo raises the marginal rate), as in SS1 to SS4. Compare taxable Social Security and the tax lines exactly.
+
+**Result (run):** every tax figure matched (Married Filing Jointly, both age 62, ACA off). RR and this tool: taxable Social Security $15,350, AGI $50,350, taxable income $18,150, ordinary tax $1,815, preferential tax $0, NIIT $0. This confirms the joint 32,000 and 44,000 thresholds.
+
+Runways: RR Roth Conversion Amount is **$174,600**, which equals this tool's "To 24%" badge exactly (RR's run ends at taxable income $211,400, the top of the 22% bracket, AGI $243,600, tax $35,932, with all Social Security taxable at $34,000). RR passes through the torpedo band to the 24% bracket, as it did in SS4; this tool's "To 22%" badge ($64,000) stops where the torpedo's 22.2% starts. RR LTCG Harvest is **$0** versus this tool's 0% LTCG Space of $80,750: gains raise taxable Social Security, so RR's effective rate on the first harvested dollar is above its 0% target (same reason as SS1 to SS4). RR's EMR map (18.5%, then 22.2%, then 12%, then 22%) and this tool's chart (torpedo band, then 12%, then 22%) show the same shape; the exact break points were not compared. Ohio was ticked in this tool's screens ($446); it is not part of the RR comparison.
+
+### SS-M2 (P1): Social Security: capped at 85%, joint
+
+Provisional income = 70,000 + 18,000 = 88,000 would give 43,400, but the cap is 85% x 36,000 = 30,600. Use RR age **62** for both spouses.
+
+**Inputs** (everything not listed is $0)
+
+| Income | RR field | Enter in RR | This tool field | Enter in this tool |
+|---|---|---|---|---|
+| Social Security | Household Social Security Benefits (annual) | $36,000 | Social Security Benefit | $36,000 |
+| Wages / pension | Additional Ordinary Income [Not Investment] | $70,000 | Pension / Annuity (Taxable) and (Gross) on Income Planning; Wages / Pension elsewhere | $70,000 |
+
+**Expected, Initial column** (this tool)
+
+| Line | Expected |
+|---|---|
+| **Taxable Social Security** (hand-checked) | **$30,600** |
+| AGI | $100,600 |
+| Taxable income | $68,400 |
+| Federal ordinary tax | $7,712 |
+| Federal preferential tax | $0 |
+| Roth Conversion Amount ("To 22%" badge) | $32,400 |
+| LTCG Harvest Amount (0% space) | $30,500 |
+
+**Result (run):** every figure matched (Married Filing Jointly, both age 62, ACA off). RR and this tool: taxable Social Security $30,600 (the 85% cap), AGI $100,600, taxable income $68,400, ordinary tax $7,712, preferential tax $0, NIIT $0.
+
+Runways also matched this time, because Social Security is already fully taxable (no torpedo), so nothing in RR's EMR differs from the brackets: RR Roth Conversion Amount **$143,000** equals this tool's "To 24%" badge, and RR LTCG Harvest **$30,500** equals this tool's 0% LTCG Space (RR's harvest column: taxable income $98,900, tax unchanged at $7,712). This tool's "To 22%" badge is $32,400. Ohio was ticked in this tool's screens ($1,422); it is not part of the RR comparison.
+
+### ACA runs, joint (P2)
+
+Only worth running if RR's ACA section accepts a household of **2**. The joint schedule in `aca_2026.json` implies a household benchmark of about $12,456 a year at every point above 300% of the poverty level (63,450), so the two tools should agree within schedule rounding. This tool uses its own schedule; there is no premium to enter.
+
+**Settings (all three runs)**
+
+| Setting | RR | This tool |
+|---|---|---|
+| ACA | Do you Qualify for ACA Premium Subsidies: **Yes** | Income Planning page: **Include ACA subsidy calculation** ticked |
+| Household | Household size **2**; location **Contiguous 48 states & DC** | (from Married Filing Jointly) |
+| Premium | Full (pre-subsidy) premium per year **$12,456**; benchmark plan full subsidy amount per year **$12,456** | not needed |
+| Income field | Additional Ordinary Income [Not Investment] | Wages / Pension |
+
+**Runs**
+
+| Run | MAGI to enter (RR and this tool) | Federal tax | RR Lost ACA Subsidy (9.96% x MAGI) | This tool's annual subsidy (implied lost) |
+|---|---|---|---|---|
+| A-M1, mid-range | $75,000 | $4,640 | $7,470.00 | $4,992 ($7,464) |
+| A-M2, exactly 400% | $84,600 | $5,792 | $8,426.16 | $4,092 ($8,364) |
+| A-M3, $400 over | $85,000 | $5,840 | $12,456.00 | $0 ($12,456) |
+
+- A-M1 should agree within the same few dollars of schedule rounding seen in the Single runs.
+- **A-M2 is expected to differ by about $62.** The schedule's last real point is 84,000, and this tool holds that subsidy flat up to the cliff (84,600), so it is about $62 above RR's formula. In the Single runs the last point was 100 below the cliff, so the gap was only about $19. This is the schedule's spacing, not a calculation error; adding a point near the cliff would close it.
+- A-M3: both tools lose the whole subsidy above the cliff.
+
+**Result (run):** _fill in_
 
 ## Exploratory: IRMAA (P3)
 
