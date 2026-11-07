@@ -10,7 +10,28 @@
   },
   "applicable_percentage_400pct": "0.1022",
   "aptc_schedule": {
-    "single": [],
-    "mfj": []
+    "single": [
+      {"magi": 22500, "monthly_aptc": 1312},
+      {"magi": 25000, "monthly_aptc": 1286},
+      {"magi": 27500, "monthly_aptc": 1258},
+      {"magi": 30000, "monthly_aptc": 1228},
+      {"magi": 32500, "monthly_aptc": 1195},
+      {"magi": 35000, "monthly_aptc": 1163},
+      {"magi": 37500, "monthly_aptc": 1129},
+      {"magi": 40000, "monthly_aptc": 1093},
+      {"magi": 42500, "monthly_aptc": 1058},
+      {"magi": 45000, "monthly_aptc": 1020},
+      {"magi": 47500, "monthly_aptc": 981},
+      {"magi": 50000, "monthly_aptc": 956},
+      {"magi": 52500, "monthly_aptc": 935},
+      {"magi": 55000, "monthly_aptc": 914},
+      {"magi": 57500, "monthly_aptc": 893},
+      {"magi": 60000, "monthly_aptc": 871},
+      {"magi": 62500, "monthly_aptc": 850},
+      {"magi": 63840, "monthly_aptc": 0}
+    ],
+    "mfj": [
+      {"magi": 86560, "monthly_aptc": 0}
+    ]
   }
 }
