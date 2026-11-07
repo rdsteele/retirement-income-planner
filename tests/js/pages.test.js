@@ -11,8 +11,8 @@ let FX = null; // fixtures for the current test
 function testFixtures() {
   const fixtures = JSON.parse(JSON.stringify(__FIXTURES));
   fixtures.config.filing_statuses = [
-    { value: 'alpha', label: 'Alpha Status' },
-    { value: 'beta', label: 'Beta Status' },
+    { value: 'alpha', label: 'Alpha Status', filers: 1 },
+    { value: 'beta', label: 'Beta Status', filers: 2 },
   ];
   fixtures.tax_years = { years: [2031, 2032], default_year: 2032 };
   fixtures.config.irmaa_lookback_years = 3;
@@ -591,4 +591,73 @@ test('income: the Lines button redraws with line traces', async () => {
   await app.el('btn-lines').click();
   await settle();
   assertTrue(traceNames(lastPlot(app)).indexOf('Total EMR') !== -1);
+});
+
+// ── Age 65 or older (extra standard deduction) ────────────────────────────
+
+const JOINT_STATUS = () => FX.config.filing_statuses.find((s) => s.filers > 1).value;
+
+for (const name of ['income', 'emr', 'tax']) {
+  test(`${name}: the spouse checkbox shows only for a status with more than one filer`, async () => {
+    const app = await startPage(name);
+    assertEqual(app.el('spouse-65-wrap').classList.contains('hidden'), true);
+    app.el('filing_status').value = JOINT_STATUS();
+    await app.el('filing_status').dispatch('change');
+    assertEqual(app.el('spouse-65-wrap').classList.contains('hidden'), false);
+  });
+}
+
+test('tax: the 65 or older boxes are sent with the request', async () => {
+  const app = await startPage('tax');
+  assertEqual(app.server.callsMatching('POST', '/api/tax')[0].body.taxpayer_65_plus, false);
+  document.getElementById('taxpayer_65_plus').checked = true;
+  document.getElementById('spouse_65_plus').checked = true;
+  app.server.calls.length = 0;
+  await document.getElementById('taxpayer_65_plus').dispatch('change');
+  await settle();
+  const body = app.server.callsMatching('POST', '/api/tax')[0].body;
+  assertEqual([body.taxpayer_65_plus, body.spouse_65_plus], [true, true]);
+});
+
+test('emr: ticking Age 65 or older sends taxpayer_65_plus on the next run', async () => {
+  const app = await startPage('emr');
+  document.getElementById('taxpayer_65_plus').checked = true;
+  app.server.calls.length = 0;
+  await app.el('run-btn').click();
+  await settle();
+  assertEqual(app.server.callsMatching('POST', '/api/total-cost')[0].body.taxpayer_65_plus, true);
+});
+
+test('income: Calculate sends the 65 or older boxes', async () => {
+  const app = await startPage('income');
+  document.getElementById('taxpayer_65_plus').checked = true;
+  await app.el('calc-btn').click();
+  await settle();
+  const body = app.server.callsMatching('POST', '/api/income-plan/calculate')[0].body;
+  assertEqual([body.taxpayer_65_plus, body.spouse_65_plus], [true, false]);
+});
+
+test('income: Save As stores the 65 or older boxes with the inputs', async () => {
+  const app = await startPage('income', () => {
+    globalThis.prompt = () => 'Plan C';
+  });
+  document.getElementById('taxpayer_65_plus').checked = true;
+  await app.el('save-as-btn').click();
+  await settle();
+  const inputs = app.server.scenarios['Plan C'].inputs;
+  assertEqual([inputs.taxpayer_65_plus, inputs.spouse_65_plus], [true, false]);
+});
+
+test('income: a saved scenario restores the boxes and shows the spouse box for a joint status', async () => {
+  const app = await startPage('income', (server) => {
+    document.getElementById('taxpayer_65_plus').type = 'checkbox';
+    document.getElementById('spouse_65_plus').type = 'checkbox';
+    server.scenarios['Plan D'] = {
+      name: 'Plan D',
+      inputs: { filing_status: JOINT_STATUS(), taxpayer_65_plus: true, spouse_65_plus: true },
+    };
+    server.current = 'Plan D';
+  });
+  assertEqual([document.getElementById('taxpayer_65_plus').checked, document.getElementById('spouse_65_plus').checked], [true, true]);
+  assertEqual(app.el('spouse-65-wrap').classList.contains('hidden'), false);
 });

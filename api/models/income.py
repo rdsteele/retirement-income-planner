@@ -26,6 +26,8 @@ class IncomeInputsRequest(BaseModel):
     tax_exempt_interest: float = Field(default=0.0, ge=0)
     above_the_line_adjustments: float = Field(default=0.0, ge=0)
     additional_deductions: float = Field(default=0.0, ge=0)
+    taxpayer_65_plus: bool = False
+    spouse_65_plus: bool = False
 
     def _taxable_pension(self) -> Decimal:
         return Decimal(str(self.pension))

@@ -13,6 +13,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import TypedDict
 
+from services.aged_deduction import additional_standard_deduction
 from services.common import round_rate, round_tax
 from services.data_loader import (
     get_default_sweep_ceiling_bracket_rate,
@@ -91,8 +92,10 @@ class _TaxSnapshot:
     total_tax: Decimal
 
 
-def _get_standard_deduction(filing_status: str, tax_year: int) -> Decimal:
-    return Decimal(load_federal_data(tax_year)["standard_deduction"][filing_status])
+def _get_standard_deduction(income: IncomeInputs, filing_status: str, tax_year: int) -> Decimal:
+    """The standard deduction, increased for filers aged 65 or older."""
+    base = Decimal(load_federal_data(tax_year)["standard_deduction"][filing_status])
+    return base + additional_standard_deduction(income, filing_status, tax_year)
 
 
 def _get_irmaa_thresholds(filing_status: str, tax_year: int) -> list[Decimal]:
@@ -596,7 +599,7 @@ def calculate_emr(
     require_supported_filing_status(filing_status)
 
     # Load data-driven defaults
-    std_deduction = _get_standard_deduction(filing_status, tax_year)
+    std_deduction = _get_standard_deduction(income, filing_status, tax_year)
     niit_threshold, niit_rate = load_niit_parameters(filing_status, tax_year)
     irmaa_thresholds = _get_irmaa_thresholds(filing_status, tax_year)
 
@@ -807,7 +810,7 @@ def compute_planning_signals(
 ) -> PlanningSignals:
     """Compute planning signals from an EMR result and the income it was run with."""
     pts = result.points
-    std_deduction = _get_standard_deduction(result.filing_status, result.tax_year)
+    std_deduction = _get_standard_deduction(income, result.filing_status, result.tax_year)
     ltcg_already_used = income.fixed_preferential
     ss_taxable_at_floor = pts[0].ss_taxable if pts else _ZERO
 

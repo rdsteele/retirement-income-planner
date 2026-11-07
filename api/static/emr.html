@@ -301,7 +301,7 @@
             <div class="field"><label>Tax-Deferred Distributions</label><input type="number" id="ira_distributions" min="0" step="1" placeholder="0"><span class="field-hint">Traditional IRA/401k withdrawals, RMDs, and Roth conversions (1040 line 4b)</span></div>
             <div class="field"><label>Other Investment Income</label><input type="number" id="other_investment_ordinary" min="0" step="1" placeholder="0"><span class="field-hint">Rental, royalties, non-qualified annuity earnings; ordinary income that counts toward NIIT</span></div>
             <div class="field"><label>Above-the-Line Adjustments</label><input type="number" id="above_the_line_adjustments" min="0" step="1" placeholder="0"><span class="field-hint">e.g. HSA contributions, IRA deductions</span></div>
-            <div class="field"><label>Additional Deductions</label><input type="number" id="additional_deductions" min="0" step="1" placeholder="0"><span class="field-hint">e.g. QBI, excess itemized deductions</span></div>
+            <div class="field"><label>Additional Deductions</label><input type="number" id="additional_deductions" min="0" step="1" placeholder="0"><span class="field-hint">Added to the standard deduction (including the 65+ extra). If you itemize, enter only the amount above that standard deduction; enter QBI in full.</span></div>
           </div>
         </details>
 
@@ -341,6 +341,14 @@
             <div class="field">
               <label>Filing Status</label>
               <select id="filing_status"></select>
+            </div>
+            <div class="checkbox-row">
+              <input type="checkbox" id="taxpayer_65_plus">
+              <label for="taxpayer_65_plus">Age 65 or older</label>
+            </div>
+            <div class="checkbox-row" id="spouse-65-wrap">
+              <input type="checkbox" id="spouse_65_plus">
+              <label for="spouse_65_plus">Spouse age 65 or older</label>
             </div>
             <div class="field">
               <label>Tax Year</label>
@@ -498,6 +506,7 @@
     setField('tax_exempt_interest',                inputs.tax_exempt_interest);
     setField('above_the_line_adjustments',         inputs.above_the_line_adjustments);
     setField('additional_deductions',              inputs.additional_deductions);
+    setAgeFlags(inputs);
     setField('include_ohio',                       ohio.include_ohio);
     setField('ohio_medical_deduction',             ohio.gross_medical_expenses);
     setField('gross_medical_expenses',             ohio.gross_medical_expenses);
@@ -550,6 +559,7 @@
       tax_exempt_interest:              fnum('tax_exempt_interest'),
       above_the_line_adjustments:       fnum('above_the_line_adjustments'),
       additional_deductions:            fnum('additional_deductions'),
+      ...ageFlags(),
       sweep_mode:                       el('sweep_mode').value,
       variable_ordinary:                fnum('variable_ordinary'),
       filing_status:                    selectedFilingStatus(),

@@ -31,3 +31,5 @@ class ScenarioSweepInputsResponse(BaseModel):
     tax_exempt_interest: float
     above_the_line_adjustments: float
     additional_deductions: float
+    taxpayer_65_plus: bool
+    spouse_65_plus: bool

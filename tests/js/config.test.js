@@ -15,13 +15,34 @@ test('loadAppConfig rejects when the server fails', async () => {
 test('populateFilingStatuses fills the dropdown from the API and selects the first status', () => {
   const dom = installFakeDocument();
   populateFilingStatuses([
-    { value: 'alpha', label: 'Alpha' },
-    { value: 'beta', label: 'Beta' },
+    { value: 'alpha', label: 'Alpha', filers: 1 },
+    { value: 'beta', label: 'Beta', filers: 2 },
   ]);
   assertEqual(
     dom.filing_status.children.map((o) => [o.value, o.textContent, o.selected]),
     [['alpha', 'Alpha', true], ['beta', 'Beta', false]],
   );
+});
+
+test('the spouse age checkbox shows only for a status with more than one filer', async () => {
+  const dom = installFakeDocument();
+  populateFilingStatuses([
+    { value: 'alpha', label: 'Alpha', filers: 1 },
+    { value: 'beta', label: 'Beta', filers: 2 },
+  ]);
+  assertEqual(dom['spouse-65-wrap'].classList.contains('hidden'), true);
+  dom.filing_status.value = 'beta';
+  await dom.filing_status.dispatch('change');
+  assertEqual(dom['spouse-65-wrap'].classList.contains('hidden'), false);
+});
+
+test('ageFlags reads both checkboxes, and setAgeFlags restores them', () => {
+  installFakeDocument();
+  document.getElementById('taxpayer_65_plus').type = 'checkbox';
+  document.getElementById('spouse_65_plus').type = 'checkbox';
+  assertEqual(ageFlags(), { taxpayer_65_plus: false, spouse_65_plus: false });
+  setAgeFlags({ taxpayer_65_plus: true, spouse_65_plus: true });
+  assertEqual(ageFlags(), { taxpayer_65_plus: true, spouse_65_plus: true });
 });
 
 test('loadTaxYears fills the dropdown and selects the default year from the API', async () => {

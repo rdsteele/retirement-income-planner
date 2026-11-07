@@ -260,6 +260,8 @@ class TestSweepInputs:
             "tax_exempt_interest",
             "above_the_line_adjustments",
             "additional_deductions",
+            "taxpayer_65_plus",
+            "spouse_65_plus",
         }
 
     def test_withdrawals_are_folded_into_income(self):

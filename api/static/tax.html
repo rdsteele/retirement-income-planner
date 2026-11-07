@@ -281,7 +281,7 @@
           <summary>Adjustments &amp; Deductions</summary>
           <div class="section-body">
             <div class="field field-wide"><label>Above-the-Line Adjustments</label><input type="number" id="above_the_line_adjustments" min="0" step="1" placeholder="0"><span class="field-hint">1040 Line 10</span></div>
-            <div class="field field-wide"><label>Additional Deductions</label><input type="number" id="additional_deductions" min="0" step="1" placeholder="0"><span class="field-hint">Beyond standard deduction</span></div>
+            <div class="field field-wide"><label>Additional Deductions</label><input type="number" id="additional_deductions" min="0" step="1" placeholder="0"><span class="field-hint">Added to the standard deduction (including the 65+ extra). If you itemize, enter only the amount above that standard deduction; enter QBI in full.</span></div>
           </div>
         </details>
 
@@ -292,6 +292,14 @@
             <div class="field">
               <label>Filing Status</label>
               <select id="filing_status"></select>
+            </div>
+            <div class="checkbox-row">
+              <input type="checkbox" id="taxpayer_65_plus">
+              <label for="taxpayer_65_plus">Age 65 or older</label>
+            </div>
+            <div class="checkbox-row" id="spouse-65-wrap">
+              <input type="checkbox" id="spouse_65_plus">
+              <label for="spouse_65_plus">Spouse age 65 or older</label>
             </div>
             <div class="field">
               <label>Tax Year</label>
@@ -421,6 +429,7 @@
       tax_exempt_interest:              fnum('tax_exempt_interest'),
       above_the_line_adjustments:       fnum('above_the_line_adjustments'),
       additional_deductions:            fnum('additional_deductions'),
+      ...ageFlags(),
       filing_status:                    selectedFilingStatus(),
       tax_year:                         selectedTaxYear(),
       include_ohio:                     el('include_ohio').checked,
@@ -478,6 +487,7 @@
       summaryRow('Above-the-Line Adjustments',  fmtDeduction(s.above_the_line_adjustments)) +
       summaryRow('AGI',                         fmtDollar(s.agi),                   { bold: true, divider: true }) +
       summaryRow('Standard Deduction',          fmtDeduction(s.standard_deduction)) +
+      summaryRow('Additional Standard Deduction (65+)', fmtDeduction(s.age_deduction), { hidden: s.age_deduction === 0 }) +
       summaryRow('Additional Deductions',       fmtDeduction(s.additional_deductions), { hidden: addlDedZero }) +
       summaryRow('Taxable Income (Ordinary)',   fmtDollar(s.taxable_ordinary),      { bold: true, divider: true }) +
       summaryRow('Taxable Income (Preferential)', fmtDollar(s.taxable_preferential), { bold: true });
@@ -557,6 +567,8 @@
     calculate();
   });
 
+  ['taxpayer_65_plus', 'spouse_65_plus'].forEach(id => el(id).addEventListener('change', calculate));
+
   // ── Blur triggers on all inputs ───────────────────────────────────────────
   document.querySelectorAll('input[type="number"], select').forEach(input => {
     input.addEventListener('blur', calculate);
@@ -585,6 +597,7 @@
     setField('tax_exempt_interest',               inputs.tax_exempt_interest);
     setField('above_the_line_adjustments',        inputs.above_the_line_adjustments);
     setField('additional_deductions',             inputs.additional_deductions);
+    setAgeFlags(inputs);
     setField('wages',                             inputs.wages);
     setField('include_ohio',                      ohio.include_ohio);
     setField('gross_medical_expenses',            ohio.gross_medical_expenses);

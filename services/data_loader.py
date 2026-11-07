@@ -12,6 +12,7 @@ from pathlib import Path
 
 _DATA_DIR = Path(__file__).parent.parent / "data"
 _BRACKETS_DIR = _DATA_DIR / "brackets"
+_DEDUCTIONS_DIR = _DATA_DIR / "deductions"
 _SS_PATH = _DATA_DIR / "ss_thresholds.json"
 _CONFIG_PATH = _DATA_DIR / "config.json"
 
@@ -35,6 +36,15 @@ def load_ohio_data(tax_year: int) -> dict:
 
 
 @lru_cache(maxsize=None)
+def load_aged_deduction_data(tax_year: int) -> dict:
+    path = _DEDUCTIONS_DIR / f"aged_{tax_year}.json"
+    if not path.exists():
+        raise ValueError(f"No age deduction data for tax year: {tax_year}")
+    with path.open() as f:
+        return json.load(f)
+
+
+@lru_cache(maxsize=None)
 def load_ss_data() -> dict:
     with _SS_PATH.open() as f:
         return json.load(f)
@@ -49,6 +59,15 @@ def load_config() -> dict:
 def supported_filing_statuses() -> list[str]:
     """Return the filing status values the application supports (from config.json)."""
     return [status["value"] for status in load_config()["filing_statuses"]]
+
+
+def filer_count(filing_status: str) -> int:
+    """Return how many people file on a return of this status (from config.json)."""
+    require_supported_filing_status(filing_status)
+    for status in load_config()["filing_statuses"]:
+        if status["value"] == filing_status:
+            return int(status["filers"])
+    raise ValueError(f"Unsupported filing status: {filing_status!r}")
 
 
 def require_supported_filing_status(filing_status: str) -> None:

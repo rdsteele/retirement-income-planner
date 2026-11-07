@@ -32,6 +32,7 @@ class InputsSummary(BaseModel):
     above_the_line_adjustments: float
     agi: float
     standard_deduction: float
+    age_deduction: float
     additional_deductions: float
     taxable_ordinary: float
     taxable_preferential: float

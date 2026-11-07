@@ -76,7 +76,9 @@ def get_scenario_sweep_inputs(name: str) -> ScenarioSweepInputsResponse:
         assembled = sweep_inputs_from_scenario(scenario)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    return ScenarioSweepInputsResponse(**{k: float(v) for k, v in asdict(assembled).items()})
+    return ScenarioSweepInputsResponse(
+        **{k: v if isinstance(v, bool) else float(v) for k, v in asdict(assembled).items()}
+    )
 
 
 @router.post("/scenarios/{name}")

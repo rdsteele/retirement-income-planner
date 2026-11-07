@@ -37,6 +37,7 @@
  "inputs_summary": {
   "above_the_line_adjustments": 0.0,
   "additional_deductions": 0.0,
+  "age_deduction": 0.0,
   "agi": 40400.0,
   "gross_ordinary_income": 36600.0,
   "ss_taxable": 0.0,

@@ -8,7 +8,9 @@
  "other_investment_ordinary": 4500.0,
  "pension": 30000.0,
  "qualified_dividends": 800.0,
+ "spouse_65_plus": false,
  "ss_benefit": 0.0,
  "tax_exempt_interest": 0.0,
+ "taxpayer_65_plus": false,
  "wages": 2000.0
 }

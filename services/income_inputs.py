@@ -22,6 +22,11 @@ def to_decimal(value: object) -> Decimal:
         raise ValueError(f"Not a number: {value!r}") from None
 
 
+def _read_field(field_type: type, value: object) -> Decimal | bool:
+    """A flag field reads as a bool; every other field is an amount."""
+    return bool(value) if field_type is bool else to_decimal(value)
+
+
 @dataclass(frozen=True)
 class IncomeInputs:
     pension: Decimal = _ZERO  # taxable portion of pension and annuity income
@@ -36,6 +41,8 @@ class IncomeInputs:
     tax_exempt_interest: Decimal = _ZERO
     above_the_line_adjustments: Decimal = _ZERO
     additional_deductions: Decimal = _ZERO
+    taxpayer_65_plus: bool = False  # aged 65 or older by year end (extra standard deduction)
+    spouse_65_plus: bool = False  # counts only on a return with two filers
 
     @property
     def fixed_ordinary(self) -> Decimal:
@@ -71,5 +78,5 @@ class IncomeInputs:
         ``overrides`` replace values from the mapping (for fields stored under another
         name).
         """
-        amounts = {f.name: to_decimal(values.get(f.name)) for f in fields(cls)}
+        amounts = {f.name: _read_field(f.type, values.get(f.name)) for f in fields(cls)}
         return cls(**{**amounts, **overrides})

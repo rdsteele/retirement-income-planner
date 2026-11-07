@@ -69,6 +69,7 @@ def _to_response(request: TaxRequest, result: TaxDetailResult) -> TaxResponse:
             above_the_line_adjustments=float(income.above_the_line_adjustments),
             agi=float(income.agi),
             standard_deduction=float(income.standard_deduction),
+            age_deduction=float(income.age_deduction),
             additional_deductions=float(income.additional_deductions),
             taxable_ordinary=float(income.taxable_ordinary),
             taxable_preferential=float(income.taxable_preferential),

@@ -1,10 +1,12 @@
 {
  "filing_statuses": [
   {
+   "filers": 1,
    "label": "Single",
    "value": "single"
   },
   {
+   "filers": 2,
    "label": "Married Filing Jointly",
    "value": "mfj"
   }

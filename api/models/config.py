@@ -6,6 +6,7 @@ from pydantic import BaseModel
 class FilingStatusOption(BaseModel):
     value: str
     label: str
+    filers: int  # people on the return
 
 
 class ConfigResponse(BaseModel):

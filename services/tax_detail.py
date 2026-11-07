@@ -8,6 +8,7 @@ Ohio tax, and combined totals. Pure Python with no knowledge of the API layer.
 from dataclasses import dataclass
 from decimal import Decimal
 
+from services.aged_deduction import additional_standard_deduction
 from services.common import round_rate
 from services.data_loader import load_federal_data
 from services.federal_tax import (
@@ -32,6 +33,7 @@ class IncomeSummary:
     above_the_line_adjustments: Decimal
     agi: Decimal
     standard_deduction: Decimal
+    age_deduction: Decimal  # extra standard deduction for filers 65 or older
     additional_deductions: Decimal
     taxable_ordinary: Decimal
     taxable_preferential: Decimal
@@ -116,9 +118,12 @@ def calculate_tax_detail(
 
     data = load_federal_data(tax_year)
     standard_deduction = Decimal(data["standard_deduction"][filing_status])
+    age_deduction = additional_standard_deduction(income, filing_status, tax_year)
     total_ordinary = gross_ordinary + ss_taxable - above_the_line_adjustments
     taxable_ordinary, taxable_preferential = split_taxable_income(
-        total_ordinary, total_preferential, standard_deduction + additional_deductions
+        total_ordinary,
+        total_preferential,
+        standard_deduction + age_deduction + additional_deductions,
     )
     federal = calculate_federal_tax(
         ordinary_income=taxable_ordinary,
@@ -155,6 +160,7 @@ def calculate_tax_detail(
             above_the_line_adjustments=above_the_line_adjustments,
             agi=agi,
             standard_deduction=standard_deduction,
+            age_deduction=age_deduction,
             additional_deductions=additional_deductions,
             taxable_ordinary=taxable_ordinary,
             taxable_preferential=taxable_preferential,

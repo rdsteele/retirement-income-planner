@@ -41,7 +41,7 @@ def test_returns_ui_settings_from_config():
 def test_returns_filing_statuses_for_dropdowns():
     statuses = client.get("/api/config").json()["filing_statuses"]
     assert statuses
-    assert all(set(s) == {"value", "label"} for s in statuses)
+    assert all(set(s) == {"value", "label", "filers"} for s in statuses)
     assert [s["value"] for s in statuses] == supported_filing_statuses()
 
 

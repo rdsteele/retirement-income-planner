@@ -16,6 +16,8 @@ from api.models.total_cost import TotalCostRequest
 from services.income_inputs import IncomeInputs
 
 _INCOME_FIELDS = {f.name for f in dataclasses.fields(IncomeInputs)}
+_FLAG_FIELDS = {f.name for f in dataclasses.fields(IncomeInputs) if f.type is bool}
+_AMOUNT_FIELDS = _INCOME_FIELDS - _FLAG_FIELDS
 
 
 class TestFieldSetsStayInSync:
@@ -48,9 +50,11 @@ class TestToIncomeInputs:
         )
 
     def test_every_field_is_carried_across(self):
-        values = {name: float(i + 1) for i, name in enumerate(sorted(_INCOME_FIELDS))}
-        income = IncomeInputsRequest(**values).to_income_inputs()
-        assert {n: float(getattr(income, n)) for n in _INCOME_FIELDS} == values
+        values = {name: float(i + 1) for i, name in enumerate(sorted(_AMOUNT_FIELDS))}
+        flags = {name: True for name in _FLAG_FIELDS}
+        income = IncomeInputsRequest(**values, **flags).to_income_inputs()
+        assert {n: float(getattr(income, n)) for n in _AMOUNT_FIELDS} == values
+        assert {n: getattr(income, n) for n in _FLAG_FIELDS} == flags
 
     def test_negative_amounts_are_rejected(self):
         with pytest.raises(ValidationError):

@@ -5,11 +5,13 @@
   "filing_statuses": [
     {
       "value": "single",
-      "label": "Single"
+      "label": "Single",
+      "filers": 1
     },
     {
       "value": "mfj",
-      "label": "Married Filing Jointly"
+      "label": "Married Filing Jointly",
+      "filers": 2
     }
   ],
   "planning_bracket_rates": [

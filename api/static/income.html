@@ -518,6 +518,14 @@
               <label>Filing Status</label>
               <select id="filing_status"></select>
             </div>
+            <div class="checkbox-row">
+              <input type="checkbox" id="taxpayer_65_plus">
+              <label for="taxpayer_65_plus">Age 65 or older</label>
+            </div>
+            <div class="checkbox-row" id="spouse-65-wrap">
+              <input type="checkbox" id="spouse_65_plus">
+              <label for="spouse_65_plus">Spouse age 65 or older</label>
+            </div>
           </div>
         </details>
 
@@ -556,7 +564,7 @@
           <summary>Adjustments</summary>
           <div class="section-body">
             <div class="field field-wide"><label>HSA Contribution</label><input type="number" id="above_the_line_adjustments" min="0" step="1" placeholder="0"><span class="field-hint">Above-the-line deduction; pre-filled from accounts if available</span></div>
-            <div class="field field-wide"><label>Additional Deductions</label><input type="number" id="additional_deductions" min="0" step="1" placeholder="0"><span class="field-hint">e.g. QBI, excess itemized deductions</span></div>
+            <div class="field field-wide"><label>Additional Deductions</label><input type="number" id="additional_deductions" min="0" step="1" placeholder="0"><span class="field-hint">Added to the standard deduction (including the 65+ extra). If you itemize, enter only the amount above that standard deduction; enter QBI in full.</span></div>
             <div class="checkbox-row">
               <input type="checkbox" id="include_ohio" checked>
               <label for="include_ohio">Include Ohio State Tax</label>
@@ -1274,6 +1282,7 @@
       tax_exempt_interest:        fnum('tax_exempt_interest'),
       above_the_line_adjustments: fnum('above_the_line_adjustments'),
       additional_deductions:      fnum('additional_deductions'),
+      ...ageFlags(),
       include_aca:                el('include_aca')?.checked ?? true,
       planned_withdrawals:        gatherPlannedWithdrawals(),
       executed_withdrawals:       gatherExecutedWithdrawalsPayload(),
@@ -1503,6 +1512,7 @@
         tax_exempt_interest:        fnum('tax_exempt_interest'),
         above_the_line_adjustments: fnum('above_the_line_adjustments'),
         additional_deductions:      fnum('additional_deductions'),
+        ...ageFlags(),
       },
       aca: { include_aca: el('include_aca')?.checked ?? true },
       ohio: {
@@ -1529,6 +1539,7 @@
     setField('tax_exempt_interest',        inp.tax_exempt_interest);
     setField('above_the_line_adjustments', inp.above_the_line_adjustments);
     setField('additional_deductions',      inp.additional_deductions);
+    setAgeFlags(inp);
     setField('include_aca',                aca.include_aca);
     const ohio = scenario.ohio || {};
     setField('include_ohio', ohio.include_ohio);
