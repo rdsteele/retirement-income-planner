@@ -1,0 +1,10 @@
+{
+  "first_year": 2025,
+  "last_year": 2028,
+  "amount_per_person": "6000",
+  "phaseout_rate": "0.06",
+  "phaseout_start": {
+    "single": "75000",
+    "mfj": "150000"
+  }
+}

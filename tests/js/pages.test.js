@@ -15,6 +15,7 @@ function testFixtures() {
     { value: 'beta', label: 'Beta Status', filers: 2 },
   ];
   fixtures.tax_years = { years: [2031, 2032], default_year: 2032 };
+  fixtures.config.senior_deduction_years = { first_year: 2030, last_year: 2031 };
   fixtures.config.irmaa_lookback_years = 3;
   fixtures.config.y_axis_max_emr = 0.41;
   fixtures.config.sweep_step_default = 250;
@@ -660,4 +661,41 @@ test('income: a saved scenario restores the boxes and shows the spouse box for a
   });
   assertEqual([document.getElementById('taxpayer_65_plus').checked, document.getElementById('spouse_65_plus').checked], [true, true]);
   assertEqual(app.el('spouse-65-wrap').classList.contains('hidden'), false);
+});
+
+for (const name of ['income', 'emr', 'tax']) {
+  test(`${name}: the senior deduction checkbox follows the tax year the API offered`, async () => {
+    const app = await startPage(name);
+    assertEqual(app.el('senior-deduction-wrap').classList.contains('hidden'), true); // 2032
+    app.el('tax_year').value = '2031';
+    await app.el('tax_year').dispatch('change');
+    assertEqual(app.el('senior-deduction-wrap').classList.contains('hidden'), false);
+  });
+}
+
+test('income: Calculate sends the senior deduction switch', async () => {
+  const app = await startPage('income');
+  document.getElementById('claim_senior_deduction').checked = true;
+  await app.el('calc-btn').click();
+  await settle();
+  const body = app.server.callsMatching('POST', '/api/income-plan/calculate')[0].body;
+  assertEqual(body.claim_senior_deduction, true);
+});
+
+test('emr: the senior deduction switch is part of the request', async () => {
+  const app = await startPage('emr');
+  document.getElementById('claim_senior_deduction').checked = true;
+  app.server.calls.length = 0;
+  await app.el('run-btn').click();
+  await settle();
+  assertEqual(app.server.callsMatching('POST', '/api/total-cost')[0].body.claim_senior_deduction, true);
+});
+
+test('tax: ticking the senior deduction box recalculates with it', async () => {
+  const app = await startPage('tax');
+  document.getElementById('claim_senior_deduction').checked = true;
+  app.server.calls.length = 0;
+  await document.getElementById('claim_senior_deduction').dispatch('change');
+  await settle();
+  assertEqual(app.server.callsMatching('POST', '/api/tax')[0].body.claim_senior_deduction, true);
 });

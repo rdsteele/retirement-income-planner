@@ -28,6 +28,7 @@ class IncomeInputsRequest(BaseModel):
     additional_deductions: float = Field(default=0.0, ge=0)
     taxpayer_65_plus: bool = False
     spouse_65_plus: bool = False
+    claim_senior_deduction: bool = False
 
     def _taxable_pension(self) -> Decimal:
         return Decimal(str(self.pension))

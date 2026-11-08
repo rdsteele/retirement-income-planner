@@ -70,6 +70,7 @@ def _to_response(request: TaxRequest, result: TaxDetailResult) -> TaxResponse:
             agi=float(income.agi),
             standard_deduction=float(income.standard_deduction),
             age_deduction=float(income.age_deduction),
+            senior_deduction=float(income.senior_deduction),
             additional_deductions=float(income.additional_deductions),
             taxable_ordinary=float(income.taxable_ordinary),
             taxable_preferential=float(income.taxable_preferential),

@@ -46,6 +46,7 @@ router in `api/routers/` and its own independent tests.
 | `ohio_tax` | 2025/2026 Ohio tax, tiered exemption, medical deduction, retirement credit |
 | `social_security` | SS taxability, provisional income, torpedo calculation |
 | `aged_deduction` | Extra standard deduction for filers 65 or older (checkboxes, not age); amounts in `data/deductions/aged_{year}.json` |
+| `senior_deduction` | Temporary senior deduction (65+) with income phase-out; years and amounts in `data/senior_deduction.json`; remove when it ends |
 | `income_inputs` | `IncomeInputs`: the forced income and adjustments every calculation starts from, with shared sums |
 | `niit` | Net Investment Income Tax; counts investment income only, not pension/IRA |
 | `scenario_inputs` | Saved scenario → assembled income inputs (withdrawals folded in) for the EMR and Tax pages |
@@ -84,6 +85,7 @@ Default route `/` redirects to `income.html`. `/emr` redirects to `emr.html`.
 - ACA schedule data lives in `data/aca/aca_{year}.json`. Updated annually by the user.
 - User scenarios are stored as JSON in `profile/scenarios/` (gitignored).
 - Age 65+ extra standard deduction amounts live in `data/deductions/aged_{year}.json`, one file per year.
+- The temporary senior deduction lives in `data/senior_deduction.json` (its first and last year, amount, phase-out). The EMR sweep holds it at the starting income.
 - Account data is stored in `profile/accounts.json` (gitignored).
 
 ---

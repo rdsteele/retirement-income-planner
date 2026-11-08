@@ -66,3 +66,11 @@ def test_emr_redirects_to_emr():
     resp = client.get("/emr", follow_redirects=False)
     assert resp.status_code in (301, 302, 307, 308)
     assert "/static/emr.html" in resp.headers["location"]
+
+
+def test_returns_the_senior_deduction_years_from_its_data_file():
+    from services.data_loader import load_senior_deduction_data
+
+    years = client.get("/api/config").json()["senior_deduction_years"]
+    data = load_senior_deduction_data()
+    assert years == {"first_year": data["first_year"], "last_year": data["last_year"]}

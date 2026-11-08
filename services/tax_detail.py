@@ -21,6 +21,7 @@ from services.federal_tax import (
 from services.income_inputs import IncomeInputs
 from services.niit import NIITResult, calculate_niit
 from services.ohio_tax import OhioTaxResult, calculate_ohio_tax
+from services.senior_deduction import senior_deduction
 from services.social_security import calculate_social_security_taxability
 
 _ZERO = Decimal("0")
@@ -34,6 +35,7 @@ class IncomeSummary:
     agi: Decimal
     standard_deduction: Decimal
     age_deduction: Decimal  # extra standard deduction for filers 65 or older
+    senior_deduction: Decimal  # temporary senior deduction, after its income phase-out
     additional_deductions: Decimal
     taxable_ordinary: Decimal
     taxable_preferential: Decimal
@@ -120,10 +122,12 @@ def calculate_tax_detail(
     standard_deduction = Decimal(data["standard_deduction"][filing_status])
     age_deduction = additional_standard_deduction(income, filing_status, tax_year)
     total_ordinary = gross_ordinary + ss_taxable - above_the_line_adjustments
+    agi = total_ordinary + total_preferential
+    senior = senior_deduction(income, filing_status, tax_year, agi)
     taxable_ordinary, taxable_preferential = split_taxable_income(
         total_ordinary,
         total_preferential,
-        standard_deduction + age_deduction + additional_deductions,
+        standard_deduction + age_deduction + senior + additional_deductions,
     )
     federal = calculate_federal_tax(
         ordinary_income=taxable_ordinary,
@@ -132,7 +136,6 @@ def calculate_tax_detail(
         tax_year=tax_year,
     )
 
-    agi = total_ordinary + total_preferential
     niit = calculate_niit(
         magi=agi,
         net_investment_income=income.net_investment_income,
@@ -161,6 +164,7 @@ def calculate_tax_detail(
             agi=agi,
             standard_deduction=standard_deduction,
             age_deduction=age_deduction,
+            senior_deduction=senior,
             additional_deductions=additional_deductions,
             taxable_ordinary=taxable_ordinary,
             taxable_preferential=taxable_preferential,

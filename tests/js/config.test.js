@@ -36,13 +36,36 @@ test('the spouse age checkbox shows only for a status with more than one filer',
   assertEqual(dom['spouse-65-wrap'].classList.contains('hidden'), false);
 });
 
-test('ageFlags reads both checkboxes, and setAgeFlags restores them', () => {
+test('deductionFlags reads both checkboxes, and setDeductionFlags restores them', () => {
   installFakeDocument();
   document.getElementById('taxpayer_65_plus').type = 'checkbox';
   document.getElementById('spouse_65_plus').type = 'checkbox';
-  assertEqual(ageFlags(), { taxpayer_65_plus: false, spouse_65_plus: false });
-  setAgeFlags({ taxpayer_65_plus: true, spouse_65_plus: true });
-  assertEqual(ageFlags(), { taxpayer_65_plus: true, spouse_65_plus: true });
+  document.getElementById('claim_senior_deduction').type = 'checkbox';
+  assertEqual(deductionFlags(), {
+    taxpayer_65_plus: false,
+    spouse_65_plus: false,
+    claim_senior_deduction: false,
+  });
+  setDeductionFlags({ taxpayer_65_plus: true, spouse_65_plus: true, claim_senior_deduction: true });
+  assertEqual(deductionFlags(), {
+    taxpayer_65_plus: true,
+    spouse_65_plus: true,
+    claim_senior_deduction: true,
+  });
+});
+
+test('the senior deduction checkbox shows only for a tax year the deduction covers', async () => {
+  const dom = installFakeDocument();
+  applySeniorDeductionYears({ first_year: 2030, last_year: 2031 });
+  dom.tax_year.value = '2029';
+  await dom.tax_year.dispatch('change');
+  assertEqual(dom['senior-deduction-wrap'].classList.contains('hidden'), true);
+  dom.tax_year.value = '2030';
+  await dom.tax_year.dispatch('change');
+  assertEqual(dom['senior-deduction-wrap'].classList.contains('hidden'), false);
+  dom.tax_year.value = '2032';
+  await dom.tax_year.dispatch('change');
+  assertEqual(dom['senior-deduction-wrap'].classList.contains('hidden'), true);
 });
 
 test('loadTaxYears fills the dropdown and selects the default year from the API', async () => {

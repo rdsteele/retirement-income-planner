@@ -25,24 +25,45 @@ function updateSpouseCheckbox() {
   el('spouse-65-wrap')?.classList.toggle('hidden', !(filers > 1));
 }
 
-// The "65 or older" checkboxes as request fields (the extra standard deduction).
-function ageFlags() {
+// First and last tax year the senior deduction exists, from the API's config.
+let seniorYears = null;
+
+function applySeniorDeductionYears(years) {
+  seniorYears = years;
+  el('tax_year')?.addEventListener('change', updateSeniorCheckbox);
+  updateSeniorCheckbox();
+}
+
+// The senior deduction checkbox shows only for a tax year the deduction covers.
+function updateSeniorCheckbox() {
+  const year = parseInt(el('tax_year')?.value, 10);
+  const covered = seniorYears && year >= seniorYears.first_year && year <= seniorYears.last_year;
+  el('senior-deduction-wrap')?.classList.toggle('hidden', !covered);
+  el('senior-hint')?.classList.toggle('hidden', !covered);
+}
+
+// The age checkboxes and the senior deduction switch as request fields.
+function deductionFlags() {
   return {
     taxpayer_65_plus: Boolean(el('taxpayer_65_plus')?.checked),
     spouse_65_plus: Boolean(el('spouse_65_plus')?.checked),
+    claim_senior_deduction: Boolean(el('claim_senior_deduction')?.checked),
   };
 }
 
-// Restores the checkboxes from saved inputs, then fixes the spouse checkbox's visibility.
-function setAgeFlags(inputs) {
+// Restores the checkboxes from saved inputs, then fixes their visibility.
+function setDeductionFlags(inputs) {
   setField('taxpayer_65_plus', inputs.taxpayer_65_plus);
   setField('spouse_65_plus', inputs.spouse_65_plus);
+  setField('claim_senior_deduction', inputs.claim_senior_deduction);
   updateSpouseCheckbox();
+  updateSeniorCheckbox();
 }
 
 async function loadTaxYears() {
   const data = await apiRequest('/api/tax-years');
   populateSelect('tax_year', data.years, data.default_year);
+  updateSeniorCheckbox();
 }
 
 // Read the dropdowns for a request. These throw, rather than fall back to a guessed

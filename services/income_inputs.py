@@ -43,6 +43,7 @@ class IncomeInputs:
     additional_deductions: Decimal = _ZERO
     taxpayer_65_plus: bool = False  # aged 65 or older by year end (extra standard deduction)
     spouse_65_plus: bool = False  # counts only on a return with two filers
+    claim_senior_deduction: bool = False  # the temporary senior deduction for those filers
 
     @property
     def fixed_ordinary(self) -> Decimal:

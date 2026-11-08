@@ -262,6 +262,7 @@ class TestSweepInputs:
             "additional_deductions",
             "taxpayer_65_plus",
             "spouse_65_plus",
+            "claim_senior_deduction",
         }
 
     def test_withdrawals_are_folded_into_income(self):

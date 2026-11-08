@@ -301,6 +301,10 @@
               <input type="checkbox" id="spouse_65_plus">
               <label for="spouse_65_plus">Spouse age 65 or older</label>
             </div>
+            <div class="checkbox-row" id="senior-deduction-wrap">
+              <input type="checkbox" id="claim_senior_deduction" checked>
+              <label for="claim_senior_deduction">Include senior deduction</label>
+            </div>
             <div class="field">
               <label>Tax Year</label>
               <select id="tax_year"><!-- populated by loadTaxYears() --></select>
@@ -412,6 +416,7 @@
   async function loadConfig() {
     const config = await loadAppConfig();
     populateFilingStatuses(config.filing_statuses);
+    applySeniorDeductionYears(config.senior_deduction_years);
   }
 
   // ── Payload builder ──────────────────────────────────────────────────────
@@ -429,7 +434,7 @@
       tax_exempt_interest:              fnum('tax_exempt_interest'),
       above_the_line_adjustments:       fnum('above_the_line_adjustments'),
       additional_deductions:            fnum('additional_deductions'),
-      ...ageFlags(),
+      ...deductionFlags(),
       filing_status:                    selectedFilingStatus(),
       tax_year:                         selectedTaxYear(),
       include_ohio:                     el('include_ohio').checked,
@@ -488,6 +493,7 @@
       summaryRow('AGI',                         fmtDollar(s.agi),                   { bold: true, divider: true }) +
       summaryRow('Standard Deduction',          fmtDeduction(s.standard_deduction)) +
       summaryRow('Additional Standard Deduction (65+)', fmtDeduction(s.age_deduction), { hidden: s.age_deduction === 0 }) +
+      summaryRow('Senior Deduction',            fmtDeduction(s.senior_deduction), { hidden: s.senior_deduction === 0 }) +
       summaryRow('Additional Deductions',       fmtDeduction(s.additional_deductions), { hidden: addlDedZero }) +
       summaryRow('Taxable Income (Ordinary)',   fmtDollar(s.taxable_ordinary),      { bold: true, divider: true }) +
       summaryRow('Taxable Income (Preferential)', fmtDollar(s.taxable_preferential), { bold: true });
@@ -567,7 +573,7 @@
     calculate();
   });
 
-  ['taxpayer_65_plus', 'spouse_65_plus'].forEach(id => el(id).addEventListener('change', calculate));
+  ['taxpayer_65_plus', 'spouse_65_plus', 'claim_senior_deduction'].forEach(id => el(id).addEventListener('change', calculate));
 
   // ── Blur triggers on all inputs ───────────────────────────────────────────
   document.querySelectorAll('input[type="number"], select').forEach(input => {
@@ -597,7 +603,7 @@
     setField('tax_exempt_interest',               inputs.tax_exempt_interest);
     setField('above_the_line_adjustments',        inputs.above_the_line_adjustments);
     setField('additional_deductions',             inputs.additional_deductions);
-    setAgeFlags(inputs);
+    setDeductionFlags(inputs);
     setField('wages',                             inputs.wages);
     setField('include_ohio',                      ohio.include_ohio);
     setField('gross_medical_expenses',            ohio.gross_medical_expenses);

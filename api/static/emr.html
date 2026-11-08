@@ -350,6 +350,11 @@
               <input type="checkbox" id="spouse_65_plus">
               <label for="spouse_65_plus">Spouse age 65 or older</label>
             </div>
+            <div class="checkbox-row" id="senior-deduction-wrap">
+              <input type="checkbox" id="claim_senior_deduction" checked>
+              <label for="claim_senior_deduction">Include senior deduction</label>
+            </div>
+            <span class="field-hint" id="senior-hint">The senior deduction phases out as income rises; the sweep holds it at the starting income.</span>
             <div class="field">
               <label>Tax Year</label>
               <select id="tax_year">
@@ -446,6 +451,7 @@
   async function loadConfig() {
     const data = await loadAppConfig();
     populateFilingStatuses(data.filing_statuses);
+    applySeniorDeductionYears(data.senior_deduction_years);
     CONFIG.yAxisMaxEMR = data.y_axis_max_emr;
     CONFIG.irmaaLookbackYears = data.irmaa_lookback_years;
     el('sweep_step').value = data.sweep_step_default;
@@ -506,7 +512,7 @@
     setField('tax_exempt_interest',                inputs.tax_exempt_interest);
     setField('above_the_line_adjustments',         inputs.above_the_line_adjustments);
     setField('additional_deductions',              inputs.additional_deductions);
-    setAgeFlags(inputs);
+    setDeductionFlags(inputs);
     setField('include_ohio',                       ohio.include_ohio);
     setField('ohio_medical_deduction',             ohio.gross_medical_expenses);
     setField('gross_medical_expenses',             ohio.gross_medical_expenses);
@@ -559,7 +565,7 @@
       tax_exempt_interest:              fnum('tax_exempt_interest'),
       above_the_line_adjustments:       fnum('above_the_line_adjustments'),
       additional_deductions:            fnum('additional_deductions'),
-      ...ageFlags(),
+      ...deductionFlags(),
       sweep_mode:                       el('sweep_mode').value,
       variable_ordinary:                fnum('variable_ordinary'),
       filing_status:                    selectedFilingStatus(),

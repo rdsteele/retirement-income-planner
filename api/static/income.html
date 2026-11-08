@@ -526,6 +526,11 @@
               <input type="checkbox" id="spouse_65_plus">
               <label for="spouse_65_plus">Spouse age 65 or older</label>
             </div>
+            <div class="checkbox-row" id="senior-deduction-wrap">
+              <input type="checkbox" id="claim_senior_deduction" checked>
+              <label for="claim_senior_deduction">Include senior deduction</label>
+            </div>
+            <span class="field-hint" id="senior-hint">The senior deduction phases out as income rises; the sweep holds it at the starting income.</span>
           </div>
         </details>
 
@@ -813,6 +818,7 @@
   async function loadConfig() {
     const data = await loadAppConfig();
     populateFilingStatuses(data.filing_statuses);
+    applySeniorDeductionYears(data.senior_deduction_years);
     CONFIG.yAxisMaxEMR = data.y_axis_max_emr;
     CONFIG.sweepCeiling = data.income_plan_sweep_ceiling;
   }
@@ -1282,7 +1288,7 @@
       tax_exempt_interest:        fnum('tax_exempt_interest'),
       above_the_line_adjustments: fnum('above_the_line_adjustments'),
       additional_deductions:      fnum('additional_deductions'),
-      ...ageFlags(),
+      ...deductionFlags(),
       include_aca:                el('include_aca')?.checked ?? true,
       planned_withdrawals:        gatherPlannedWithdrawals(),
       executed_withdrawals:       gatherExecutedWithdrawalsPayload(),
@@ -1512,7 +1518,7 @@
         tax_exempt_interest:        fnum('tax_exempt_interest'),
         above_the_line_adjustments: fnum('above_the_line_adjustments'),
         additional_deductions:      fnum('additional_deductions'),
-        ...ageFlags(),
+        ...deductionFlags(),
       },
       aca: { include_aca: el('include_aca')?.checked ?? true },
       ohio: {
@@ -1539,7 +1545,7 @@
     setField('tax_exempt_interest',        inp.tax_exempt_interest);
     setField('above_the_line_adjustments', inp.above_the_line_adjustments);
     setField('additional_deductions',      inp.additional_deductions);
-    setAgeFlags(inp);
+    setDeductionFlags(inp);
     setField('include_aca',                aca.include_aca);
     const ohio = scenario.ohio || {};
     setField('include_ohio', ohio.include_ohio);

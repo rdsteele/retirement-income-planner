@@ -40,6 +40,7 @@
   "age_deduction": 0.0,
   "agi": 40400.0,
   "gross_ordinary_income": 36600.0,
+  "senior_deduction": 0.0,
   "ss_taxable": 0.0,
   "standard_deduction": 16100.0,
   "taxable_ordinary": 20500.0,

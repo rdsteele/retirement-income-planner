@@ -34,6 +34,7 @@ from services.federal_tax import (
 from services.income_inputs import IncomeInputs
 from services.niit import compute_niit, load_niit_parameters
 from services.ohio_tax import calculate_ohio_tax
+from services.senior_deduction import senior_deduction
 from services.social_security import calculate_social_security_taxability
 
 _ZERO = Decimal("0")
@@ -92,10 +93,35 @@ class _TaxSnapshot:
     total_tax: Decimal
 
 
-def _get_standard_deduction(income: IncomeInputs, filing_status: str, tax_year: int) -> Decimal:
-    """The standard deduction, increased for filers aged 65 or older."""
+def _get_standard_deduction(
+    income: IncomeInputs, filing_status: str, tax_year: int, magi: Decimal
+) -> Decimal:
+    """The standard deduction, increased for filers aged 65 or older.
+
+    Includes the senior deduction, which depends on income: it is evaluated once at
+    ``magi`` (the sweep's starting income), so it does not change along the sweep.
+    """
     base = Decimal(load_federal_data(tax_year)["standard_deduction"][filing_status])
-    return base + additional_standard_deduction(income, filing_status, tax_year)
+    return (
+        base
+        + additional_standard_deduction(income, filing_status, tax_year)
+        + senior_deduction(income, filing_status, tax_year, magi)
+    )
+
+
+def _agi_at_point(
+    sweep_value: Decimal,
+    sweep_mode: SweepMode,
+    income: IncomeInputs,
+    variable_ordinary: Decimal,
+    filing_status: str,
+) -> Decimal:
+    """AGI at a sweep point (deductions do not change it)."""
+    total_ordinary, total_preferential = _compute_incomes_at_point(
+        sweep_value, sweep_mode, income, variable_ordinary
+    )
+    ss_taxable, _ = _compute_ss_at_point(total_ordinary, total_preferential, income, filing_status)
+    return total_ordinary + ss_taxable + total_preferential - income.above_the_line_adjustments
 
 
 def _get_irmaa_thresholds(filing_status: str, tax_year: int) -> list[Decimal]:
@@ -599,7 +625,8 @@ def calculate_emr(
     require_supported_filing_status(filing_status)
 
     # Load data-driven defaults
-    std_deduction = _get_standard_deduction(income, filing_status, tax_year)
+    floor_agi = _agi_at_point(sweep_floor, sweep_mode, income, variable_ordinary, filing_status)
+    std_deduction = _get_standard_deduction(income, filing_status, tax_year, floor_agi)
     niit_threshold, niit_rate = load_niit_parameters(filing_status, tax_year)
     irmaa_thresholds = _get_irmaa_thresholds(filing_status, tax_year)
 
@@ -810,7 +837,10 @@ def compute_planning_signals(
 ) -> PlanningSignals:
     """Compute planning signals from an EMR result and the income it was run with."""
     pts = result.points
-    std_deduction = _get_standard_deduction(income, result.filing_status, result.tax_year)
+    floor_agi = pts[0].irmaa_magi - income.tax_exempt_interest if pts else _ZERO
+    std_deduction = _get_standard_deduction(
+        income, result.filing_status, result.tax_year, floor_agi
+    )
     ltcg_already_used = income.fixed_preferential
     ss_taxable_at_floor = pts[0].ss_taxable if pts else _ZERO
 

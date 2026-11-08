@@ -14,6 +14,10 @@
  "income_plan_sweep_ceiling": 150000.0,
  "irmaa_inflation_default": 0.025,
  "irmaa_lookback_years": 2,
+ "senior_deduction_years": {
+  "first_year": 2025,
+  "last_year": 2028
+ },
  "sweep_step_default": 100.0,
  "y_axis_max_emr": 0.5
 }

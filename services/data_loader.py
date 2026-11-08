@@ -15,6 +15,7 @@ _BRACKETS_DIR = _DATA_DIR / "brackets"
 _DEDUCTIONS_DIR = _DATA_DIR / "deductions"
 _SS_PATH = _DATA_DIR / "ss_thresholds.json"
 _CONFIG_PATH = _DATA_DIR / "config.json"
+_SENIOR_DEDUCTION_PATH = _DATA_DIR / "senior_deduction.json"
 
 
 @lru_cache(maxsize=None)
@@ -41,6 +42,12 @@ def load_aged_deduction_data(tax_year: int) -> dict:
     if not path.exists():
         raise ValueError(f"No age deduction data for tax year: {tax_year}")
     with path.open() as f:
+        return json.load(f)
+
+
+@lru_cache(maxsize=None)
+def load_senior_deduction_data() -> dict:
+    with _SENIOR_DEDUCTION_PATH.open() as f:
         return json.load(f)
 
 

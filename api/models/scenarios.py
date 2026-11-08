@@ -33,3 +33,4 @@ class ScenarioSweepInputsResponse(BaseModel):
     additional_deductions: float
     taxpayer_65_plus: bool
     spouse_65_plus: bool
+    claim_senior_deduction: bool
