@@ -827,6 +827,100 @@ Only worth running if RR's ACA section accepts a household of **2**. The joint s
 
 **Result (run):** _fill in_
 
+## Age 65 or older scenarios
+
+These check the additional standard deduction for filers aged 65 or older (2026: $2,050 single; $1,650 per spouse on a joint return). This tool takes it from the "Age 65 or older" and "Spouse age 65 or older" checkboxes instead of an age.
+
+**Why the incomes are high:** RR takes ages, so for a filer aged 65 or older it probably also applies the temporary **senior deduction** from the 2025 tax law ($6,000 per person, reduced by 6% of income over $75,000 single or $150,000 joint). This tool does not model the senior deduction yet. The first three runs use income above the point where that deduction has phased out completely (single $175,000; joint $250,000 for one person, $350,000 for two), so any difference comes from the additional standard deduction alone. The last two runs use lower income on purpose, to learn whether RR applies the senior deduction.
+
+**Setup:** RR Filing Status as shown, ages as shown, Medicare months in 2028 **0**, ACA **No**, everything not listed **$0**, targets Ordinary **22%** and Preferential **0%**. In this tool: tax year 2026, the filing status shown, **Include Ohio State Tax unticked**, and the checkboxes shown. Enter the income in RR as Additional Ordinary Income [Not Investment], and in this tool as Wages / Pension. Compare the tax lines (AGI, taxable income, ordinary tax); runways are bracket-only in this tool and are expected to differ.
+
+### AG1 (P1): Single, age 66
+
+| Setting | RR | This tool |
+|---|---|---|
+| Age | first person **66** | **Age 65 or older** ticked |
+| Income | Additional Ordinary Income [Not Investment] **$200,000** | Wages / Pension **$200,000** |
+
+| Line | Expected (this tool) |
+|---|---|
+| AGI | $200,000 |
+| Standard deduction | $16,100 + $2,050 = $18,150 |
+| Taxable income | $181,850 |
+| Federal ordinary tax | $36,242 (1,240 + 4,560 + 12,166 + 18,276) |
+
+**Result (run):** matched RR (reported by the tester; screens not reviewed).
+
+### AG2 (P1): Joint, one spouse 66 (the other 61)
+
+| Setting | RR | This tool |
+|---|---|---|
+| Ages | first person **66**, second person **61** | **Age 65 or older** ticked, spouse box unticked |
+| Income | Additional Ordinary Income [Not Investment] **$400,000** | Wages / Pension **$400,000** |
+
+| Line | Expected (this tool) |
+|---|---|
+| AGI | $400,000 |
+| Standard deduction | $32,200 + $1,650 = $33,850 |
+| Taxable income | $366,150 |
+| Federal ordinary tax | $73,072 (2,480 + 9,120 + 24,332 + 37,140) |
+
+**Result (run):** matched RR (reported by the tester; screens not reviewed).
+
+### AG3 (P1): Joint, both spouses 66
+
+| Setting | RR | This tool |
+|---|---|---|
+| Ages | first person **66**, second person **66** | both boxes ticked |
+| Income | Additional Ordinary Income [Not Investment] **$400,000** | Wages / Pension **$400,000** |
+
+| Line | Expected (this tool) |
+|---|---|
+| AGI | $400,000 |
+| Standard deduction | $32,200 + $3,300 = $35,500 |
+| Taxable income | $364,500 |
+| Federal ordinary tax | $72,676 (35,932 + 36,744) |
+
+**Result (run):** matched RR (reported by the tester; screens not reviewed).
+
+### AG4 (P2): Does RR apply the senior deduction? Single, age 66, income $50,000
+
+Exploratory. This tool does not model the senior deduction, so if RR applies it, RR's taxable income will be **$6,000 lower** than the figures below and its tax $720 lower. Record the difference.
+
+| Setting | RR | This tool |
+|---|---|---|
+| Age | first person **66** | **Age 65 or older** ticked |
+| Income | Additional Ordinary Income [Not Investment] **$50,000** | Wages / Pension **$50,000** |
+
+| Line | Expected (this tool, additional standard deduction only) |
+|---|---|
+| AGI | $50,000 |
+| Taxable income | $31,850 |
+| Federal ordinary tax | $3,574 |
+| If RR also applies the $6,000 senior deduction | taxable income $25,850; tax $2,854 |
+
+**Result (run):** RR **does** apply the senior deduction. RR's Below-the-line Deduction is $24,150 = $16,100 standard + $2,050 additional (65+) + **$6,000 senior**, so its taxable income is $25,850 and its tax $2,854. This tool shows $3,574 (taxable $31,850): $720 higher, exactly the unmodeled $6,000 senior deduction at the 12% bracket. Everything else in the run agrees (AGI $50,000, ACA off, NIIT $0).
+
+RR's ordinary EMR map also shows the phase-out: the rate steps up from the start of the phase-out near $75,000 (about 23.3%, the 22% bracket plus 6% x 22%), then to about 25.5% in the 24% bracket (6% x 24%), and drops back near $175,000 where the deduction is gone. That matches the 6% reduction over $75,000 for a single filer (gone at $175,000).
+
+### AG5 (P2): Senior deduction, joint, both spouses 66, income $100,000
+
+Exploratory, same purpose as AG4. Both spouses' senior deductions would total $12,000 and are below the $150,000 phase-out start.
+
+| Setting | RR | This tool |
+|---|---|---|
+| Ages | first person **66**, second person **66** | both boxes ticked |
+| Income | Additional Ordinary Income [Not Investment] **$100,000** | Wages / Pension **$100,000** |
+
+| Line | Expected (this tool, additional standard deduction only) |
+|---|---|
+| AGI | $100,000 |
+| Taxable income | $64,500 |
+| Federal ordinary tax | $7,244 |
+| If RR also applies $12,000 of senior deductions | taxable income $52,500; tax $5,804 |
+
+**Result (run):** _fill in_
+
 ## Exploratory: IRMAA (P3)
 
 This tool draws IRMAA threshold lines but does not price the surcharge, so there is nothing to match. The goal is to learn which thresholds RR uses. **Enter in RR:** Additional Ordinary Income [Not Investment] **$110,000**, Medicare months in 2028 **12**, ACA **No**, then **$105,000**. Record whether and how much IRMAA RR charges at each. This tool's first 2026 threshold is $109,000.
