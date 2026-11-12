@@ -8,6 +8,7 @@ Pure Python with no knowledge of the API layer.
 
 from dataclasses import dataclass, fields
 from decimal import Decimal, InvalidOperation
+from typing import Any
 
 _ZERO = Decimal("0")
 
@@ -22,7 +23,7 @@ def to_decimal(value: object) -> Decimal:
         raise ValueError(f"Not a number: {value!r}") from None
 
 
-def _read_field(field_type: type, value: object) -> Decimal | bool:
+def _read_field(field_type: object, value: object) -> Decimal | bool:
     """A flag field reads as a bool; every other field is an amount."""
     return bool(value) if field_type is bool else to_decimal(value)
 
@@ -79,5 +80,7 @@ class IncomeInputs:
         ``overrides`` replace values from the mapping (for fields stored under another
         name).
         """
-        amounts = {f.name: _read_field(f.type, values.get(f.name)) for f in fields(cls)}
+        amounts: dict[str, Any] = {
+            f.name: _read_field(f.type, values.get(f.name)) for f in fields(cls)
+        }
         return cls(**{**amounts, **overrides})

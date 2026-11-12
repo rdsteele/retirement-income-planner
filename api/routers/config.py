@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, HTTPException
 
-from api.models.config import ConfigResponse
+from api.models.config import ConfigResponse, SeniorDeductionYears
 from services.data_loader import load_config
 from services.senior_deduction import senior_deduction_years
 
@@ -17,5 +17,8 @@ def get_config() -> ConfigResponse:
         raise HTTPException(status_code=500, detail="config.json not found")
     first_year, last_year = senior_deduction_years()
     return ConfigResponse(
-        **data, senior_deduction_years={"first_year": first_year, "last_year": last_year}
+        **data,
+        senior_deduction_years=SeniorDeductionYears(
+            first_year=first_year, last_year=last_year
+        ),
     )
