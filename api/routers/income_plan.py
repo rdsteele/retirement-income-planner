@@ -9,8 +9,8 @@ from api.models.income_plan import IncomePlanRequest, PlanSummaryResponse
 from api.models.total_cost import TotalCostResponse
 from api.routers.total_cost import (
     _build_points,
-    _default_sweep_ceiling_fields,
     _compute_planning_signals,
+    _default_sweep_ceiling_fields,
     _to_decimal_or_none,
 )
 from services.emr import SweepMode

@@ -841,7 +841,6 @@ def compute_planning_signals(
     std_deduction = _get_standard_deduction(
         income, result.filing_status, result.tax_year, floor_agi
     )
-    ltcg_already_used = income.fixed_preferential
     ss_taxable_at_floor = pts[0].ss_taxable if pts else _ZERO
 
     zero_ordinary_space = _compute_zero_ordinary_space(
