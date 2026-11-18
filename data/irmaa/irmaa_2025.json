@@ -1,6 +1,8 @@
 {
   "tax_year": 2025,
   "_note": "Per-person monthly surcharge above the matching entry of irmaa_thresholds in federal_2025.json (same order); the figures are the same for every filing status",
+  "threshold_rounding": "1000",
+  "index_top_threshold": false,
   "monthly_surcharge": {
     "part_b": ["74.00", "185.00", "295.90", "406.90", "443.90"],
     "part_d": ["13.70", "35.30", "57.00", "78.60", "85.80"]

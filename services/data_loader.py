@@ -110,3 +110,13 @@ def get_default_sweep_ceiling_bracket_rate() -> Decimal:
 
 def get_default_sweep_step() -> Decimal:
     return Decimal(str(load_config()["sweep_step_default"]))
+
+
+def get_irmaa_lookback_years() -> int:
+    """Return how many years before the premium year the IRMAA income is measured (config.json)."""
+    return int(load_config()["irmaa_lookback_years"])
+
+
+def get_irmaa_inflation_default() -> Decimal:
+    """Return the default yearly growth of IRMAA thresholds when projecting them (config.json)."""
+    return Decimal(str(load_config()["irmaa_inflation_default"]))
