@@ -131,3 +131,77 @@ class TestErrors:
     def test_missing_maximum_is_rejected(self):
         body = {k: v for k, v in _BASE.items() if k != "max_emr"}
         assert client.post("/api/target-points", json=body).status_code == 422
+
+
+# ── POST /api/total-cost/target-points (the EMR page's request shape) ──────
+
+_SWEEP = {
+    "filing_status": "single",
+    "tax_year": 2026,
+    "pension": 40000.0,
+    "sweep_mode": "ordinary",
+    "sweep_floor": 0.0,
+    "sweep_ceiling": 150000.0,
+    "sweep_step": 1000.0,
+    "include_ohio": False,
+    "include_aca": False,
+    "irmaa_inflation_rate": 0.0,
+    "max_emr": 0.30,
+}
+
+
+def _post_sweep(**overrides):
+    return client.post("/api/total-cost/target-points", json={**_SWEEP, **overrides})
+
+
+class TestSweepRoute:
+    def test_status_and_shape_match_the_income_route(self):
+        resp = _post_sweep()
+        assert resp.status_code == 200
+        assert set(resp.json()) == set(_post().json())
+
+    def test_same_income_gives_the_same_targets_as_the_income_route(self):
+        assert _post_sweep().json() == _post().json()
+
+    def test_every_leg_is_within_the_maximum(self):
+        body = _post_sweep().json()
+        assert body["legs"]
+        assert all(leg["average_emr"] <= body["max_emr"] for leg in body["legs"])
+
+    def test_preferential_sweep_is_accepted(self):
+        resp = _post_sweep(
+            sweep_mode="preferential",
+            variable_ordinary=20000.0,
+            qualified_dividends=10000.0,
+            sweep_ceiling=300000.0,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["targets"][0] == 0.0
+
+    def test_preferential_targets_include_the_irmaa_cliffs(self):
+        body = _post_sweep(
+            sweep_mode="preferential", variable_ordinary=60000.0, sweep_ceiling=200000.0
+        ).json()
+        assert len(body["targets"]) > 2
+
+    def test_irmaa_off_leaves_no_cliff_targets(self):
+        assert _post_sweep(include_irmaa=False).json()["targets"] == [0.0, 150000.0]
+
+    def test_returns_the_thresholds_it_used(self):
+        published = load_federal_data(2026)["irmaa_thresholds"]["single"]
+        assert _post_sweep().json()["irmaa_thresholds"] == [float(t) for t in published]
+
+    def test_invalid_sweep_mode_is_422(self):
+        resp = _post_sweep(sweep_mode="sideways")
+        assert resp.status_code == 422
+        assert "sweep_mode" in resp.json()["detail"]
+
+    def test_unsupported_filing_status_is_422(self):
+        assert _post_sweep(filing_status="bogus").status_code == 422
+
+    def test_too_many_enrollees_is_422(self):
+        assert _post_sweep(irmaa_enrollees=5).status_code == 422
+
+    def test_missing_maximum_is_rejected(self):
+        body = {k: v for k, v in _SWEEP.items() if k != "max_emr"}
+        assert client.post("/api/total-cost/target-points", json=body).status_code == 422
