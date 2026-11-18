@@ -280,3 +280,50 @@ test('income: with IRMAA left out of the targets the lines keep the published th
   const { shapes } = lastPlot(app).layout;
   assertEqual(shapes.filter((s) => s.yref === 'paper' && s.xref !== 'paper').map((s) => s.x0), [10000]);
 });
+
+// ── The shared panel ──────────────────────────────────────────────────────
+
+async function panelOnAnotherEndpoint(configure) {
+  const app = await startPage('income', configure);
+  app.server.handle('POST', '/api/other-target-points', () => ({ status: 200, body: FX.target_points }));
+  const changes = [];
+  const panel = createTargetPanel({ endpoint: '/api/other-target-points', onChange: () => changes.push(1) });
+  return { app, panel, changes };
+}
+
+test('panel: it posts the page request and settings to the endpoint it was given', async () => {
+  const { app, panel } = await panelOnAnotherEndpoint(() => { FX.config.target_emr_rate_default = 0.28; });
+  await panel.load({ filing_status: 'x', tax_year: 1 });
+  const [call] = app.server.callsMatching('POST', '/api/other-target-points');
+  assertEqual(call.body.filing_status, 'x');
+  assertEqual(call.body.max_emr, 0.28);
+});
+
+test('panel: nothing is drawn and the published thresholds stand until targets load', async () => {
+  const { panel } = await panelOnAnotherEndpoint();
+  assertEqual(panel.overlay(), { traces: [], shapes: [], annotations: [] });
+  assertEqual(panel.irmaaThresholds([1, 2]), [1, 2]);
+  assertEqual(panel.irmaaSuffix(2030, 2), '');
+});
+
+test('panel: after loading it supplies the markers and the thresholds the server used', async () => {
+  const { panel } = await panelOnAnotherEndpoint(() => {
+    tick('target-toggle');
+    FX.target_points.irmaa_thresholds = [77000];
+  });
+  await panel.load({});
+  assertEqual(panel.irmaaThresholds([1]), [77000]);
+  assertEqual(panel.overlay().traces.length, 1);
+});
+
+test('panel: a change redraws only once there is a request to repeat', async () => {
+  const { app, panel, changes } = await panelOnAnotherEndpoint();
+  panel.wire();
+  await app.el('target_max_emr').dispatch('change');
+  await settle();
+  assertEqual(changes.length, 0);
+  await panel.load({});
+  await app.el('target_max_emr').dispatch('change');
+  await settle();
+  assertEqual(changes.length, 1);
+});

@@ -12,6 +12,7 @@
   <script src="/static/js/scenario-bar.js"></script>
   <script src="/static/js/emr-chart.js"></script>
   <script src="/static/js/target-points.js"></script>
+  <script src="/static/js/target-points-panel.js"></script>
   <link rel="stylesheet" href="/static/css/scenario-bar.css">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -859,8 +860,10 @@
   const CONFIG = {};
   let lastResult         = null;
   let lastPayload        = null;  // the request behind lastResult, reused for target points
-  let lastTargets        = null;  // response of /api/target-points for lastResult, or null
-  let lastTargetInflation = 0;    // IRMAA threshold growth the targets were computed with
+  const targetPanel = createTargetPanel({
+    endpoint: '/api/target-points',
+    onChange: () => { if (lastResult) renderChart(); },
+  });
   let accounts           = [];
   let executedWithdrawals = [];  // [{ id, description, amount, basis, type }]
   let acaCliffMagi    = 0;     // updated from Calculate response
@@ -877,8 +880,7 @@
     CONFIG.yAxisMaxEMR = data.y_axis_max_emr;
     CONFIG.sweepCeiling = data.income_plan_sweep_ceiling;
     CONFIG.irmaaLookbackYears = data.irmaa_lookback_years;
-    el('target_max_emr').value = percentInputValue(data.target_emr_rate_default);
-    el('target_irmaa_inflation_rate').value = percentInputValue(data.irmaa_inflation_default);
+    targetPanel.applyConfig(data);
   }
 
   // ── Accounts ──────────────────────────────────────────────────────────
@@ -1365,7 +1367,7 @@
     try {
       lastPayload = buildCalculatePayload();
       lastResult = await postJson('/api/income-plan/calculate', lastPayload);
-      await fetchTargets();
+      await targetPanel.load(lastPayload);
 
       // Update ACA cliff, estimated taxes, and APTC estimate from response
       if (lastResult.aca_cliff_magi > 0) {
@@ -1387,11 +1389,10 @@
 
       el('chart-section').style.display     = 'block';
       el('key-points-section').style.display = 'block';
-      el('target-points-section').style.display = 'block';
+      targetPanel.show();
       Plotly.Plots.resize(el('chart'));
       renderChart();
       renderKeyPoints(lastResult.planning_signals);
-      renderTargetPoints();
 
       // Refresh portfolio summary
       try {
@@ -1414,7 +1415,7 @@
 
     // IRMAA vertical lines, placed where the sweep's MAGI reaches each threshold. They use
     // the thresholds the target points were placed with, so the two always agree.
-    const irmaaThresholds = chartIrmaaThresholds();
+    const irmaaThresholds = targetPanel.irmaaThresholds(lastResult?.irmaa_thresholds ?? []);
     if (el('irmaa-toggle')?.checked && irmaaThresholds.length) {
       for (const { tier, x } of irmaaLines(irmaaThresholds, lastResult.points)) {
         shapes.push({
@@ -1423,7 +1424,8 @@
         });
         annotations.push({
           x, y: 1, yref: 'paper',
-          text: 'IRMAA ' + tier + irmaaEstimateSuffix(),
+          text: 'IRMAA ' + tier
+            + targetPanel.irmaaSuffix(lastPayload.tax_year, CONFIG.irmaaLookbackYears),
           showarrow: false,
           font: { size: 10, color: 'gray' },
           xanchor: 'left', yanchor: 'top',
@@ -1437,7 +1439,7 @@
     annotations.push(...cliff.annotations);
 
     // Target points: max EMR line and a green line per desirable leg
-    const targets = targetOverlay();
+    const targets = targetPanel.overlay();
     shapes.push(...targets.shapes);
     annotations.push(...targets.annotations);
 
@@ -1450,27 +1452,7 @@
 
   async function renderChart() {
     if (!lastResult) return;
-    await drawChart(lastResult.points, buildLayout(), targetOverlay().traces);
-  }
-
-  // The IRMAA thresholds to draw: those the target points used, else the published ones.
-  function chartIrmaaThresholds() {
-    if (lastTargets?.irmaa_thresholds?.length) return lastTargets.irmaa_thresholds;
-    return lastResult?.irmaa_thresholds ?? [];
-  }
-
-  // " (est. year)" on a line whose threshold was grown to the year the surcharge is billed.
-  function irmaaEstimateSuffix() {
-    const grown = lastTargets?.irmaa_thresholds?.length && lastTargetInflation > 0;
-    return grown ? ` (est. ${lastPayload.tax_year + CONFIG.irmaaLookbackYears})` : '';
-  }
-
-  // The target point markers, or nothing while they are off or not loaded.
-  function targetOverlay() {
-    if (!el('target-toggle')?.checked || !lastTargets) {
-      return { traces: [], shapes: [], annotations: [] };
-    }
-    return targetChartMarkers(lastTargets);
+    await drawChart(lastResult.points, buildLayout(), targetPanel.overlay().traces);
   }
 
   wireChartModeButtons(renderChart);
@@ -1479,75 +1461,7 @@
     if (lastResult) renderChart();
   });
 
-  // ── Target Points ─────────────────────────────────────────────────────
-  // Asks the server for the target points of the last Calculate; a failure here is
-  // shown beside the table and never hides the chart.
-  async function fetchTargets() {
-    const maxEmr = parseMaxEmrPercent(el('target_max_emr').value);
-    const inflationRate = irmaaInflationRate(
-      el('target_irmaa_inflation_adj').checked, el('target_irmaa_inflation_rate').value);
-    lastTargets = null;
-    if (maxEmr === null) {
-      setTargetNote('Enter a max EMR of 0% or more.');
-      return;
-    }
-    if (inflationRate === null) {
-      setTargetNote('Enter an IRMAA growth rate of 0% or more.');
-      return;
-    }
-    try {
-      lastTargets = await postJson('/api/target-points', targetPointsPayload(lastPayload, {
-        maxEmr,
-        includeIrmaa: el('target_include_irmaa').checked,
-        enrollees: parseEnrollees(el('target_irmaa_enrollees').value),
-        inflationRate,
-      }));
-      lastTargetInflation = inflationRate;
-      setTargetNote('');
-    } catch (err) {
-      setTargetNote('Target points unavailable: ' + err.message);
-    }
-  }
-
-  function setTargetNote(message) {
-    const note = el('target-points-note');
-    note.innerHTML = '';
-    if (!message) return;
-    const p = document.createElement('p');
-    p.style.cssText = 'padding: 8px 14px; font-size: 12px; color: #6c757d;';
-    p.textContent = message;
-    note.appendChild(p);
-  }
-
-  function renderTargetPoints() {
-    const rows = lastTargets ? targetLegRows(lastTargets.legs) : [];
-    el('target-points-body').innerHTML = rows.map(r => `<tr>
-        <td>${escHtml(r.from)}</td>
-        <td>${escHtml(r.to)}</td>
-        <td>${escHtml(r.average)}</td>
-        <td>${escHtml(r.cost)}</td>
-        <td>${escHtml(r.causes)}</td>
-      </tr>`).join('');
-    if (lastTargets && !rows.length) {
-      setTargetNote('No leg averages at or below the max EMR.');
-    }
-  }
-
-  async function refreshTargets() {
-    if (!lastPayload) return;
-    await fetchTargets();
-    renderTargetPoints();
-    renderChart();
-  }
-
-  ['target_max_emr', 'target_include_irmaa', 'target_irmaa_enrollees',
-   'target_irmaa_inflation_adj', 'target_irmaa_inflation_rate'].forEach(id =>
-    el(id).addEventListener('change', refreshTargets));
-  el('target_irmaa_inflation_adj').addEventListener('change', () => {
-    el('target-inflation-rate-wrap').classList.toggle(
-      'hidden', !el('target_irmaa_inflation_adj').checked);
-  });
-  el('target-toggle').addEventListener('change', () => { if (lastResult) renderChart(); });
+  targetPanel.wire();
 
   // ── Key Points Table ──────────────────────────────────────────────────
   function renderKeyPoints(signals) {
