@@ -13,6 +13,7 @@ from pathlib import Path
 _DATA_DIR = Path(__file__).parent.parent / "data"
 _BRACKETS_DIR = _DATA_DIR / "brackets"
 _DEDUCTIONS_DIR = _DATA_DIR / "deductions"
+_IRMAA_DIR = _DATA_DIR / "irmaa"
 _SS_PATH = _DATA_DIR / "ss_thresholds.json"
 _CONFIG_PATH = _DATA_DIR / "config.json"
 _SENIOR_DEDUCTION_PATH = _DATA_DIR / "senior_deduction.json"
@@ -41,6 +42,15 @@ def load_aged_deduction_data(tax_year: int) -> dict:
     path = _DEDUCTIONS_DIR / f"aged_{tax_year}.json"
     if not path.exists():
         raise ValueError(f"No age deduction data for tax year: {tax_year}")
+    with path.open() as f:
+        return json.load(f)
+
+
+@lru_cache(maxsize=None)
+def load_irmaa_data(tax_year: int) -> dict:
+    path = _IRMAA_DIR / f"irmaa_{tax_year}.json"
+    if not path.exists():
+        raise ValueError(f"No IRMAA data for tax year: {tax_year}")
     with path.open() as f:
         return json.load(f)
 

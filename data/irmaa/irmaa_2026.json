@@ -1,0 +1,8 @@
+{
+  "tax_year": 2026,
+  "_note": "Per-person monthly surcharge above the matching entry of irmaa_thresholds in federal_2026.json (same order); the figures are the same for every filing status",
+  "monthly_surcharge": {
+    "part_b": ["81.20", "202.90", "324.60", "446.30", "487.00"],
+    "part_d": ["14.50", "37.50", "60.40", "83.30", "91.00"]
+  }
+}
