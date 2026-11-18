@@ -9,28 +9,28 @@
  ],
  "legs": [
   {
-   "average_emr": 0.2486,
+   "average_emr": 0.2496,
    "causes": [
     "aca"
    ],
-   "cost": 1889.0,
+   "cost": 2496.0,
    "from_income": 0.0,
-   "to_income": 7600.0
+   "to_income": 10000.0
   },
   {
-   "average_emr": 0.2289,
+   "average_emr": 0.2142,
    "causes": [
     "aca"
    ],
-   "cost": 1451.0,
-   "from_income": 7600.0,
+   "cost": 844.0,
+   "from_income": 10000.0,
    "to_income": 13940.0
   }
  ],
  "max_emr": 0.25,
  "targets": [
   0.0,
-  7600.0,
+  10000.0,
   13940.0,
   17750.0,
   20000.0

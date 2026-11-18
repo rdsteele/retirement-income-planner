@@ -10,7 +10,7 @@ const TARGET_CAUSE_LABELS = {
   ss_torpedo: 'SS torpedo',
   pref_stacking: 'LTCG stacking',
   niit: 'NIIT',
-  aca: 'ACA cliff',
+  aca: 'ACA subsidy loss',
   irmaa: 'IRMAA',
 };
 

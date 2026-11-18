@@ -12,7 +12,7 @@ D = Decimal
 _ZERO = D("0")
 
 
-def _point(income, *, tax="0", aca="0", irmaa="0", **emr):
+def _point(income, *, tax="0", aca="0", irmaa="0", total="0", **emr):
     components = dict(
         emr_ordinary=_ZERO,
         emr_ss_torpedo=_ZERO,
@@ -27,6 +27,7 @@ def _point(income, *, tax="0", aca="0", irmaa="0", **emr):
         total_tax=D(tax),
         aca_subsidy_loss=D(aca),
         irmaa_surcharge=D(irmaa),
+        total_cost_emr=D(total),
         **components,
     )
 
@@ -36,6 +37,10 @@ class TestToCostPoints:
         points = module.to_cost_points([_point("100", tax="10", aca="20", irmaa="30")], D("0.25"))
         assert points[0].cost == D("60")
         assert points[0].income == D("100")
+
+    def test_rate_is_the_total_cost_emr_at_the_point(self):
+        points = module.to_cost_points([_point("0", total="0.31")], D("0.25"))
+        assert points[0].rate == D("0.31")
 
     def test_each_active_component_becomes_a_cause(self):
         point = _point(

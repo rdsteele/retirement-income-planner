@@ -3,7 +3,9 @@
 Given the running cost of an income sweep and a maximum acceptable effective marginal rate
 (EMR), find the last income before each stretch whose EMR is above the maximum, and the
 average EMR of each leg between those targets. Only legs whose average is within the
-maximum are returned. Pure Python on a list of cost points, with no knowledge of the API
+maximum are returned. Costs are rounded to whole dollars, so the rate between two close
+points is noisy; a point's own ``rate`` (measured over a wider window) says whether its
+stretch is costly, and the cost between points only confirms where the stretch begins. Pure Python on a list of cost points, with no knowledge of the API
 layer or of where the costs come from. ``calculate_target_points`` composes the total cost
 sweep with that search.
 """
@@ -23,10 +25,15 @@ _ZERO = Decimal("0")
 
 @dataclass(frozen=True)
 class CostPoint:
-    """Cumulative annual cost at an income, and what drives the cost just above it."""
+    """Cumulative annual cost at an income, and the marginal rate just above it.
+
+    ``rate`` is the cost of the next dollar measured over a window wide enough to be free
+    of rounding noise (a cliff shows as a very large rate). ``causes`` say what drives it.
+    """
 
     income: Decimal
     cost: Decimal
+    rate: Decimal
     causes: tuple[str, ...] = ()
 
 
@@ -63,9 +70,48 @@ def _average_rate(start: CostPoint, end: CostPoint) -> Decimal:
     return (end.cost - start.cost) / (end.income - start.income)
 
 
+def _rate_runs(costly: list[bool]) -> list[tuple[int, int]]:
+    """First and last index of each run of consecutive True values."""
+    runs: list[tuple[int, int]] = []
+    for i, is_costly in enumerate(costly):
+        if not is_costly:
+            continue
+        if runs and runs[-1][1] == i - 1:
+            runs[-1] = (runs[-1][0], i)
+        else:
+            runs.append((i, i))
+    return runs
+
+
+def _first_costly_segment(
+    points: list[CostPoint], run: tuple[int, int], max_rate: Decimal
+) -> int | None:
+    """The first point in the run whose own segment costs more than the maximum, if any.
+
+    A point's rate looks ahead, so the run can begin a little before the real stretch; the
+    cost of the segment itself places the start exactly. A run with no such segment is
+    rounding noise.
+    """
+    first, last = run
+    return next(
+        (i for i in range(first, last + 1) if _average_rate(points[i], points[i + 1]) > max_rate),
+        None,
+    )
+
+
 def _hot_segments(points: list[CostPoint], max_rate: Decimal) -> list[bool]:
-    """For each segment between adjacent points, whether its rate is above the maximum."""
-    return [_average_rate(cur, nxt) > max_rate for cur, nxt in zip(points, points[1:])]
+    """For each segment between adjacent points, whether it is inside a costly stretch.
+
+    A stretch is a run of points whose rate is above the maximum, from the first segment
+    that really costs more than the maximum to the end of the run.
+    """
+    costly = [point.rate > max_rate for point in points[:-1]]
+    hot = [False] * len(costly)
+    for run in _rate_runs(costly):
+        start = _first_costly_segment(points, run, max_rate)
+        if start is not None:
+            hot[start : run[1] + 1] = [True] * (run[1] + 1 - start)
+    return hot
 
 
 def _zone_starts(hot: list[bool]) -> list[int]:
@@ -106,9 +152,11 @@ def _within_max(leg_points: tuple[CostPoint, CostPoint], max_rate: Decimal) -> b
 def find_target_points(points: list[CostPoint], max_rate: Decimal) -> TargetPointsResult:
     """Find the targets and the desirable legs between them.
 
-    ``points`` are in increasing income order with cumulative cost. A segment is costly when
-    its cost per dollar is above ``max_rate``; consecutive costly segments form a stretch.
-    Targets are the first income, the start of every costly stretch, and the last income.
+    ``points`` are in increasing income order with cumulative cost and the marginal rate
+    above each. A point is costly when its rate is above ``max_rate``; consecutive costly
+    points form a stretch, which begins at its first segment that really costs more than
+    ``max_rate``. Targets are the first income, the start of every costly stretch, and the
+    last income.
     A leg is desirable when its average cost per dollar, with its costly stretch included,
     is at or below ``max_rate``.
     """
@@ -159,7 +207,10 @@ def _causes_of(point: TotalCostPoint, max_rate: Decimal) -> tuple[str, ...]:
 
 
 def to_cost_points(points: list[TotalCostPoint], max_rate: Decimal) -> list[CostPoint]:
-    return [CostPoint(p.income, _total_cost_of(p), _causes_of(p, max_rate)) for p in points]
+    return [
+        CostPoint(p.income, _total_cost_of(p), p.total_cost_emr, _causes_of(p, max_rate))
+        for p in points
+    ]
 
 
 def _thresholds_reported(

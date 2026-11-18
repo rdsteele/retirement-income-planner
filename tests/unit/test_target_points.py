@@ -1,6 +1,6 @@
 """Unit tests for services.target_points: the pure search for targets and desirable legs."""
 
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 import pytest
 
@@ -12,20 +12,21 @@ D = Decimal
 def _curve(*stretches, causes=None):
     """Cost points from (width, rate) stretches, starting at income 0 with no cost.
 
-    A stretch is sampled every 1,000 of income; a stretch of width 1 is a single step, so a
-    ``rate`` above 1 models a cliff. ``causes`` maps a stretch's position to its cause.
+    A stretch is sampled every 1,000 of income. Each point's rate is that of the stretch
+    above it, as the sweep's own marginal rate would be. ``causes`` maps a stretch's
+    position to its cause.
     """
     causes = causes or {}
-    points = [CostPoint(D("0"), D("0"))]
+    points = []
+    income, cost = D("0"), D("0")
     for index, (width, rate) in enumerate(stretches):
         step = min(D(width), D("1000"))
-        steps = int(D(width) / step)
-        for _ in range(steps):
-            last = points[-1]
-            # the point whose segment this is carries the cause of the segment above it
-            points[-1] = CostPoint(last.income, last.cost, causes.get(index, ()))
-            points.append(CostPoint(last.income + step, last.cost + step * D(rate)))
-    return points
+        for _ in range(int(D(width) / step)):
+            points.append(CostPoint(income, cost, D(rate), causes.get(index, ())))
+            income += step
+            cost += step * D(rate)
+    last_rate = D(stretches[-1][1])
+    return [*points, CostPoint(income, cost, last_rate)]
 
 
 class TestNoCostlyStretch:
@@ -38,7 +39,7 @@ class TestNoCostlyStretch:
         assert leg.average_emr == D("0.2000")
         assert leg.cost == D("20000")
 
-    def test_segment_exactly_at_the_maximum_is_not_costly(self):
+    def test_rate_exactly_at_the_maximum_is_not_costly(self):
         result = find_target_points(_curve((50000, "0.25")), D("0.25"))
         assert result.targets == [D("0"), D("50000")]
         assert len(result.legs) == 1
@@ -76,12 +77,13 @@ class TestOneCostlyStretch:
 
 
 class TestCliff:
-    # 20% to 100,000, then a one-dollar step costing 5,000, then 20% again
+    # 20% to 100,000, then a one-dollar step costing 5,000, then 20% again. The point
+    # before a cliff carries the cliff's spike as its rate.
     points = [
-        CostPoint(D("0"), D("0")),
-        CostPoint(D("100000"), D("20000")),
-        CostPoint(D("100001"), D("25000.20")),
-        CostPoint(D("200000"), D("45000.00")),
+        CostPoint(D("0"), D("0"), D("0.20")),
+        CostPoint(D("100000"), D("20000"), D("5000")),
+        CostPoint(D("100001"), D("25000.20"), D("0.20")),
+        CostPoint(D("200000"), D("45000.00"), D("0.20")),
     ]
 
     def test_target_sits_on_the_last_dollar_before_the_cliff(self):
@@ -102,11 +104,12 @@ class TestCliff:
 class TestSeveralStretches:
     # 10% | 40% for 10,000 | 10% for 40,000 | cliff | 10% | 40% for 10,000 | 10%
     points = [
-        *_curve((50000, "0.10"), (10000, "0.40"), (40000, "0.10")),
-    ]
-    points += [
-        CostPoint(D("100001"), points[-1].cost + D("4000")),
-        CostPoint(D("150000"), points[-1].cost + D("4000") + D("49999") * D("0.10")),
+        CostPoint(D("0"), D("0"), D("0.10")),
+        CostPoint(D("50000"), D("5000"), D("0.40")),
+        CostPoint(D("60000"), D("9000"), D("0.10")),
+        CostPoint(D("100000"), D("13000"), D("4000")),
+        CostPoint(D("100001"), D("17000"), D("0.10")),
+        CostPoint(D("150000"), D("21999.9"), D("0.10")),
     ]
 
     def test_every_stretch_opens_a_target(self):
@@ -131,7 +134,7 @@ class TestEdges:
         assert [(leg.from_income, leg.to_income) for leg in result.legs] == [(D("0"), D("90000"))]
 
     def test_one_point_has_a_target_and_no_legs(self):
-        result = find_target_points([CostPoint(D("5"), D("1"))], D("0.25"))
+        result = find_target_points([CostPoint(D("5"), D("1"), D("0"))], D("0.25"))
         assert result.targets == [D("5")]
         assert result.legs == []
 
@@ -143,12 +146,12 @@ class TestEdges:
         assert find_target_points([], D("0.30")).max_rate == D("0.30")
 
     def test_unsorted_points_are_rejected(self):
-        points = [CostPoint(D("10"), D("0")), CostPoint(D("5"), D("1"))]
+        points = [CostPoint(D("10"), D("0"), D("0")), CostPoint(D("5"), D("1"), D("0"))]
         with pytest.raises(ValueError, match="increasing"):
             find_target_points(points, D("0.25"))
 
     def test_repeated_income_is_rejected(self):
-        points = [CostPoint(D("5"), D("0")), CostPoint(D("5"), D("1"))]
+        points = [CostPoint(D("5"), D("0"), D("0")), CostPoint(D("5"), D("1"), D("0"))]
         with pytest.raises(ValueError, match="increasing"):
             find_target_points(points, D("0.25"))
 
@@ -157,8 +160,70 @@ class TestEdges:
             find_target_points([], D("-0.01"))
 
     def test_average_just_over_the_maximum_is_not_let_through_by_rounding(self):
-        points = [CostPoint(D("0"), D("0")), CostPoint(D("1000000"), D("250001"))]
+        points = [
+            CostPoint(D("0"), D("0"), D("0.10")),
+            CostPoint(D("1000000"), D("250001"), D("0.10")),
+        ]
         assert find_target_points(points, D("0.25")).legs == []
+
+
+def _rounded(income, rate):
+    """Cost at an income with the tax rounded to whole dollars, as the real sweep does."""
+    return (income * D(rate)).quantize(D("1"), rounding=ROUND_HALF_UP)
+
+
+class TestRoundingNoise:
+    def test_a_rate_just_over_the_maximum_is_one_stretch_not_many(self):
+        # 10% to 5,000, then a true rate of 24.75% sampled every 100 with whole-dollar costs:
+        # segments alternate between 24 and 25 dollars, so some segments equal 24%.
+        def cost_at(income):
+            beyond = max(income - 5000, D("0"))
+            return _rounded(min(income, D("5000")) * D("0.10") + beyond * D("0.2475"), "1")
+
+        points = [
+            CostPoint(D(i * 100), cost_at(D(i * 100)), D("0.10") if i < 50 else D("0.2475"))
+            for i in range(101)
+        ]
+        result = find_target_points(points, D("0.24"))
+        assert result.targets == [D("0"), D("5000"), D("10000")]
+
+    def test_a_narrow_segment_that_only_looks_costly_is_ignored(self):
+        # a boundary point seven dollars away: the cost rounds up by a dollar (14% there)
+        # and a dollar over a one-dollar gap is 100%, but the points' own rates are low
+        points = [
+            CostPoint(D("0"), D("0"), D("0.12")),
+            CostPoint(D("1000"), D("120"), D("0.12")),
+            CostPoint(D("1001"), D("121"), D("0.12")),
+            CostPoint(D("2000"), D("240"), D("0.12")),
+        ]
+        result = find_target_points(points, D("0.25"))
+        assert result.targets == [D("0"), D("2000")]
+        assert len(result.legs) == 1
+
+    def test_a_run_with_no_segment_that_really_costs_more_is_noise(self):
+        points = [
+            CostPoint(D("0"), D("0"), D("0.30")),
+            CostPoint(D("1000"), D("100"), D("0.30")),
+            CostPoint(D("2000"), D("200"), D("0.10")),
+        ]
+        result = find_target_points(points, D("0.25"))
+        assert result.targets == [D("0"), D("2000")]
+
+    def test_the_target_is_placed_by_the_segment_not_the_looking_ahead_rate(self):
+        # the rate looks ahead over a window, so it turns high two points early; the
+        # target is the point where the cost really starts to climb
+        points = [
+            CostPoint(D("0"), D("0"), D("0.10")),
+            CostPoint(D("100"), D("10"), D("0.30")),
+            CostPoint(D("200"), D("20"), D("0.30")),
+            CostPoint(D("300"), D("60"), D("0.40")),
+            CostPoint(D("400"), D("100"), D("0.40")),
+            CostPoint(D("100000"), D("100"), D("0.00")),
+        ]
+        result = find_target_points(points, D("0.25"))
+        assert result.targets == [D("0"), D("200"), D("100000")]
+        # the cheap hundreds before the target stay in the first leg
+        assert result.legs[0].to_income == D("200")
 
 
 class TestCauses:
@@ -175,21 +240,32 @@ class TestCauses:
 
     def test_causes_are_listed_once_in_order(self):
         points = [
-            CostPoint(D("0"), D("0"), ("irmaa",)),
-            CostPoint(D("1"), D("5000"), ("aca", "irmaa")),
-            CostPoint(D("2"), D("10000"), ()),
-            CostPoint(D("1000000"), D("10000")),
+            CostPoint(D("0"), D("0"), D("5000"), ("irmaa",)),
+            CostPoint(D("1"), D("5000"), D("5000"), ("aca", "irmaa")),
+            CostPoint(D("2"), D("10000"), D("0"), ()),
+            CostPoint(D("1000000"), D("10000"), D("0")),
         ]
         result = find_target_points(points, D("0.25"))
         assert result.legs[0].causes == ("irmaa", "aca")
 
-    def test_costly_segments_only_contribute_their_causes(self):
+    def test_costly_stretch_only_contributes_its_causes(self):
         points = [
-            CostPoint(D("0"), D("0"), ("cheap",)),
-            CostPoint(D("1000"), D("100"), ("irmaa",)),
-            CostPoint(D("1001"), D("5100"), ()),
-            CostPoint(D("100000"), D("20000")),
+            CostPoint(D("0"), D("0"), D("0.10"), ("cheap",)),
+            CostPoint(D("1000"), D("100"), D("5.0"), ("irmaa",)),
+            CostPoint(D("1001"), D("5100"), D("0.10"), ()),
+            CostPoint(D("100000"), D("20000"), D("0.10")),
         ]
         result = find_target_points(points, D("0.25"))
         assert result.legs[0].causes == ()
         assert result.legs[1].causes == ("irmaa",)
+
+    def test_looking_ahead_points_before_the_start_do_not_add_causes_to_the_leg_before(self):
+        points = [
+            CostPoint(D("0"), D("0"), D("0.30"), ("torpedo",)),
+            CostPoint(D("100"), D("10"), D("0.30"), ("torpedo",)),
+            CostPoint(D("200"), D("60"), D("0.40"), ("torpedo",)),
+            CostPoint(D("100000"), D("60"), D("0.00")),
+        ]
+        result = find_target_points(points, D("0.25"))
+        assert result.targets == [D("0"), D("100"), D("100000")]
+        assert result.legs[0].causes == ()
