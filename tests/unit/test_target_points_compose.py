@@ -70,7 +70,8 @@ class TestCalculateTargetPoints:
         def fake_total_cost(**kwargs):
             seen.update(kwargs)
             return SimpleNamespace(
-                points=[_point("0"), _point("1000", tax="100"), _point("2000", tax="200")]
+                points=[_point("0"), _point("1000", tax="100"), _point("2000", tax="200")],
+                irmaa_projected_thresholds=[D("115000"), D("144000")],
             )
 
         monkeypatch.setattr(module, "calculate_total_cost", fake_total_cost)
@@ -89,13 +90,16 @@ class TestCalculateTargetPoints:
         assert seen["irmaa_inflation_rate"] == D("0.03")
         assert result.targets == [D("0"), D("2000")]
         assert result.legs[0].average_emr == D("0.1000")
+        assert result.irmaa_thresholds == [D("115000"), D("144000")]
 
     def test_irmaa_can_be_turned_off(self, monkeypatch):
         seen = {}
         monkeypatch.setattr(
             module,
             "calculate_total_cost",
-            lambda **kwargs: seen.update(kwargs) or SimpleNamespace(points=[]),
+            lambda **kwargs: (
+                seen.update(kwargs) or SimpleNamespace(points=[], irmaa_projected_thresholds=[])
+            ),
         )
         module.calculate_target_points(
             income=IncomeInputs(),
@@ -108,7 +112,9 @@ class TestCalculateTargetPoints:
 
     def test_a_negative_maximum_is_rejected(self, monkeypatch):
         monkeypatch.setattr(
-            module, "calculate_total_cost", lambda **kwargs: SimpleNamespace(points=[])
+            module,
+            "calculate_total_cost",
+            lambda **kwargs: SimpleNamespace(points=[], irmaa_projected_thresholds=[]),
         )
         with pytest.raises(ValueError, match="negative"):
             module.calculate_target_points(

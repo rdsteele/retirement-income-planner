@@ -70,4 +70,5 @@ def post_target_points(request: TargetPointsRequest):
         max_emr=request.max_emr,
         targets=[float(t) for t in result.targets],
         legs=[_to_leg_response(leg) for leg in result.legs],
+        irmaa_thresholds=[float(t) for t in result.irmaa_thresholds],
     )

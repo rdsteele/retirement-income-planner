@@ -563,6 +563,7 @@ test('income: an IRMAA line sits where the sweep MAGI reaches the threshold', as
     r.irmaa_thresholds = [50000, 55000, 90000]; // the third is beyond the sweep
     r.points.irmaa_magi = r.points.income.map((x) => x + 40000);
     r.planning_signals.aca_cliff_sweep_value = null;
+    FX.target_points.irmaa_thresholds = []; // no targets thresholds: the published ones are drawn
   });
   await app.el('calc-btn').click();
   await settle();

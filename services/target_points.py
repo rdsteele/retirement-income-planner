@@ -8,7 +8,7 @@ layer or of where the costs come from. ``calculate_target_points`` composes the 
 sweep with that search.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from decimal import Decimal
 
 from services.common import round_rate
@@ -44,6 +44,9 @@ class TargetPointsResult:
     max_rate: Decimal
     targets: list[Decimal] = field(default_factory=list)
     legs: list[TargetLeg] = field(default_factory=list)
+    # IRMAA thresholds the costs were computed with (empty when IRMAA is left out), so a
+    # chart can draw its threshold lines where the targets were placed.
+    irmaa_thresholds: list[Decimal] = field(default_factory=list)
 
 
 def _require_valid_input(points: list[CostPoint], max_rate: Decimal) -> None:
@@ -194,4 +197,5 @@ def calculate_target_points(
         irmaa_enrollees=irmaa_enrollees,
         irmaa_inflation_rate=irmaa_inflation_rate,
     )
-    return find_target_points(to_cost_points(sweep.points, max_rate), max_rate)
+    found = find_target_points(to_cost_points(sweep.points, max_rate), max_rate)
+    return replace(found, irmaa_thresholds=sweep.irmaa_projected_thresholds)

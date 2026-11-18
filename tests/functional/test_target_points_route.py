@@ -6,7 +6,7 @@ Uses FastAPI TestClient with real data files — no mocks.
 from fastapi.testclient import TestClient
 
 from api.main import app
-from services.data_loader import load_config
+from services.data_loader import load_config, load_federal_data
 
 client = TestClient(app)
 
@@ -38,7 +38,14 @@ class TestHappyPath:
         assert self.resp.status_code == 200
 
     def test_response_shape(self):
-        assert set(self.body) == {"filing_status", "tax_year", "max_emr", "targets", "legs"}
+        assert set(self.body) == {
+            "filing_status",
+            "tax_year",
+            "max_emr",
+            "targets",
+            "legs",
+            "irmaa_thresholds",
+        }
         assert self.body["max_emr"] == 0.30
         assert set(self.body["legs"][0]) == {
             "from_income",
@@ -83,6 +90,27 @@ class TestOptions:
     def test_default_maximum_in_config_is_a_usable_value(self):
         default = load_config()["target_emr_rate_default"]
         assert _post(max_emr=default).status_code == 200
+
+
+class TestIrmaaThresholds:
+    def test_published_thresholds_when_not_inflated(self):
+        published = load_federal_data(2026)["irmaa_thresholds"]["single"]
+        thresholds = _post(irmaa_inflation_rate=0.0).json()["irmaa_thresholds"]
+        assert thresholds == [float(t) for t in published]
+
+    def test_inflation_raises_them_except_the_top_one(self):
+        flat = _post(irmaa_inflation_rate=0.0).json()["irmaa_thresholds"]
+        grown = _post(irmaa_inflation_rate=0.05).json()["irmaa_thresholds"]
+        assert all(g > f for g, f in zip(grown[:-1], flat[:-1]))
+        assert grown[-1] == flat[-1]
+
+    def test_the_first_target_before_a_cliff_follows_the_returned_threshold(self):
+        # 40,000 of fixed income, so the sweep reaches the threshold at threshold - 40,000
+        body = _post(irmaa_inflation_rate=0.05).json()
+        assert body["irmaa_thresholds"][0] - 40000.0 in body["targets"]
+
+    def test_none_when_irmaa_is_left_out(self):
+        assert _post(include_irmaa=False).json()["irmaa_thresholds"] == []
 
 
 class TestErrors:

@@ -38,11 +38,20 @@ test('a blank enrollee box means everyone, so it is sent as null', () => {
 
 test('the target points request adds the settings to the Calculate request', () => {
   const body = targetPointsPayload({ filing_status: 'x', tax_year: 1 }, {
-    maxEmr: 0.2, includeIrmaa: true, enrollees: null,
+    maxEmr: 0.2, includeIrmaa: true, enrollees: null, inflationRate: 0.03,
   });
   assertEqual(body, {
     filing_status: 'x', tax_year: 1, max_emr: 0.2, include_irmaa: true, irmaa_enrollees: null,
+    irmaa_inflation_rate: 0.03,
   });
+});
+
+test('IRMAA growth is zero unless adjusting, a rate when adjusting, null when that is invalid', () => {
+  assertEqual(irmaaInflationRate(false, '2.5'), 0);
+  assertEqual(irmaaInflationRate(false, ''), 0);
+  assertEqual(irmaaInflationRate(true, '2.5'), 0.025);
+  assertEqual(irmaaInflationRate(true, ''), null);
+  assertEqual(irmaaInflationRate(true, '-1'), null);
 });
 
 test('causes are listed with readable names and a dash when there are none', () => {
@@ -116,7 +125,10 @@ test('income: Calculate asks for target points with the same inputs plus the set
   const [calc] = app.server.callsMatching('POST', '/api/income-plan/calculate');
   const posts = app.server.callsMatching('POST', '/api/target-points');
   assertEqual(posts.length, 1);
-  assertEqual(posts[0].body, { ...calc.body, max_emr: 0.31, include_irmaa: true, irmaa_enrollees: null });
+  assertEqual(posts[0].body, {
+    ...calc.body, max_emr: 0.31, include_irmaa: true, irmaa_enrollees: null,
+    irmaa_inflation_rate: 0,
+  });
 });
 
 test('income: the target table lists the desirable legs', async () => {
@@ -187,4 +199,84 @@ test('income: a target points failure is shown beside the table and the chart st
 test('income: a response with no desirable leg says so', async () => {
   const app = await calculated(() => { FX.target_points.legs = []; });
   assertTrue(app.el('target-points-note').children[0].textContent.indexOf('No leg') !== -1, 'no empty note');
+});
+
+// ── IRMAA thresholds: lines and targets agree ─────────────────────────────
+
+test('income: the growth rate box starts at the configured rate', async () => {
+  const app = await startPage('income', () => { FX.config.irmaa_inflation_default = 0.035; });
+  assertEqual(app.el('target_irmaa_inflation_rate').value, '3.5');
+});
+
+test('income: IRMAA growth is not sent unless the box is ticked', async () => {
+  const app = await calculated();
+  assertEqual(app.server.callsMatching('POST', '/api/target-points')[0].body.irmaa_inflation_rate, 0);
+});
+
+test('income: ticking Adjust IRMAA for Inflation sends the typed rate and shows the box', async () => {
+  const app = await calculated();
+  tick('target_irmaa_inflation_adj');
+  app.el('target_irmaa_inflation_rate').value = '4';
+  await app.el('target_irmaa_inflation_adj').dispatch('change');
+  await settle();
+  const last = app.server.callsMatching('POST', '/api/target-points').pop();
+  assertEqual(last.body.irmaa_inflation_rate, 0.04);
+  assertEqual(app.el('target-inflation-rate-wrap').classList.contains('hidden'), false);
+});
+
+test('income: an invalid growth rate is explained and nothing is requested', async () => {
+  const app = await calculated();
+  tick('target_irmaa_inflation_adj');
+  app.el('target_irmaa_inflation_rate').value = '';
+  await app.el('target_irmaa_inflation_adj').dispatch('change');
+  await settle();
+  assertEqual(app.server.callsMatching('POST', '/api/target-points').length, 1);
+  assertTrue(app.el('target-points-note').children[0].textContent.indexOf('growth rate') !== -1, 'no explanation shown');
+});
+
+// IRMAA lines come from the thresholds the target points were placed with.
+async function calculatedWithIrmaaLines(inflation) {
+  const app = await startPage('income', () => {
+    tick('irmaa-toggle');
+    tick('target_include_irmaa');
+    tick('target_irmaa_inflation_adj', inflation > 0);
+    FX.config.irmaa_lookback_years = 2;
+    const r = FX.income_plan_calculate;
+    r.irmaa_thresholds = [50000]; // published
+    r.points.irmaa_magi = r.points.income.map((x) => x + 40000);
+    r.planning_signals.aca_cliff_sweep_value = null;
+    FX.target_points.irmaa_thresholds = [55000]; // as the server placed the targets
+  });
+  app.el('target_irmaa_inflation_rate').value = String(inflation * 100);
+  await app.el('calc-btn').click();
+  await settle();
+  return app;
+}
+
+test('income: the IRMAA lines use the thresholds the targets were placed with', async () => {
+  const app = await calculatedWithIrmaaLines(0);
+  const { shapes, annotations } = lastPlot(app).layout;
+  assertEqual(shapes.filter((s) => s.yref === 'paper' && s.xref !== 'paper').map((s) => s.x0), [15000]);
+  assertEqual(annotations.map((a) => a.text).filter((t) => t.indexOf('IRMAA') === 0), ['IRMAA 1']);
+});
+
+test('income: a grown threshold is labelled with the year it applies to', async () => {
+  const app = await calculatedWithIrmaaLines(0.03);
+  const labels = lastPlot(app).layout.annotations.map((a) => a.text);
+  assertTrue(labels.indexOf('IRMAA 1 (est. ' + (DEFAULT_YEAR() + 2) + ')') !== -1, 'missing estimate label: ' + labels);
+});
+
+test('income: with IRMAA left out of the targets the lines keep the published thresholds', async () => {
+  const app = await startPage('income', () => {
+    tick('irmaa-toggle');
+    const r = FX.income_plan_calculate;
+    r.irmaa_thresholds = [50000];
+    r.points.irmaa_magi = r.points.income.map((x) => x + 40000);
+    r.planning_signals.aca_cliff_sweep_value = null;
+    FX.target_points.irmaa_thresholds = [];
+  });
+  await app.el('calc-btn').click();
+  await settle();
+  const { shapes } = lastPlot(app).layout;
+  assertEqual(shapes.filter((s) => s.yref === 'paper' && s.xref !== 'paper').map((s) => s.x0), [10000]);
 });

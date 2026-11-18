@@ -1,5 +1,12 @@
 {
  "filing_status": "single",
+ "irmaa_thresholds": [
+  118000.0,
+  148000.0,
+  186000.0,
+  223000.0,
+  500000.0
+ ],
  "legs": [
   {
    "average_emr": 0.2486,

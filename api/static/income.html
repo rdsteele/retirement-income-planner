@@ -814,6 +814,13 @@
             Medicare enrollees
             <input type="number" id="target_irmaa_enrollees" min="0" step="1" placeholder="all">
           </label>
+          <label class="irmaa-toggle">
+            <input type="checkbox" id="target_irmaa_inflation_adj">
+            Adjust IRMAA for Inflation
+          </label>
+          <span id="target-inflation-rate-wrap" class="hidden">
+            <input type="number" id="target_irmaa_inflation_rate" min="0" max="20" step="0.1"> % / yr
+          </span>
         </div>
         <table class="key-points-table">
           <thead>
@@ -853,6 +860,7 @@
   let lastResult         = null;
   let lastPayload        = null;  // the request behind lastResult, reused for target points
   let lastTargets        = null;  // response of /api/target-points for lastResult, or null
+  let lastTargetInflation = 0;    // IRMAA threshold growth the targets were computed with
   let accounts           = [];
   let executedWithdrawals = [];  // [{ id, description, amount, basis, type }]
   let acaCliffMagi    = 0;     // updated from Calculate response
@@ -868,7 +876,9 @@
     applySeniorDeductionYears(data.senior_deduction_years);
     CONFIG.yAxisMaxEMR = data.y_axis_max_emr;
     CONFIG.sweepCeiling = data.income_plan_sweep_ceiling;
+    CONFIG.irmaaLookbackYears = data.irmaa_lookback_years;
     el('target_max_emr').value = percentInputValue(data.target_emr_rate_default);
+    el('target_irmaa_inflation_rate').value = percentInputValue(data.irmaa_inflation_default);
   }
 
   // ── Accounts ──────────────────────────────────────────────────────────
@@ -1402,16 +1412,18 @@
     const shapes      = [];
     const annotations = [];
 
-    // IRMAA vertical lines, placed where the sweep's MAGI reaches each threshold
-    if (el('irmaa-toggle')?.checked && lastResult?.irmaa_thresholds?.length) {
-      for (const { tier, x } of irmaaLines(lastResult.irmaa_thresholds, lastResult.points)) {
+    // IRMAA vertical lines, placed where the sweep's MAGI reaches each threshold. They use
+    // the thresholds the target points were placed with, so the two always agree.
+    const irmaaThresholds = chartIrmaaThresholds();
+    if (el('irmaa-toggle')?.checked && irmaaThresholds.length) {
+      for (const { tier, x } of irmaaLines(irmaaThresholds, lastResult.points)) {
         shapes.push({
           type: 'line', x0: x, x1: x, y0: 0, y1: 1, yref: 'paper',
           line: { color: 'gray', dash: 'dash', width: 1 },
         });
         annotations.push({
           x, y: 1, yref: 'paper',
-          text: 'IRMAA ' + tier,
+          text: 'IRMAA ' + tier + irmaaEstimateSuffix(),
           showarrow: false,
           font: { size: 10, color: 'gray' },
           xanchor: 'left', yanchor: 'top',
@@ -1441,6 +1453,18 @@
     await drawChart(lastResult.points, buildLayout(), targetOverlay().traces);
   }
 
+  // The IRMAA thresholds to draw: those the target points used, else the published ones.
+  function chartIrmaaThresholds() {
+    if (lastTargets?.irmaa_thresholds?.length) return lastTargets.irmaa_thresholds;
+    return lastResult?.irmaa_thresholds ?? [];
+  }
+
+  // " (est. year)" on a line whose threshold was grown to the year the surcharge is billed.
+  function irmaaEstimateSuffix() {
+    const grown = lastTargets?.irmaa_thresholds?.length && lastTargetInflation > 0;
+    return grown ? ` (est. ${lastPayload.tax_year + CONFIG.irmaaLookbackYears})` : '';
+  }
+
   // The target point markers, or nothing while they are off or not loaded.
   function targetOverlay() {
     if (!el('target-toggle')?.checked || !lastTargets) {
@@ -1460,9 +1484,15 @@
   // shown beside the table and never hides the chart.
   async function fetchTargets() {
     const maxEmr = parseMaxEmrPercent(el('target_max_emr').value);
+    const inflationRate = irmaaInflationRate(
+      el('target_irmaa_inflation_adj').checked, el('target_irmaa_inflation_rate').value);
     lastTargets = null;
     if (maxEmr === null) {
       setTargetNote('Enter a max EMR of 0% or more.');
+      return;
+    }
+    if (inflationRate === null) {
+      setTargetNote('Enter an IRMAA growth rate of 0% or more.');
       return;
     }
     try {
@@ -1470,7 +1500,9 @@
         maxEmr,
         includeIrmaa: el('target_include_irmaa').checked,
         enrollees: parseEnrollees(el('target_irmaa_enrollees').value),
+        inflationRate,
       }));
+      lastTargetInflation = inflationRate;
       setTargetNote('');
     } catch (err) {
       setTargetNote('Target points unavailable: ' + err.message);
@@ -1508,8 +1540,13 @@
     renderChart();
   }
 
-  ['target_max_emr', 'target_include_irmaa', 'target_irmaa_enrollees'].forEach(id =>
+  ['target_max_emr', 'target_include_irmaa', 'target_irmaa_enrollees',
+   'target_irmaa_inflation_adj', 'target_irmaa_inflation_rate'].forEach(id =>
     el(id).addEventListener('change', refreshTargets));
+  el('target_irmaa_inflation_adj').addEventListener('change', () => {
+    el('target-inflation-rate-wrap').classList.toggle(
+      'hidden', !el('target_irmaa_inflation_adj').checked);
+  });
   el('target-toggle').addEventListener('change', () => { if (lastResult) renderChart(); });
 
   // ── Key Points Table ──────────────────────────────────────────────────

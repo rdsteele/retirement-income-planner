@@ -34,13 +34,20 @@ function parseEnrollees(text) {
   return Number.isInteger(count) && count >= 0 ? count : null;
 }
 
+// The IRMAA threshold growth to send: the typed percent when adjusting for inflation,
+// otherwise zero (the published thresholds). Null when adjusting with an invalid rate.
+function irmaaInflationRate(adjust, percentText) {
+  return adjust ? parseMaxEmrPercent(percentText) : 0;
+}
+
 // The Calculate request plus the target settings.
-function targetPointsPayload(calculatePayload, { maxEmr, includeIrmaa, enrollees }) {
+function targetPointsPayload(calculatePayload, { maxEmr, includeIrmaa, enrollees, inflationRate }) {
   return {
     ...calculatePayload,
     max_emr: maxEmr,
     include_irmaa: includeIrmaa,
     irmaa_enrollees: enrollees,
+    irmaa_inflation_rate: inflationRate,
   };
 }
 
