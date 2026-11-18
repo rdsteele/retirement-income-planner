@@ -124,6 +124,18 @@ def _agi_at_point(
     return total_ordinary + ss_taxable + total_preferential - income.above_the_line_adjustments
 
 
+def magi_at_sweep_value(
+    sweep_value: Decimal,
+    sweep_mode: SweepMode,
+    income: IncomeInputs,
+    variable_ordinary: Decimal,
+    filing_status: str,
+) -> Decimal:
+    """MAGI for IRMAA at a sweep point: AGI plus tax-exempt interest."""
+    agi = _agi_at_point(sweep_value, sweep_mode, income, variable_ordinary, filing_status)
+    return agi + income.tax_exempt_interest
+
+
 def _get_irmaa_thresholds(filing_status: str, tax_year: int) -> list[Decimal]:
     return [Decimal(t) for t in load_federal_data(tax_year)["irmaa_thresholds"][filing_status]]
 

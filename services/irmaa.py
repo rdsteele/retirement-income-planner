@@ -75,12 +75,17 @@ def monthly_surcharge_per_person(tier: int, tax_year: int) -> Decimal:
     return sum((Decimal(amounts[part][tier - 1]) for part in amounts), _ZERO)
 
 
+def annual_surcharge_at_tier(tier: int, tax_year: int, enrollees: int) -> Decimal:
+    """The year's surcharge for the household when MAGI falls in this tier."""
+    return monthly_surcharge_per_person(tier, tax_year) * _MONTHS * enrollees
+
+
 def default_enrollees(filing_status: str) -> int:
     """Everyone on the return, unless told otherwise."""
     return filer_count(filing_status)
 
 
-def _require_valid_enrollees(enrollees: int, filing_status: str) -> None:
+def require_valid_enrollees(enrollees: int, filing_status: str) -> None:
     if not 0 <= enrollees <= filer_count(filing_status):
         raise ValueError(f"enrollees must be between 0 and {filer_count(filing_status)}")
 
@@ -94,7 +99,6 @@ def annual_surcharge(
     inflation_rate: Decimal,
 ) -> Decimal:
     """The year's total Part B and Part D surcharge for the household at this MAGI."""
-    _require_valid_enrollees(enrollees, filing_status)
+    require_valid_enrollees(enrollees, filing_status)
     thresholds = projected_thresholds(filing_status, tax_year, inflation_rate)
-    monthly = monthly_surcharge_per_person(irmaa_tier(magi, thresholds), tax_year)
-    return monthly * _MONTHS * enrollees
+    return annual_surcharge_at_tier(irmaa_tier(magi, thresholds), tax_year, enrollees)
