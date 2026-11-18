@@ -10,6 +10,9 @@
 #                    joint:   212,000 / 266,000 / 334,000 / 400,000 / 750,000
 #   premium year 2026 single: 109,000 / 137,000 / 171,000 / 205,000 / 500,000
 #                    joint:   218,000 / 274,000 / 342,000 / 410,000 / 750,000
+#   premium year 2027 single: 112,000 / 141,000 / 177,000 / 212,000 / 500,000
+#                    joint:   224,000 / 282,000 / 354,000 / 424,000 / 750,000
+#                    (CMS 2027 Parts A & B fact sheet)
 
 from decimal import Decimal
 
@@ -26,6 +29,10 @@ _PUBLISHED = {
         "single": [109000, 137000, 171000, 205000, 500000],
         "mfj": [218000, 274000, 342000, 410000, 750000],
     },
+    2027: {
+        "single": [112000, 141000, 177000, 212000, 500000],
+        "mfj": [224000, 282000, 354000, 424000, 750000],
+    },
 }
 
 
@@ -41,4 +48,11 @@ def test_each_year_differs_from_the_year_before():
     assert (
         load_federal_data(2026)["irmaa_thresholds"]["single"]
         != load_federal_data(2025)["irmaa_thresholds"]["single"]
+    )
+
+
+def test_2027_differs_from_2026():
+    assert (
+        load_federal_data(2027)["irmaa_thresholds"]["single"]
+        != load_federal_data(2026)["irmaa_thresholds"]["single"]
     )
