@@ -31,7 +31,14 @@
       {"magi": 63840, "monthly_aptc": 0}
     ],
     "mfj": [
-      {"magi": 86560, "monthly_aptc": 0}
+      {"magi": 30000, "monthly_aptc": 2674},
+      {"magi": 32500, "monthly_aptc": 2647},
+      {"magi": 43500, "monthly_aptc": 2517},
+      {"magi": 54000, "monthly_aptc": 2375},
+      {"magi": 65000, "monthly_aptc": 2210},
+      {"magi": 85000, "monthly_aptc": 2040},
+      {"magi": 86560, "monthly_aptc": 2027},
+      {"magi": 86561, "monthly_aptc": 0}
     ]
   }
 }
