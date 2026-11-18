@@ -1,0 +1,190 @@
+// Tests for api/static/js/target-points.js and the Income page's Target Points card.
+
+const SAMPLE_TARGETS = {
+  max_emr: 0.25,
+  targets: [0, 56000, 130000],
+  legs: [
+    { from_income: 0, to_income: 56000, average_emr: 0.142, cost: 7952, causes: [] },
+    { from_income: 56000, to_income: 130000, average_emr: 0.2331, cost: 17249, causes: ['ss_torpedo', 'irmaa'] },
+  ],
+};
+
+// ── Shared helpers ────────────────────────────────────────────────────────
+
+test('the max EMR box takes a percent and sends a rate', () => {
+  assertEqual(parseMaxEmrPercent('25'), 0.25);
+  assertEqual(parseMaxEmrPercent('0'), 0);
+  assertEqual(parseMaxEmrPercent('12.5'), 0.125);
+});
+
+test('a blank, non-numeric, or negative max EMR is not a rate', () => {
+  assertEqual(parseMaxEmrPercent(''), null);
+  assertEqual(parseMaxEmrPercent('abc'), null);
+  assertEqual(parseMaxEmrPercent('-1'), null);
+});
+
+test('a rate is shown in the box as a clean percent', () => {
+  assertEqual(percentInputValue(0.25), '25');
+  assertEqual(percentInputValue(0.125), '12.5');
+  assertEqual(percentInputValue(0.07), '7');
+});
+
+test('a blank enrollee box means everyone, so it is sent as null', () => {
+  assertEqual(parseEnrollees(''), null);
+  assertEqual(parseEnrollees('0'), 0);
+  assertEqual(parseEnrollees('2'), 2);
+  assertEqual(parseEnrollees('-1'), null);
+});
+
+test('the target points request adds the settings to the Calculate request', () => {
+  const body = targetPointsPayload({ filing_status: 'x', tax_year: 1 }, {
+    maxEmr: 0.2, includeIrmaa: true, enrollees: null,
+  });
+  assertEqual(body, {
+    filing_status: 'x', tax_year: 1, max_emr: 0.2, include_irmaa: true, irmaa_enrollees: null,
+  });
+});
+
+test('causes are listed with readable names and a dash when there are none', () => {
+  assertEqual(targetCauseText([]), '—');
+  assertEqual(targetCauseText(['ss_torpedo', 'irmaa']), 'SS torpedo, IRMAA');
+  assertEqual(targetCauseText(['something_new']), 'something_new');
+});
+
+test('each desirable leg becomes a row of display strings', () => {
+  assertEqual(targetLegRows(SAMPLE_TARGETS.legs), [
+    { from: '$0', to: '$56,000', average: '14.2%', cost: '$7,952', causes: '—' },
+    { from: '$56,000', to: '$130,000', average: '23.31%', cost: '$17,249', causes: 'SS torpedo, IRMAA' },
+  ]);
+});
+
+test('chart markers put dots on the max EMR line and a labelled green line on each leg', () => {
+  const { traces, shapes, annotations } = targetChartMarkers(SAMPLE_TARGETS);
+  assertEqual(traces.length, 1);
+  assertEqual(traces[0].name, 'Target points');
+  assertEqual(traces[0].x, [0, 56000, 130000]);
+  assertEqual(traces[0].y, [0.25, 0.25, 0.25]);
+  assertEqual(shapes[0].y0, 0.25);
+  assertEqual(shapes[0].xref, 'paper');
+  assertEqual(shapes.slice(1).map((s) => [s.x0, s.x1, s.y0]), [[0, 56000, 0.142], [56000, 130000, 0.2331]]);
+  assertEqual(annotations.map((a) => [a.x, a.text]), [[28000, '14.2%'], [93000, '23.31%']]);
+});
+
+test('chart markers with no legs still show the max EMR line and the dots', () => {
+  const { shapes, annotations } = targetChartMarkers({ max_emr: 0.2, targets: [0, 9], legs: [] });
+  assertEqual(shapes.length, 1);
+  assertEqual(annotations, []);
+});
+
+test('drawChart adds extra traces after the page traces', async () => {
+  const page = installFakePage();
+  await drawChart(
+    { income: [0], emr: [0.1], components: { ordinary: [0.1], ss_torpedo: [0], pref_stacking: [0], niit: [0], ohio: [0] } },
+    {},
+    [{ name: 'extra' }],
+  );
+  const traces = page.plotly.calls[0].args[1];
+  assertEqual(traces[traces.length - 1].name, 'extra');
+});
+
+// ── Income page ───────────────────────────────────────────────────────────
+
+const tick = (id, on = true) => {
+  document.getElementById(id).type = 'checkbox';
+  document.getElementById(id).checked = on;
+};
+
+async function calculated(configure) {
+  const app = await startPage('income', (server, page) => {
+    FX.config.target_emr_rate_default = 0.31;
+    tick('target_include_irmaa');
+    tick('target-toggle');
+    if (configure) configure(server, page);
+  });
+  await app.el('calc-btn').click();
+  await settle();
+  return app;
+}
+
+test('income: the max EMR box starts at the configured default', async () => {
+  const app = await startPage('income', () => { FX.config.target_emr_rate_default = 0.31; });
+  assertEqual(app.el('target_max_emr').value, '31');
+});
+
+test('income: Calculate asks for target points with the same inputs plus the settings', async () => {
+  const app = await calculated();
+  const [calc] = app.server.callsMatching('POST', '/api/income-plan/calculate');
+  const posts = app.server.callsMatching('POST', '/api/target-points');
+  assertEqual(posts.length, 1);
+  assertEqual(posts[0].body, { ...calc.body, max_emr: 0.31, include_irmaa: true, irmaa_enrollees: null });
+});
+
+test('income: the target table lists the desirable legs', async () => {
+  const app = await calculated();
+  const html = app.el('target-points-body').innerHTML;
+  assertEqual(app.el('target-points-section').style.display, 'block');
+  for (const leg of FX.target_points.legs) {
+    assertTrue(html.indexOf(fmt$(leg.to_income)) !== -1, 'missing target ' + leg.to_income);
+  }
+});
+
+test('income: the chart shows the target markers while the box is ticked', async () => {
+  const app = await calculated();
+  const plot = lastPlot(app);
+  assertTrue(traceNames(plot).indexOf('Target points') !== -1, 'missing target dots');
+  assertTrue(plot.layout.shapes.some((s) => s.y0 === FX.target_points.max_emr && s.xref === 'paper'), 'missing max EMR line');
+});
+
+test('income: unticking Target Points removes the markers', async () => {
+  const app = await calculated();
+  app.el('target-toggle').checked = false;
+  await app.el('target-toggle').dispatch('change');
+  await settle();
+  assertEqual(traceNames(lastPlot(app)).indexOf('Target points'), -1);
+  assertTrue(!lastPlot(app).layout.shapes.some((s) => s.y0 === FX.target_points.max_emr), 'max EMR line remains');
+});
+
+test('income: changing the max EMR asks again using the last Calculate inputs', async () => {
+  const app = await calculated();
+  app.el('pension').value = '99999'; // changed after Calculate: must not be sent
+  app.el('target_max_emr').value = '20';
+  await app.el('target_max_emr').dispatch('change');
+  await settle();
+  const posts = app.server.callsMatching('POST', '/api/target-points');
+  assertEqual(posts.length, 2);
+  assertEqual(posts[1].body.max_emr, 0.2);
+  assertEqual(posts[1].body.pension, posts[0].body.pension);
+});
+
+test('income: Medicare enrollees and Include IRMAA are sent', async () => {
+  const app = await calculated();
+  app.el('target_irmaa_enrollees').value = '1';
+  tick('target_include_irmaa', false);
+  await app.el('target_irmaa_enrollees').dispatch('change');
+  await settle();
+  const last = app.server.callsMatching('POST', '/api/target-points').pop();
+  assertEqual([last.body.irmaa_enrollees, last.body.include_irmaa], [1, false]);
+});
+
+test('income: an invalid max EMR is explained and nothing is requested', async () => {
+  const app = await calculated();
+  app.el('target_max_emr').value = '';
+  await app.el('target_max_emr').dispatch('change');
+  await settle();
+  assertEqual(app.server.callsMatching('POST', '/api/target-points').length, 1);
+  assertTrue(app.el('target-points-note').children[0].textContent.indexOf('max EMR') !== -1, 'no explanation shown');
+  assertEqual(app.el('target-points-body').innerHTML, '');
+});
+
+test('income: a target points failure is shown beside the table and the chart still draws', async () => {
+  const app = await calculated((server) => server.failOn('POST', '/api/target-points', 500));
+  assertTrue(app.el('target-points-note').children[0].textContent.indexOf('Target points unavailable') !== -1, 'no failure note');
+  assertEqual(errorShown(app), null);
+  assertTrue(app.page.plotly.calls.some((c) => c.name === 'newPlot'), 'chart was not drawn');
+  assertEqual(traceNames(lastPlot(app)).indexOf('Target points'), -1);
+});
+
+test('income: a response with no desirable leg says so', async () => {
+  const app = await calculated(() => { FX.target_points.legs = []; });
+  assertTrue(app.el('target-points-note').children[0].textContent.indexOf('No leg') !== -1, 'no empty note');
+});

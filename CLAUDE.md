@@ -29,7 +29,7 @@ Services are designed to work both independently and composed:
 
 - `federal_tax`, `ohio_tax`, `social_security` are standalone — usable directly via API or in tests
 - `emr` composes `federal_tax`, `ohio_tax`, and `social_security`
-- `total_cost` composes `emr` and `aca` for full tax + ACA subsidy EMR
+- `total_cost` composes `emr`, `aca`, and `irmaa` for full tax + ACA subsidy + IRMAA EMR; `target_points` composes `total_cost`
 - `accounts` and `scenarios` are standalone CRUD services over profile JSON files
 - `data_loader` is a shared utility for loading bracket and threshold data
 
@@ -51,9 +51,11 @@ router in `api/routers/` and its own independent tests.
 | `niit` | Net Investment Income Tax; counts investment income only, not pension/IRA |
 | `scenario_inputs` | Saved scenario → assembled income inputs (withdrawals folded in) for the EMR and Tax pages |
 | `tax_detail` | Point-in-time tax breakdown: composes SS taxability, federal, NIIT, and Ohio |
+| `irmaa` | Medicare Part B and D income-related surcharge by MAGI tier; amounts in `data/irmaa/irmaa_{year}.json`, tiers in the federal file |
 | `emr` | Effective marginal rate sweep, all components, boundary point insertion |
 | `aca` | ACA subsidy from schedule-based interpolation, cliff detection |
-| `total_cost` | Combines tax EMR + ACA subsidy loss into total cost EMR |
+| `total_cost` | Combines tax EMR + ACA subsidy loss + IRMAA surcharge into total cost EMR |
+| `target_points` | Given a max EMR, the income points just before each costly stretch and the desirable legs between them |
 | `accounts` | Account inventory CRUD (taxable/traditional/roth/hsa) |
 | `scenarios` | Save/load/export/import named planning scenarios |
 | `data_loader` | Shared bracket and threshold data loading |
@@ -84,6 +86,7 @@ Default route `/` redirects to `income.html`. `/emr` redirects to `emr.html`.
   Adding a new tax year means adding a new file — never modify existing year files.
 - ACA schedule data lives in `data/aca/aca_{year}.json`. Updated annually by the user.
 - User scenarios are stored as JSON in `profile/scenarios/` (gitignored).
+- IRMAA surcharge amounts live in `data/irmaa/irmaa_{year}.json`, one file per year; the tier thresholds stay in `data/brackets/federal_{year}.json`.
 - Age 65+ extra standard deduction amounts live in `data/deductions/aged_{year}.json`, one file per year.
 - The temporary senior deduction lives in `data/senior_deduction.json` (its first and last year, amount, phase-out). The EMR sweep holds it at the starting income.
 - Account data is stored in `profile/accounts.json` (gitignored).

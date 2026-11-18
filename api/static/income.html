@@ -11,6 +11,7 @@
   <script src="/static/js/config.js"></script>
   <script src="/static/js/scenario-bar.js"></script>
   <script src="/static/js/emr-chart.js"></script>
+  <script src="/static/js/target-points.js"></script>
   <link rel="stylesheet" href="/static/css/scenario-bar.css">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -262,6 +263,12 @@
     .key-points-table td:first-child { font-variant-numeric: tabular-nums; }
     .key-points-table td:nth-child(2) { font-variant-numeric: tabular-nums; }
     .key-points-table tr:last-child td { border-bottom: none; }
+    .target-controls {
+      display: flex; flex-wrap: wrap; gap: 16px; align-items: center;
+      padding: 10px 14px; font-size: 13px;
+    }
+    .target-controls input[type="number"] { width: 70px; }
+    .target-footnote { padding: 8px 14px; font-size: 12px; color: #6c757d; }
 
     /* ── Portfolio Summary ── */
     .portfolio-row {
@@ -768,6 +775,10 @@
             <input type="checkbox" id="irmaa-toggle" checked>
             IRMAA Thresholds
           </label>
+          <label class="irmaa-toggle">
+            <input type="checkbox" id="target-toggle" checked>
+            Target Points
+          </label>
         </div>
         <div id="chart" style="width:100%; height:500px; min-height:500px;"></div>
       </div>
@@ -788,6 +799,40 @@
         <div id="key-points-note"></div>
       </div>
 
+      <!-- Target Points Table (shown after Calculate) -->
+      <div class="card" id="target-points-section" style="display:none;">
+        <div class="card-header">Target Points</div>
+        <div class="target-controls">
+          <label>Max EMR
+            <input type="number" id="target_max_emr" min="0" step="0.5"> %
+          </label>
+          <label class="irmaa-toggle">
+            <input type="checkbox" id="target_include_irmaa" checked>
+            Include IRMAA
+          </label>
+          <label title="People on Medicare who pay the surcharge; blank means everyone on the return">
+            Medicare enrollees
+            <input type="number" id="target_irmaa_enrollees" min="0" step="1" placeholder="all">
+          </label>
+        </div>
+        <table class="key-points-table">
+          <thead>
+            <tr>
+              <th>From</th>
+              <th>To (target)</th>
+              <th>Average EMR</th>
+              <th>Added cost</th>
+              <th>Includes</th>
+            </tr>
+          </thead>
+          <tbody id="target-points-body"></tbody>
+        </table>
+        <div id="target-points-note"></div>
+        <p class="target-footnote">Each leg runs between two targets, so its average counts any
+          costly stretch inside it. IRMAA is counted in the year of the income that causes it,
+          although it is billed two years later.</p>
+      </div>
+
       <!-- Portfolio Summary (shown on load) -->
       <div class="card" id="portfolio-section">
         <div class="card-header">Portfolio Summary</div>
@@ -806,6 +851,8 @@
   // ── State ─────────────────────────────────────────────────────────────
   const CONFIG = {};
   let lastResult         = null;
+  let lastPayload        = null;  // the request behind lastResult, reused for target points
+  let lastTargets        = null;  // response of /api/target-points for lastResult, or null
   let accounts           = [];
   let executedWithdrawals = [];  // [{ id, description, amount, basis, type }]
   let acaCliffMagi    = 0;     // updated from Calculate response
@@ -821,6 +868,7 @@
     applySeniorDeductionYears(data.senior_deduction_years);
     CONFIG.yAxisMaxEMR = data.y_axis_max_emr;
     CONFIG.sweepCeiling = data.income_plan_sweep_ceiling;
+    el('target_max_emr').value = percentInputValue(data.target_emr_rate_default);
   }
 
   // ── Accounts ──────────────────────────────────────────────────────────
@@ -1305,7 +1353,9 @@
     calcBtn.textContent = 'Calculating…';
 
     try {
-      lastResult = await postJson('/api/income-plan/calculate', buildCalculatePayload());
+      lastPayload = buildCalculatePayload();
+      lastResult = await postJson('/api/income-plan/calculate', lastPayload);
+      await fetchTargets();
 
       // Update ACA cliff, estimated taxes, and APTC estimate from response
       if (lastResult.aca_cliff_magi > 0) {
@@ -1327,9 +1377,11 @@
 
       el('chart-section').style.display     = 'block';
       el('key-points-section').style.display = 'block';
+      el('target-points-section').style.display = 'block';
       Plotly.Plots.resize(el('chart'));
       renderChart();
       renderKeyPoints(lastResult.planning_signals);
+      renderTargetPoints();
 
       // Refresh portfolio summary
       try {
@@ -1372,6 +1424,11 @@
     shapes.push(...cliff.shapes);
     annotations.push(...cliff.annotations);
 
+    // Target points: max EMR line and a green line per desirable leg
+    const targets = targetOverlay();
+    shapes.push(...targets.shapes);
+    annotations.push(...targets.annotations);
+
     return {
       ...buildBaseLayout('Additional Ordinary Income ($)', CONFIG.yAxisMaxEMR),
       shapes,
@@ -1381,7 +1438,15 @@
 
   async function renderChart() {
     if (!lastResult) return;
-    await drawChart(lastResult.points, buildLayout());
+    await drawChart(lastResult.points, buildLayout(), targetOverlay().traces);
+  }
+
+  // The target point markers, or nothing while they are off or not loaded.
+  function targetOverlay() {
+    if (!el('target-toggle')?.checked || !lastTargets) {
+      return { traces: [], shapes: [], annotations: [] };
+    }
+    return targetChartMarkers(lastTargets);
   }
 
   wireChartModeButtons(renderChart);
@@ -1389,6 +1454,63 @@
   el('irmaa-toggle').addEventListener('change', () => {
     if (lastResult) renderChart();
   });
+
+  // ── Target Points ─────────────────────────────────────────────────────
+  // Asks the server for the target points of the last Calculate; a failure here is
+  // shown beside the table and never hides the chart.
+  async function fetchTargets() {
+    const maxEmr = parseMaxEmrPercent(el('target_max_emr').value);
+    lastTargets = null;
+    if (maxEmr === null) {
+      setTargetNote('Enter a max EMR of 0% or more.');
+      return;
+    }
+    try {
+      lastTargets = await postJson('/api/target-points', targetPointsPayload(lastPayload, {
+        maxEmr,
+        includeIrmaa: el('target_include_irmaa').checked,
+        enrollees: parseEnrollees(el('target_irmaa_enrollees').value),
+      }));
+      setTargetNote('');
+    } catch (err) {
+      setTargetNote('Target points unavailable: ' + err.message);
+    }
+  }
+
+  function setTargetNote(message) {
+    const note = el('target-points-note');
+    note.innerHTML = '';
+    if (!message) return;
+    const p = document.createElement('p');
+    p.style.cssText = 'padding: 8px 14px; font-size: 12px; color: #6c757d;';
+    p.textContent = message;
+    note.appendChild(p);
+  }
+
+  function renderTargetPoints() {
+    const rows = lastTargets ? targetLegRows(lastTargets.legs) : [];
+    el('target-points-body').innerHTML = rows.map(r => `<tr>
+        <td>${escHtml(r.from)}</td>
+        <td>${escHtml(r.to)}</td>
+        <td>${escHtml(r.average)}</td>
+        <td>${escHtml(r.cost)}</td>
+        <td>${escHtml(r.causes)}</td>
+      </tr>`).join('');
+    if (lastTargets && !rows.length) {
+      setTargetNote('No leg averages at or below the max EMR.');
+    }
+  }
+
+  async function refreshTargets() {
+    if (!lastPayload) return;
+    await fetchTargets();
+    renderTargetPoints();
+    renderChart();
+  }
+
+  ['target_max_emr', 'target_include_irmaa', 'target_irmaa_enrollees'].forEach(id =>
+    el(id).addEventListener('change', refreshTargets));
+  el('target-toggle').addEventListener('change', () => { if (lastResult) renderChart(); });
 
   // ── Key Points Table ──────────────────────────────────────────────────
   function renderKeyPoints(signals) {

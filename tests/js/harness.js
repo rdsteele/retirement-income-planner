@@ -337,5 +337,6 @@ function makeAppServer(F = __FIXTURES) {
   server.handle('POST', '/api/total-cost', ok(F.total_cost));
   server.handle('POST', '/api/income-plan/summary', ok(F.income_plan_summary));
   server.handle('POST', '/api/income-plan/calculate', ok(F.income_plan_calculate));
+  server.handle('POST', '/api/target-points', ok(F.target_points));
   return server;
 }

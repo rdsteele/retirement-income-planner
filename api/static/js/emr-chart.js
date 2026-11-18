@@ -116,10 +116,11 @@ function acaCliffMarkers(signals) {
   };
 }
 
-// Plots the points in the current mode (stacked area or lines) with the given layout.
-async function drawChart(pts, layout) {
+// Plots the points in the current mode (stacked area or lines) with the given layout,
+// plus any extra traces a page adds on top.
+async function drawChart(pts, layout, extraTraces = []) {
   const traces = chartMode === 'stacked' ? buildStackedTraces(pts) : buildLineTraces(pts);
-  await Plotly.newPlot('chart', traces, layout, { responsive: true });
+  await Plotly.newPlot('chart', [...traces, ...extraTraces], layout, { responsive: true });
 }
 
 // Connects the Stacked Area / Lines buttons; `redraw` re-renders the page's chart.

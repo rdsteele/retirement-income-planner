@@ -88,6 +88,10 @@ def build_fixtures() -> dict[str, object]:
         ).json(),
         "income_plan_summary": client.post("/api/income-plan/summary", json=plan).json(),
         "income_plan_calculate": client.post("/api/income-plan/calculate", json=plan).json(),
+        "target_points": client.post(
+            "/api/target-points",
+            json={**plan, "max_emr": client.get("/api/config").json()["target_emr_rate_default"]},
+        ).json(),
         "scenario_sweep_inputs": _scenario_sweep_inputs(client),
     }
 
