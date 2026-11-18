@@ -327,3 +327,116 @@ test('panel: a change redraws only once there is a request to repeat', async () 
   await settle();
   assertEqual(changes.length, 1);
 });
+
+// ── EMR page ──────────────────────────────────────────────────────────────
+
+const sweepPosts = (app) => app.server.calls.filter(
+  (c) => c.method === 'POST' && c.url === '/api/total-cost/target-points');
+
+async function emrRun(configure) {
+  return startPage('emr', (server, page) => {
+    FX.config.target_emr_rate_default = 0.31;
+    tick('target_include_irmaa');
+    tick('target-toggle');
+    if (configure) configure(server, page);
+  });
+}
+
+test('emr: the max EMR box starts at the configured default', async () => {
+  const app = await emrRun();
+  assertEqual(app.el('target_max_emr').value, '31');
+});
+
+test('emr: the run asks for target points with the same request plus the settings', async () => {
+  const app = await emrRun();
+  const [run] = app.server.calls.filter((c) => c.method === 'POST' && c.url === '/api/total-cost');
+  const posts = sweepPosts(app);
+  assertEqual(posts.length, 1);
+  assertEqual(posts[0].body, {
+    ...run.body, max_emr: 0.31, include_irmaa: true, irmaa_enrollees: null,
+    irmaa_inflation_rate: 0,
+  });
+});
+
+test('emr: the target table lists the desirable legs and is shown', async () => {
+  const app = await emrRun();
+  assertEqual(app.el('target-points-section').style.display, 'block');
+  const html = app.el('target-points-body').innerHTML;
+  for (const leg of FX.target_points_sweep.legs) {
+    assertTrue(html.indexOf(fmt$(leg.to_income)) !== -1, 'missing target ' + leg.to_income);
+  }
+});
+
+test('emr: the chart shows the target markers while the box is ticked', async () => {
+  const app = await emrRun();
+  const plot = lastPlot(app);
+  assertTrue(traceNames(plot).indexOf('Target points') !== -1, 'missing target dots');
+  assertTrue(plot.layout.shapes.some((s) => s.y0 === FX.target_points_sweep.max_emr && s.xref === 'paper'), 'missing max EMR line');
+});
+
+test('emr: unticking Target Points removes the markers', async () => {
+  const app = await emrRun();
+  app.el('target-toggle').checked = false;
+  await app.el('target-toggle').dispatch('change');
+  await settle();
+  assertEqual(traceNames(lastPlot(app)).indexOf('Target points'), -1);
+});
+
+test('emr: turning the IRMAA lines on keeps the target markers', async () => {
+  const app = await emrRun(() => {
+    FX.target_points_sweep.irmaa_thresholds = [50000];
+    FX.total_cost.points.irmaa_magi = FX.total_cost.points.income.map((x) => x + 40000);
+  });
+  tick('irmaa-toggle', false);
+  app.el('irmaa-toggle').checked = true;
+  await app.el('irmaa-toggle').dispatch('change');
+  await settle();
+  const relayout = app.page.plotly.calls.filter((c) => c.name === 'relayout').pop().args[1];
+  assertTrue(relayout.shapes.some((s) => s.y0 === FX.target_points_sweep.max_emr), 'target markers lost');
+  assertTrue(relayout.shapes.some((s) => s.x0 === 10000), 'IRMAA line missing');
+});
+
+test('emr: the IRMAA lines use the thresholds the targets were placed with', async () => {
+  const app = await emrRun(() => {
+    tick('irmaa-toggle');
+    FX.total_cost.irmaa_thresholds = [50000]; // published
+    FX.target_points_sweep.irmaa_thresholds = [55000]; // as the server placed the targets
+    FX.total_cost.points.irmaa_magi = FX.total_cost.points.income.map((x) => x + 40000);
+  });
+  const relayout = app.page.plotly.calls.filter((c) => c.name === 'relayout').pop().args[1];
+  assertEqual(relayout.shapes.filter((s) => s.yref === 'paper' && s.xref !== 'paper').map((s) => s.x0), [15000]);
+});
+
+test('emr: changing the max EMR asks again with the last run inputs', async () => {
+  const app = await emrRun();
+  app.el('pension').value = '99999'; // changed after the run: must not be sent
+  app.el('target_max_emr').value = '20';
+  await app.el('target_max_emr').dispatch('change');
+  await settle();
+  const posts = sweepPosts(app);
+  assertEqual(posts.length, 2);
+  assertEqual(posts[1].body.max_emr, 0.2);
+  assertEqual(posts[1].body.pension, posts[0].body.pension);
+});
+
+test('emr: a target points failure is shown beside the table and the chart still draws', async () => {
+  const app = await emrRun((server) => server.failOn('POST', '/api/total-cost/target-points', 500));
+  assertTrue(app.el('target-points-note').children[0].textContent.indexOf('Target points unavailable') !== -1, 'no failure note');
+  assertEqual(errorShown(app), null);
+  assertEqual(traceNames(lastPlot(app)).indexOf('Target points'), -1);
+});
+
+test('emr: tiers above the sweep are called out', async () => {
+  const app = await emrRun(() => {
+    FX.target_points_sweep.irmaa_thresholds = [1e9, 2e9];
+  });
+  assertTrue(app.el('target-range-hint').textContent.indexOf('2 IRMAA tiers') !== -1, 'no range hint');
+});
+
+test('the range hint counts tiers above the sweep and is empty otherwise', () => {
+  assertEqual(irmaaRangeHint([100, 200, 300], 250, true).indexOf('1 IRMAA tier starts'), 0);
+  assertEqual(irmaaRangeHint([100, 200, 300], 50, true).indexOf('3 IRMAA tiers start'), 0);
+  assertEqual(irmaaRangeHint([100, 200], 250, true), '');
+  assertEqual(irmaaRangeHint([100, 200, 300], 50, false), '');
+  assertEqual(irmaaRangeHint([100], null, true), '');
+});

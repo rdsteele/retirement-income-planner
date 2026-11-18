@@ -12,9 +12,11 @@ from dataclasses import dataclass, field, replace
 from decimal import Decimal
 
 from services.common import round_rate
+from services.data_loader import get_irmaa_inflation_default
 from services.emr import SweepMode
 from services.income_inputs import IncomeInputs
-from services.total_cost import TotalCostPoint, calculate_total_cost
+from services.irmaa import projected_thresholds
+from services.total_cost import TotalCostPoint, TotalCostResult, calculate_total_cost
 
 _ZERO = Decimal("0")
 
@@ -44,8 +46,8 @@ class TargetPointsResult:
     max_rate: Decimal
     targets: list[Decimal] = field(default_factory=list)
     legs: list[TargetLeg] = field(default_factory=list)
-    # IRMAA thresholds the costs were computed with (empty when IRMAA is left out), so a
-    # chart can draw its threshold lines where the targets were placed.
+    # IRMAA thresholds for the requested growth (the ones the costs used when IRMAA is
+    # included), so a chart can draw its threshold lines where the targets were placed.
     irmaa_thresholds: list[Decimal] = field(default_factory=list)
 
 
@@ -160,6 +162,19 @@ def to_cost_points(points: list[TotalCostPoint], max_rate: Decimal) -> list[Cost
     return [CostPoint(p.income, _total_cost_of(p), _causes_of(p, max_rate)) for p in points]
 
 
+def _thresholds_reported(
+    sweep: TotalCostResult,
+    filing_status: str,
+    tax_year: int,
+    inflation_rate: Decimal | None,
+) -> list[Decimal]:
+    """The thresholds the sweep used, or the ones for the same growth when IRMAA was left out."""
+    if sweep.irmaa_projected_thresholds:
+        return sweep.irmaa_projected_thresholds
+    rate = get_irmaa_inflation_default() if inflation_rate is None else inflation_rate
+    return projected_thresholds(filing_status, tax_year, rate)
+
+
 def calculate_target_points(
     *,
     income: IncomeInputs,
@@ -198,4 +213,5 @@ def calculate_target_points(
         irmaa_inflation_rate=irmaa_inflation_rate,
     )
     found = find_target_points(to_cost_points(sweep.points, max_rate), max_rate)
-    return replace(found, irmaa_thresholds=sweep.irmaa_projected_thresholds)
+    thresholds = _thresholds_reported(sweep, filing_status, tax_year, irmaa_inflation_rate)
+    return replace(found, irmaa_thresholds=thresholds)

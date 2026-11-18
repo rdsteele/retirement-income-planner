@@ -92,6 +92,52 @@ class TestCalculateTargetPoints:
         assert result.legs[0].average_emr == D("0.1000")
         assert result.irmaa_thresholds == [D("115000"), D("144000")]
 
+    def test_thresholds_are_still_reported_for_the_growth_when_irmaa_is_off(self, monkeypatch):
+        monkeypatch.setattr(
+            module,
+            "calculate_total_cost",
+            lambda **kwargs: SimpleNamespace(points=[], irmaa_projected_thresholds=[]),
+        )
+        seen = {}
+
+        def fake_projected(status, year, rate):
+            seen.update(status=status, year=year, rate=rate)
+            return [D("123000")]
+
+        monkeypatch.setattr(module, "projected_thresholds", fake_projected)
+        result = module.calculate_target_points(
+            income=IncomeInputs(),
+            filing_status="single",
+            tax_year=7,
+            max_rate=D("0.25"),
+            include_irmaa=False,
+            irmaa_inflation_rate=D("0.04"),
+        )
+        assert result.irmaa_thresholds == [D("123000")]
+        assert seen == {"status": "single", "year": 7, "rate": D("0.04")}
+
+    def test_default_growth_applies_to_the_reported_thresholds_when_none_is_given(
+        self, monkeypatch
+    ):
+        monkeypatch.setattr(
+            module,
+            "calculate_total_cost",
+            lambda **kwargs: SimpleNamespace(points=[], irmaa_projected_thresholds=[]),
+        )
+        monkeypatch.setattr(module, "get_irmaa_inflation_default", lambda: D("0.02"))
+        rates = []
+        monkeypatch.setattr(
+            module, "projected_thresholds", lambda s, y, rate: rates.append(rate) or []
+        )
+        module.calculate_target_points(
+            income=IncomeInputs(),
+            filing_status="single",
+            tax_year=7,
+            max_rate=D("0.25"),
+            include_irmaa=False,
+        )
+        assert rates == [D("0.02")]
+
     def test_irmaa_can_be_turned_off(self, monkeypatch):
         seen = {}
         monkeypatch.setattr(
@@ -101,6 +147,7 @@ class TestCalculateTargetPoints:
                 seen.update(kwargs) or SimpleNamespace(points=[], irmaa_projected_thresholds=[])
             ),
         )
+        monkeypatch.setattr(module, "projected_thresholds", lambda *args: [])
         module.calculate_target_points(
             income=IncomeInputs(),
             filing_status="single",

@@ -51,6 +51,19 @@ function targetPointsPayload(calculatePayload, { maxEmr, includeIrmaa, enrollees
   };
 }
 
+// A reminder when IRMAA tiers start above the sweep, so their cliffs cannot be targets.
+// Empty when IRMAA is left out or every tier is inside the sweep.
+function irmaaRangeHint(thresholds, sweepMaxMagi, includeIrmaa) {
+  if (!includeIrmaa || sweepMaxMagi == null) return '';
+  const above = thresholds.filter((t) => t > sweepMaxMagi).length;
+  if (above === 0) return '';
+  return above === 1
+    ? '1 IRMAA tier starts above this sweep, so no target is found for it. '
+      + 'Raise the sweep ceiling to include it.'
+    : `${above} IRMAA tiers start above this sweep, so no targets are found for them. `
+      + 'Raise the sweep ceiling to include them.';
+}
+
 function targetCauseText(causes) {
   if (!causes.length) return '—';
   return causes.map((cause) => TARGET_CAUSE_LABELS[cause] ?? cause).join(', ');

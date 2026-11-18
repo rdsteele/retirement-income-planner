@@ -111,9 +111,12 @@ test('tax: shows the server error when the calculation fails', async () => {
 
 // ── EMR Analysis ──────────────────────────────────────────────────────────
 
+// Calls to exactly this URL (callsMatching also matches longer URLs that contain it).
+const callsTo = (app, method, url) => app.server.calls.filter((c) => c.method === method && c.url === url);
+
 test('emr: runs on load with API-provided status, year, and the configured sweep step', async () => {
   const app = await startPage('emr');
-  const posts = app.server.callsMatching('POST', '/api/total-cost');
+  const posts = callsTo(app, 'POST', '/api/total-cost');
   assertEqual(posts.length, 1);
   assertEqual(posts[0].body.filing_status, FIRST_STATUS());
   assertEqual(posts[0].body.tax_year, DEFAULT_YEAR());
@@ -127,7 +130,7 @@ test('emr: a blank sweep step is sent as null so the server applies its default'
   app.server.calls.length = 0;
   await app.el('run-btn').click();
   await settle();
-  const posts = app.server.callsMatching('POST', '/api/total-cost');
+  const posts = callsTo(app, 'POST', '/api/total-cost');
   assertEqual(posts.length, 1);
   assertEqual(posts[0].body.sweep_step, null);
 });
@@ -145,22 +148,33 @@ test('emr: renders one badge per configured bracket rate and the default ceiling
   assertEqual(app.el('sweep_ceiling').placeholder, `${ceiling} (${rate} bracket top)`);
 });
 
-test('emr: IRMAA labels and inflation scaling use the configured lookback years', async () => {
-  const app = await startPage('emr');
-  const years = FX.config.irmaa_lookback_years;
-  const labels = __page.buildIrmaaAnnotations([{ tier: 1, x: 100000 }], true, true).map((a) => a.text);
-  assertEqual(labels, [`IRMAA 1 (est. ${DEFAULT_YEAR() + years})`]);
+test('emr: a grown IRMAA threshold is labelled with the year it applies to', async () => {
+  const app = await startPage('emr', () => {
+    FX.config.irmaa_lookback_years = 3;
+    FX.config.irmaa_inflation_default = 0.03;
+    document.getElementById('irmaa_inflation_adj').type = 'checkbox';
+  });
+  app.el('irmaa_inflation_adj').checked = true;
+  await app.el('irmaa_inflation_adj').dispatch('change');
+  await settle();
+  const labels = __page.buildIrmaaAnnotations(
+    [{ tier: 1, x: 100000 }], true, __page.effectiveIrmaaLines().suffix,
+  ).map((a) => a.text);
+  assertEqual(labels, [`IRMAA 1 (est. ${DEFAULT_YEAR() + 3})`]);
+});
 
-  // 10% inflation over the lookback years, applied to a threshold inside the sweep range
+test('emr: the inflation controls are sent to the server, which grows the thresholds', async () => {
+  const app = await startPage('emr', () => {
+    FX.config.irmaa_inflation_default = 0.03;
+    document.getElementById('irmaa_inflation_adj').type = 'checkbox';
+  });
+  assertEqual(app.el('irmaa_inflation_rate').value, '3');
   app.el('irmaa_inflation_adj').checked = true;
   app.el('irmaa_inflation_rate').value = '10';
-  // MAGI = sweep + 1,000 here, so the line sits at (scaled threshold - 1,000)
-  __page.lastResult.irmaa_thresholds = [5000];
-  __page.lastResult.points.income = [0, 20000];
-  __page.lastResult.points.irmaa_magi = [1000, 21000];
-  const x = __page.effectiveIrmaaLines().lines[0].x;
-  const expected = 5000 * 1.1 ** years - 1000;
-  assertTrue(Math.abs(x - expected) < 1e-6, `expected ${expected}, got ${x}`);
+  await app.el('irmaa_inflation_adj').dispatch('change');
+  await settle();
+  const last = callsTo(app, 'POST', '/api/total-cost/target-points').pop();
+  assertEqual(last.body.irmaa_inflation_rate, 0.1);
 });
 
 test('emr: draws the chart', async () => {
@@ -497,6 +511,7 @@ test('emr: turning IRMAA lines on keeps the ACA cliff marker', async () => {
     r.planning_signals.aca_cliff_sweep_value = 12345;
     r.irmaa_thresholds = [50000];
     r.points.irmaa_magi = r.points.income.map((x) => x + 40000);
+    FX.target_points_sweep.irmaa_thresholds = []; // no targets thresholds: the published ones are drawn
   });
   const update = app.page.plotly.calls.filter((c) => c.name === 'relayout')[0].args[1];
   assertEqual(update.shapes.map((sh) => sh.x0).sort((a, b) => a - b), [10000, 12345]);
@@ -528,6 +543,7 @@ test('emr: an IRMAA line sits where the sweep MAGI reaches the threshold, not at
     const r = FX.total_cost;
     r.irmaa_thresholds = [50000];
     r.points.irmaa_magi = r.points.income.map((x) => x + 40000); // 40,000 of fixed income
+    FX.target_points_sweep.irmaa_thresholds = [];
   });
   const update = app.page.plotly.calls.filter((c) => c.name === 'relayout')[0].args[1];
   assertEqual(update.shapes.map((sh) => sh.x0), [10000]);

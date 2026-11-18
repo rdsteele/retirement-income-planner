@@ -3,15 +3,22 @@
 // The Target Points card shared by the Income and EMR pages: it asks the server for the
 // target points of the page's last calculation, fills the table, and supplies the chart
 // markers and IRMAA threshold lines. Each page creates one panel with its own endpoint and
-// redraw callback, and the card's elements use the same ids on both pages.
+// redraw callback, and the card's elements use the same ids on both pages. A page that
+// keeps its IRMAA growth controls elsewhere (the EMR page's chart toolbar) names them in
+// `inflationControls`.
 // Depends on api.js, common.js, and target-points.js. Declarations only.
 
 // `endpoint` is the route for the page's request shape; `onChange` redraws the page's
 // chart after the user changes a setting.
-function createTargetPanel({ endpoint, onChange }) {
+function createTargetPanel({ endpoint, onChange, inflationControls = {} }) {
+  const adjustId = inflationControls.adjustId ?? 'target_irmaa_inflation_adj';
+  const rateId = inflationControls.rateId ?? 'target_irmaa_inflation_rate';
+  const wrapId = inflationControls.wrapId ?? 'target-inflation-rate-wrap';
   let request = null; // the request behind the page's current result
   let targets = null; // the server's response for that request, or null
-  let inflation = 0; // IRMAA threshold growth the targets were computed with
+  let grownBy = 0; // IRMAA threshold growth the targets were computed with
+  let includedIrmaa = false; // whether IRMAA was part of the costs
+  let sweepMax = null; // highest IRMAA MAGI the sweep reaches, when the page says
 
   function setNote(message) {
     const note = el('target-points-note');
@@ -27,8 +34,7 @@ function createTargetPanel({ endpoint, onChange }) {
   // invalid.
   function readSettings() {
     const maxEmr = parseMaxEmrPercent(el('target_max_emr').value);
-    const inflationRate = irmaaInflationRate(
-      el('target_irmaa_inflation_adj').checked, el('target_irmaa_inflation_rate').value);
+    const inflationRate = irmaaInflationRate(el(adjustId).checked, el(rateId).value);
     if (maxEmr === null) {
       setNote('Enter a max EMR of 0% or more.');
       return null;
@@ -52,7 +58,8 @@ function createTargetPanel({ endpoint, onChange }) {
     if (!settings) return;
     try {
       targets = await postJson(endpoint, targetPointsPayload(request, settings));
-      inflation = settings.inflationRate;
+      grownBy = settings.inflationRate;
+      includedIrmaa = settings.includeIrmaa;
       setNote('');
     } catch (err) {
       setNote('Target points unavailable: ' + err.message);
@@ -69,6 +76,14 @@ function createTargetPanel({ endpoint, onChange }) {
         <td>${escHtml(r.causes)}</td>
       </tr>`).join('');
     if (targets && !rows.length) setNote('No leg averages at or below the max EMR.');
+    renderRangeHint();
+  }
+
+  function renderRangeHint() {
+    const hint = el('target-range-hint');
+    if (!hint) return;
+    hint.textContent = targets ? irmaaRangeHint(targets.irmaa_thresholds, sweepMax, includedIrmaa) : '';
+    hint.style.display = hint.textContent ? 'block' : 'none';
   }
 
   async function refresh() {
@@ -82,24 +97,24 @@ function createTargetPanel({ endpoint, onChange }) {
     // Fills the settings from the API's config.
     applyConfig(config) {
       el('target_max_emr').value = percentInputValue(config.target_emr_rate_default);
-      el('target_irmaa_inflation_rate').value = percentInputValue(config.irmaa_inflation_default);
+      el(rateId).value = percentInputValue(config.irmaa_inflation_default);
     },
 
     // Connects the card's controls; any change asks again with the last request.
     wire() {
-      ['target_max_emr', 'target_include_irmaa', 'target_irmaa_enrollees',
-        'target_irmaa_inflation_adj', 'target_irmaa_inflation_rate']
+      ['target_max_emr', 'target_include_irmaa', 'target_irmaa_enrollees', adjustId, rateId]
         .forEach((id) => el(id).addEventListener('change', refresh));
-      el('target_irmaa_inflation_adj').addEventListener('change', () => {
-        el('target-inflation-rate-wrap').classList.toggle(
-          'hidden', !el('target_irmaa_inflation_adj').checked);
+      el(adjustId).addEventListener('change', () => {
+        el(wrapId).classList.toggle('hidden', !el(adjustId).checked);
       });
       el('target-toggle').addEventListener('change', onChange);
     },
 
-    // Asks for the targets of a new calculation and fills the table.
-    async load(newRequest) {
+    // Asks for the targets of a new calculation and fills the table. `sweepMaxMagi` is the
+    // highest IRMAA MAGI the sweep reaches, for the reminder about tiers above it.
+    async load(newRequest, sweepMaxMagi = null) {
       request = newRequest;
+      sweepMax = sweepMaxMagi;
       await fetchTargets();
       renderTable();
     },
@@ -123,7 +138,7 @@ function createTargetPanel({ endpoint, onChange }) {
 
     // " (est. year)" for a line whose threshold was grown to the year it is billed.
     irmaaSuffix(taxYear, lookbackYears) {
-      const grown = targets?.irmaa_thresholds?.length && inflation > 0;
+      const grown = targets?.irmaa_thresholds?.length && grownBy > 0;
       return grown ? ` (est. ${taxYear + lookbackYears})` : '';
     },
   };

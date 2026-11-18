@@ -836,6 +836,7 @@
           <tbody id="target-points-body"></tbody>
         </table>
         <div id="target-points-note"></div>
+        <p class="target-footnote" id="target-range-hint" style="display:none;"></p>
         <p class="target-footnote">Each leg runs between two targets, so its average counts any
           costly stretch inside it. IRMAA is counted in the year of the income that causes it,
           although it is billed two years later.</p>
@@ -1367,7 +1368,7 @@
     try {
       lastPayload = buildCalculatePayload();
       lastResult = await postJson('/api/income-plan/calculate', lastPayload);
-      await targetPanel.load(lastPayload);
+      await targetPanel.load(lastPayload, lastResult.points.irmaa_magi.at(-1));
 
       // Update ACA cliff, estimated taxes, and APTC estimate from response
       if (lastResult.aca_cliff_magi > 0) {

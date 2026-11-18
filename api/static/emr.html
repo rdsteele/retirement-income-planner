@@ -253,6 +253,22 @@
 
     #chart { width: 100%; height: 500px; }
 
+    .target-controls {
+      display: flex; flex-wrap: wrap; gap: 16px; align-items: center;
+      padding: 10px 14px; font-size: 13px;
+    }
+    .target-controls input[type="number"] { width: 70px; }
+    .target-points-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .target-points-table th {
+      text-align: left; padding: 6px 14px; font-size: 11px; letter-spacing: 0.05em;
+      text-transform: uppercase; color: #6c757d; border-bottom: 2px solid #e9ecef;
+    }
+    .target-points-table td {
+      padding: 6px 14px; border-bottom: 1px solid #f1f3f5; font-variant-numeric: tabular-nums;
+    }
+    .target-points-table tr:last-child td { border-bottom: none; }
+    .target-footnote { padding: 8px 14px; font-size: 12px; color: #6c757d; }
+
     /* ── Scenario bar ── */
   </style>
   <link rel="stylesheet" href="/static/css/scenario-bar.css">
@@ -427,8 +443,48 @@
             <input type="number" id="irmaa_inflation_rate" min="0" max="20" step="0.1">
             <span class="toolbar-label">% / yr</span>
           </div>
+          <label class="irmaa-toggle">
+            <input type="checkbox" id="target-toggle" checked>
+            Target Points
+          </label>
         </div>
         <div id="chart" style="width:100%; height:500px; min-height:500px;"></div>
+      </div>
+
+      <!-- Target Points Table (shown after a run) -->
+      <div class="card" id="target-points-section" style="display:none;">
+        <div class="card-header">Target Points</div>
+        <div class="target-controls">
+          <label>Max EMR
+            <input type="number" id="target_max_emr" min="0" step="0.5"> %
+          </label>
+          <label class="irmaa-toggle">
+            <input type="checkbox" id="target_include_irmaa" checked>
+            Include IRMAA
+          </label>
+          <label title="People on Medicare who pay the surcharge; blank means everyone on the return">
+            Medicare enrollees
+            <input type="number" id="target_irmaa_enrollees" min="0" step="1" placeholder="all">
+          </label>
+        </div>
+        <table class="target-points-table">
+          <thead>
+            <tr>
+              <th>From</th>
+              <th>To (target)</th>
+              <th>Average EMR</th>
+              <th>Added cost</th>
+              <th>Includes</th>
+            </tr>
+          </thead>
+          <tbody id="target-points-body"></tbody>
+        </table>
+        <div id="target-points-note"></div>
+        <p class="target-footnote" id="target-range-hint" style="display:none;"></p>
+        <p class="target-footnote">Each leg runs between two targets, so its average counts any
+          costly stretch inside it. IRMAA is counted in the year of the income that causes it,
+          although it is billed two years later. Adjust IRMAA for Inflation above the chart
+          also moves the targets.</p>
       </div>
 
     </div><!-- /.right-panel -->
@@ -440,12 +496,25 @@
 <script src="/static/js/config.js"></script>
 <script src="/static/js/scenario-bar.js"></script>
 <script src="/static/js/emr-chart.js"></script>
+<script src="/static/js/target-points.js"></script>
+<script src="/static/js/target-points-panel.js"></script>
 <script>
   // ── Config — populated from GET /api/config before first run ──────────────
   const CONFIG = {};
 
   // ── State ────────────────────────────────────────────────────────────────
   let lastResult = null;    // raw API response
+  let lastPayload = null;   // the request behind lastResult, reused for target points
+  const targetPanel = createTargetPanel({
+    endpoint: '/api/total-cost/target-points',
+    onChange: () => { if (lastResult) renderChart(); },
+    // The growth controls live in the chart toolbar on this page.
+    inflationControls: {
+      adjustId: 'irmaa_inflation_adj',
+      rateId: 'irmaa_inflation_rate',
+      wrapId: 'irmaa-inflation-rate-wrap',
+    },
+  });
 
   // ── App config loader ─────────────────────────────────────────────────────
   async function loadConfig() {
@@ -455,7 +524,7 @@
     CONFIG.yAxisMaxEMR = data.y_axis_max_emr;
     CONFIG.irmaaLookbackYears = data.irmaa_lookback_years;
     el('sweep_step').value = data.sweep_step_default;
-    el('irmaa_inflation_rate').value = (data.irmaa_inflation_default * 100).toFixed(1);
+    targetPanel.applyConfig(data);
   }
 
   // ── Sweep ceiling hint ────────────────────────────────────────────────────
@@ -587,7 +656,10 @@
     runBtn.textContent = 'Running…';
 
     try {
-      lastResult = await postJson('/api/total-cost', buildPayload());
+      lastPayload = buildPayload();
+      lastResult = await postJson('/api/total-cost', lastPayload);
+      await targetPanel.load(lastPayload, lastResult.points.irmaa_magi.at(-1));
+      targetPanel.show();
       updateSweepCeilingHint();
       renderSignals(lastResult.planning_signals);
       chartSection.style.display = 'block';
@@ -663,15 +735,16 @@
 
   // ── IRMAA helpers ─────────────────────────────────────────────────────────
 
-  // Returns { lines, adjusted }: the IRMAA lines inside the sweep, after applying inflation
-  // when the checkbox is on. Each line is { tier, x } with x on the sweep axis.
+  // The IRMAA lines inside the sweep, from the thresholds the target points were placed
+  // with (the server applies any growth), else the published ones. Each line is
+  // { tier, x } with x on the sweep axis; `suffix` labels a grown threshold's year.
   function effectiveIrmaaLines() {
-    const raw = lastResult ? lastResult.irmaa_thresholds : [];
-    const adjChecked = el('irmaa_inflation_adj').checked;
-    const rate = adjChecked ? (parseFloat(el('irmaa_inflation_rate').value) || 0) / 100 : 0;
-    const scaled = adjChecked ? raw.map(t => t * (1 + rate) ** CONFIG.irmaaLookbackYears) : raw;
-    const lines = lastResult?.points ? irmaaLines(scaled, lastResult.points) : [];
-    return { lines, adjusted: adjChecked };
+    const thresholds = targetPanel.irmaaThresholds(lastResult?.irmaa_thresholds ?? []);
+    const lines = lastResult?.points ? irmaaLines(thresholds, lastResult.points) : [];
+    const suffix = lastPayload
+      ? targetPanel.irmaaSuffix(lastPayload.tax_year, CONFIG.irmaaLookbackYears)
+      : '';
+    return { lines, suffix };
   }
 
   function buildIrmaaShapes(lines, show) {
@@ -685,15 +758,12 @@
     }));
   }
 
-  // adjusted: when true, appends "(est. YYYY)" to each label.
-  function buildIrmaaAnnotations(lines, show, adjusted) {
+  // suffix: appended to each label, the " (est. year)" text for a grown threshold.
+  function buildIrmaaAnnotations(lines, show, suffix) {
     if (!show) return [];
-    const estYear = adjusted
-      ? selectedTaxYear() + CONFIG.irmaaLookbackYears
-      : null;
     return lines.map(({ tier, x }) => ({
       x, y: 1, yref: 'paper',
-      text: 'IRMAA ' + tier + (estYear ? ` (est. ${estYear})` : ''),
+      text: 'IRMAA ' + tier + suffix,
       showarrow: false,
       font: { size: 10, color: 'gray' },
       xanchor: 'left',
@@ -702,42 +772,33 @@
   }
 
   // The shapes and annotations for a re-layout: the IRMAA lines (when shown) plus the
-  // ACA cliff, which stays on the chart either way.
+  // ACA cliff and the target point markers, which stay on the chart either way.
   function overlayMarkers(showIrmaa) {
     const cliff = acaCliffMarkers(lastResult?.planning_signals);
-    const { lines, adjusted } = effectiveIrmaaLines();
+    const targets = targetPanel.overlay();
+    const { lines, suffix } = effectiveIrmaaLines();
     return {
-      shapes:      [...buildIrmaaShapes(lines, showIrmaa), ...cliff.shapes],
-      annotations: [...buildIrmaaAnnotations(lines, showIrmaa, adjusted), ...cliff.annotations],
+      shapes: [...buildIrmaaShapes(lines, showIrmaa), ...cliff.shapes, ...targets.shapes],
+      annotations: [
+        ...buildIrmaaAnnotations(lines, showIrmaa, suffix),
+        ...cliff.annotations,
+        ...targets.annotations,
+      ],
     };
-  }
-
-  // Re-applies IRMAA shapes/annotations to an already-rendered chart.
-  function rerenderIrmaa() {
-    if (!lastResult) return;
-    const show = irmaaToggle.checked;
-    if (!show) return;
-    const currentRange = document.getElementById('chart').layout?.xaxis?.range;
-    const update = overlayMarkers(true);
-    if (currentRange) {
-      update['xaxis.range']     = currentRange;
-      update['xaxis.autorange'] = false;
-    }
-    Plotly.relayout('chart', update);
   }
 
   function buildLayout() {
     const xTitle = lastResult && lastResult.sweep_mode === 'preferential'
       ? 'Additional Preferential Income ($)'
       : 'Additional Ordinary Income ($)';
-    // IRMAA lines are drawn after the plot (see renderChart); the ACA cliff is laid out here
-    const cliff = acaCliffMarkers(lastResult?.planning_signals);
-    return { ...buildBaseLayout(xTitle, CONFIG.yAxisMaxEMR), ...cliff };
+    // IRMAA lines are drawn after the plot (see renderChart); the ACA cliff and the target
+    // markers are laid out here
+    return { ...buildBaseLayout(xTitle, CONFIG.yAxisMaxEMR), ...overlayMarkers(false) };
   }
 
   async function renderChart() {
     if (!lastResult) return;
-    await drawChart(lastResult.points, buildLayout());
+    await drawChart(lastResult.points, buildLayout(), targetPanel.overlay().traces);
     if (irmaaToggle.checked) {
       const currentRange = document.getElementById('chart').layout.xaxis.range;
       Plotly.relayout('chart', {
@@ -770,15 +831,10 @@
     }
   });
 
-  // ── IRMAA inflation adjustment ────────────────────────────────────────────
-  el('irmaa_inflation_adj').addEventListener('change', () => {
-    el('irmaa-inflation-rate-wrap').classList.toggle(
-      'hidden', !el('irmaa_inflation_adj').checked
-    );
-    rerenderIrmaa();
-  });
-
-  el('irmaa_inflation_rate').addEventListener('input', rerenderIrmaa);
+  // ── Target points ─────────────────────────────────────────────────────────
+  // The IRMAA growth controls above are part of the panel's settings: a change asks the
+  // server again and redraws the chart, so the lines and targets stay together.
+  targetPanel.wire();
 </script>
 </body>
 </html>

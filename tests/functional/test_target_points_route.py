@@ -109,8 +109,12 @@ class TestIrmaaThresholds:
         body = _post(irmaa_inflation_rate=0.05).json()
         assert body["irmaa_thresholds"][0] - 40000.0 in body["targets"]
 
-    def test_none_when_irmaa_is_left_out(self):
-        assert _post(include_irmaa=False).json()["irmaa_thresholds"] == []
+    def test_still_reported_for_the_growth_when_irmaa_is_left_out(self):
+        published = load_federal_data(2026)["irmaa_thresholds"]["single"]
+        body = _post(include_irmaa=False, irmaa_inflation_rate=0.0).json()
+        assert body["irmaa_thresholds"] == [float(t) for t in published]
+        grown = _post(include_irmaa=False, irmaa_inflation_rate=0.05).json()
+        assert grown["irmaa_thresholds"][0] > body["irmaa_thresholds"][0]
 
 
 class TestErrors:

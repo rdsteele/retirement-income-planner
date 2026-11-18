@@ -37,4 +37,4 @@ class TargetPointsResponse(BaseModel):
     max_emr: float
     targets: list[float]
     legs: list[TargetLegResponse]
-    irmaa_thresholds: list[float]  # the thresholds the targets were placed with
+    irmaa_thresholds: list[float]  # IRMAA thresholds for the requested growth
