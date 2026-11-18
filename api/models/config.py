@@ -20,5 +20,6 @@ class ConfigResponse(BaseModel):
     sweep_step_default: float
     irmaa_lookback_years: int
     income_plan_sweep_ceiling: float
+    target_emr_rate_default: float
     filing_statuses: list[FilingStatusOption]
     senior_deduction_years: SeniorDeductionYears

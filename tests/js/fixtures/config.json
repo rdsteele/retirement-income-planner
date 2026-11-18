@@ -19,5 +19,6 @@
   "last_year": 2028
  },
  "sweep_step_default": 100.0,
+ "target_emr_rate_default": 0.25,
  "y_axis_max_emr": 0.5
 }

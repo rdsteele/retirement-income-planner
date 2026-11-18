@@ -9,6 +9,7 @@ from api.routers.config import router as config_router
 from api.routers.emr import router as emr_router
 from api.routers.income_plan import router as income_plan_router
 from api.routers.scenarios import router as scenarios_router
+from api.routers.target_points import router as target_points_router
 from api.routers.tax import router as tax_router
 from api.routers.tax_years import router as tax_years_router
 from api.routers.total_cost import router as total_cost_router
@@ -31,6 +32,7 @@ app = FastAPI(title="Retirement Income Planner")
 app.include_router(emr_router, prefix="/api")
 app.include_router(income_plan_router, prefix="/api")
 app.include_router(total_cost_router, prefix="/api")
+app.include_router(target_points_router, prefix="/api")
 app.include_router(tax_router, prefix="/api")
 app.include_router(accounts_router, prefix="/api")
 app.include_router(tax_years_router, prefix="/api")

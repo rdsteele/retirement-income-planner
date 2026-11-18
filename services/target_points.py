@@ -4,13 +4,17 @@ Given the running cost of an income sweep and a maximum acceptable effective mar
 (EMR), find the last income before each stretch whose EMR is above the maximum, and the
 average EMR of each leg between those targets. Only legs whose average is within the
 maximum are returned. Pure Python on a list of cost points, with no knowledge of the API
-layer or of where the costs come from.
+layer or of where the costs come from. ``calculate_target_points`` composes the total cost
+sweep with that search.
 """
 
 from dataclasses import dataclass, field
 from decimal import Decimal
 
 from services.common import round_rate
+from services.emr import SweepMode
+from services.income_inputs import IncomeInputs
+from services.total_cost import TotalCostPoint, calculate_total_cost
 
 _ZERO = Decimal("0")
 
@@ -117,3 +121,77 @@ def find_target_points(points: list[CostPoint], max_rate: Decimal) -> TargetPoin
     return TargetPointsResult(
         max_rate=max_rate, targets=[points[i].income for i in indexes], legs=legs
     )
+
+
+# ---------------------------------------------------------------------------
+# From a total cost sweep
+# ---------------------------------------------------------------------------
+
+CAUSE_BRACKET = "bracket"
+CAUSE_SS_TORPEDO = "ss_torpedo"
+CAUSE_PREF_STACKING = "pref_stacking"
+CAUSE_NIIT = "niit"
+CAUSE_ACA = "aca"
+CAUSE_IRMAA = "irmaa"
+
+
+def _total_cost_of(point: TotalCostPoint) -> Decimal:
+    """Annual dollars the household has paid by this income: tax, lost subsidy, surcharge."""
+    return point.total_tax + point.aca_subsidy_loss + point.irmaa_surcharge
+
+
+def _causes_of(point: TotalCostPoint, max_rate: Decimal) -> tuple[str, ...]:
+    """What is pushing the rate just above this income, from the EMR components."""
+    candidates = [
+        (point.emr_ordinary > max_rate, CAUSE_BRACKET),
+        (point.emr_ss_torpedo > _ZERO, CAUSE_SS_TORPEDO),
+        (point.emr_pref_stacking > _ZERO, CAUSE_PREF_STACKING),
+        (point.emr_niit > _ZERO, CAUSE_NIIT),
+        (point.emr_aca > _ZERO, CAUSE_ACA),
+        (point.emr_irmaa > _ZERO, CAUSE_IRMAA),
+    ]
+    return tuple(name for active, name in candidates if active)
+
+
+def to_cost_points(points: list[TotalCostPoint], max_rate: Decimal) -> list[CostPoint]:
+    return [CostPoint(p.income, _total_cost_of(p), _causes_of(p, max_rate)) for p in points]
+
+
+def calculate_target_points(
+    *,
+    income: IncomeInputs,
+    filing_status: str,
+    tax_year: int,
+    max_rate: Decimal,
+    sweep_mode: SweepMode = SweepMode.ORDINARY,
+    variable_ordinary: Decimal = _ZERO,
+    sweep_floor: Decimal = _ZERO,
+    sweep_ceiling: Decimal | None = None,
+    sweep_step: Decimal | None = None,
+    include_ohio: bool = False,
+    ohio_medical_deduction: Decimal = _ZERO,
+    ohio_qualifying_retirement_income: Decimal = _ZERO,
+    include_aca: bool = False,
+    include_irmaa: bool = True,
+    irmaa_enrollees: int | None = None,
+    irmaa_inflation_rate: Decimal | None = None,
+) -> TargetPointsResult:
+    """Run the total cost sweep and find the target points and desirable legs in it."""
+    sweep = calculate_total_cost(
+        income=income,
+        filing_status=filing_status,
+        tax_year=tax_year,
+        sweep_mode=sweep_mode,
+        variable_ordinary=variable_ordinary,
+        sweep_floor=sweep_floor,
+        sweep_ceiling=sweep_ceiling,
+        sweep_step=sweep_step,
+        include_ohio=include_ohio,
+        ohio_medical_deduction=ohio_medical_deduction,
+        ohio_qualifying_retirement_income=ohio_qualifying_retirement_income,
+        include_aca=include_aca,
+        include_irmaa=include_irmaa,
+        irmaa_enrollees=irmaa_enrollees,
+        irmaa_inflation_rate=irmaa_inflation_rate,
+    )
+    return find_target_points(to_cost_points(sweep.points, max_rate), max_rate)

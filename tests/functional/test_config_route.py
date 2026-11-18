@@ -36,6 +36,7 @@ def test_returns_ui_settings_from_config():
     assert isinstance(data["irmaa_lookback_years"], int)
     assert data["irmaa_lookback_years"] > 0
     assert data["income_plan_sweep_ceiling"] > 0
+    assert 0 < data["target_emr_rate_default"] < 1
 
 
 def test_returns_filing_statuses_for_dropdowns():
