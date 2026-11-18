@@ -60,7 +60,9 @@ class TestDefaultSweepCeilingFields:
         total = client.post("/api/total-cost", json=_BASE)
         assert total.status_code == 200
         assert total.json()["default_sweep_ceiling"] == emr.json()["default_sweep_ceiling"]
-        assert total.json()["default_sweep_ceiling_rate"] == emr.json()["default_sweep_ceiling_rate"]
+        assert (
+            total.json()["default_sweep_ceiling_rate"] == emr.json()["default_sweep_ceiling_rate"]
+        )
 
 
 # ── Test 1: Happy path — include_aca=False ───────────────────────────────

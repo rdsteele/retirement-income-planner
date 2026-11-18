@@ -18,7 +18,5 @@ def get_config() -> ConfigResponse:
     first_year, last_year = senior_deduction_years()
     return ConfigResponse(
         **data,
-        senior_deduction_years=SeniorDeductionYears(
-            first_year=first_year, last_year=last_year
-        ),
+        senior_deduction_years=SeniorDeductionYears(first_year=first_year, last_year=last_year),
     )
