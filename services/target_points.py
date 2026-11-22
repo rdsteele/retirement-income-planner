@@ -14,7 +14,7 @@ from dataclasses import dataclass, field, replace
 from decimal import Decimal
 
 from services.common import round_rate
-from services.data_loader import get_irmaa_inflation_default
+from services.data_loader import get_irmaa_inflation_default, get_target_min_excess_cost
 from services.emr import SweepMode
 from services.income_inputs import IncomeInputs
 from services.irmaa import projected_thresholds
@@ -56,6 +56,12 @@ class TargetPointsResult:
     # IRMAA thresholds for the requested growth (the ones the costs used when IRMAA is
     # included), so a chart can draw its threshold lines where the targets were placed.
     irmaa_thresholds: list[Decimal] = field(default_factory=list)
+    # The spans between neighbouring targets whose average is above the maximum: what it
+    # would cost to push through to the next target.
+    over_max_legs: list[TargetLeg] = field(default_factory=list)
+    # Spans between neighbouring targets that are within the maximum but lie past a span
+    # that no later target recovers, so they are only reached by paying that span.
+    unreachable_legs: list[TargetLeg] = field(default_factory=list)
 
 
 def _require_valid_input(points: list[CostPoint], max_rate: Decimal) -> None:
@@ -99,17 +105,31 @@ def _first_costly_segment(
     )
 
 
-def _hot_segments(points: list[CostPoint], max_rate: Decimal) -> list[bool]:
+def _excess_cost(points: list[CostPoint], first: int, last: int, max_rate: Decimal) -> Decimal:
+    """Dollars paid over what the maximum rate would cost, over the segments costing more.
+
+    Segments at or under the maximum are left out, so a long cheap stretch after the
+    costly one cannot hide it.
+    """
+    segments = zip(points[first:last], points[first + 1 : last + 1])
+    excesses = ((b.cost - a.cost) - max_rate * (b.income - a.income) for a, b in segments)
+    return sum((e for e in excesses if e > _ZERO), _ZERO)
+
+
+def _hot_segments(
+    points: list[CostPoint], max_rate: Decimal, min_excess: Decimal = _ZERO
+) -> list[bool]:
     """For each segment between adjacent points, whether it is inside a costly stretch.
 
     A stretch is a run of points whose rate is above the maximum, from the first segment
-    that really costs more than the maximum to the end of the run.
+    that really costs more than the maximum to the end of the run. A stretch that costs
+    less than ``min_excess`` dollars over the maximum is not worth a target.
     """
     costly = [point.rate > max_rate for point in points[:-1]]
     hot = [False] * len(costly)
     for run in _rate_runs(costly):
         start = _first_costly_segment(points, run, max_rate)
-        if start is not None:
+        if start is not None and _excess_cost(points, start, run[1] + 1, max_rate) >= min_excess:
             hot[start : run[1] + 1] = [True] * (run[1] + 1 - start)
     return hot
 
@@ -149,30 +169,110 @@ def _within_max(leg_points: tuple[CostPoint, CostPoint], max_rate: Decimal) -> b
     return _average_rate(*leg_points) <= max_rate
 
 
-def find_target_points(points: list[CostPoint], max_rate: Decimal) -> TargetPointsResult:
+def _leg_end(
+    points: list[CostPoint], indexes: list[int], pos: int, max_rate: Decimal
+) -> int | None:
+    """Position of the target where the desirable leg starting at ``pos`` ends, if there is one.
+
+    The leg normally ends at the next target. When that span is too costly, a later target
+    can still be reachable because the rate falls back under the maximum: the farthest one
+    whose average from ``pos`` fits ends the leg, so an undesirable stretch is taken to
+    reach the desirable income beyond it.
+    """
+
+    def fits(end: int) -> bool:
+        return _within_max((points[indexes[pos]], points[indexes[end]]), max_rate)
+
+    if fits(pos + 1):
+        return pos + 1
+    reachable = [end for end in range(pos + 2, len(indexes)) if fits(end)]
+    return reachable[-1] if reachable else None
+
+
+def _desirable_spans(
+    points: list[CostPoint], indexes: list[int], max_rate: Decimal
+) -> list[tuple[int, int]]:
+    """First and last point index of each desirable leg, in order.
+
+    The walk ends at the first span that no later target brings back under the maximum:
+    income beyond it is only reached by paying that span, so it is not desirable.
+    """
+    spans: list[tuple[int, int]] = []
+    pos = 0
+    while pos < len(indexes) - 1:
+        end = _leg_end(points, indexes, pos, max_rate)
+        if end is None:
+            break  # what lies beyond cannot be reached without paying an unrecovered stretch
+        spans.append((indexes[pos], indexes[end]))
+        pos = end
+    return spans
+
+
+def _over_max_spans(
+    points: list[CostPoint], candidates: list[int], max_rate: Decimal
+) -> list[tuple[int, int]]:
+    """Each span between neighbouring targets that costs more than the maximum on average."""
+    return [
+        (first, last)
+        for first, last in zip(candidates, candidates[1:])
+        if not _within_max((points[first], points[last]), max_rate)
+    ]
+
+
+def _unreachable_spans(
+    points: list[CostPoint],
+    candidates: list[int],
+    spans: list[tuple[int, int]],
+    max_rate: Decimal,
+) -> list[tuple[int, int]]:
+    """Neighbouring-target spans within the maximum that lie beyond the last desirable leg."""
+    reached = spans[-1][1] if spans else candidates[0]
+    return [
+        (first, last)
+        for first, last in zip(candidates, candidates[1:])
+        if first > reached and _within_max((points[first], points[last]), max_rate)
+    ]
+
+
+def find_target_points(
+    points: list[CostPoint], max_rate: Decimal, min_excess: Decimal = _ZERO
+) -> TargetPointsResult:
     """Find the targets and the desirable legs between them.
 
     ``points`` are in increasing income order with cumulative cost and the marginal rate
     above each. A point is costly when its rate is above ``max_rate``; consecutive costly
     points form a stretch, which begins at its first segment that really costs more than
-    ``max_rate``. Targets are the first income, the start of every costly stretch, and the
-    last income.
-    A leg is desirable when its average cost per dollar, with its costly stretch included,
-    is at or below ``max_rate``.
+    ``max_rate`` and costs at least ``min_excess`` dollars more than that rate would.
+    Candidate targets are the first income, the start of every costly stretch, and the last
+    income.
+    A leg is desirable when its average cost per dollar, with any costly stretch inside it
+    included, is at or below ``max_rate``. ``over_max_legs`` lists the neighbouring-target
+    spans that are not, and ``unreachable_legs`` those that are but lie past one that
+    cannot be recovered. When the span to the next target is not, a later
+    target is used if the average to it fits.
     """
     _require_valid_input(points, max_rate)
     if len(points) < 2:
         return TargetPointsResult(max_rate=max_rate, targets=[p.income for p in points])
 
-    hot = _hot_segments(points, max_rate)
-    indexes = _target_indexes(hot, len(points) - 1)
-    legs = [
+    hot = _hot_segments(points, max_rate, min_excess)
+    candidates = _target_indexes(hot, len(points) - 1)
+    spans = _desirable_spans(points, candidates, max_rate)
+    legs = [_build_leg(points, hot, first, last) for first, last in spans]
+    unreachable = [
         _build_leg(points, hot, first, last)
-        for first, last in zip(indexes, indexes[1:])
-        if _within_max((points[first], points[last]), max_rate)
+        for first, last in _unreachable_spans(points, candidates, spans, max_rate)
+    ]
+    over = [
+        _build_leg(points, hot, first, last)
+        for first, last in _over_max_spans(points, candidates, max_rate)
     ]
     return TargetPointsResult(
-        max_rate=max_rate, targets=[points[i].income for i in indexes], legs=legs
+        max_rate=max_rate,
+        targets=[points[i].income for i in candidates],
+        legs=legs,
+        over_max_legs=over,
+        unreachable_legs=unreachable,
     )
 
 
@@ -263,6 +363,8 @@ def calculate_target_points(
         irmaa_enrollees=irmaa_enrollees,
         irmaa_inflation_rate=irmaa_inflation_rate,
     )
-    found = find_target_points(to_cost_points(sweep.points, max_rate), max_rate)
+    found = find_target_points(
+        to_cost_points(sweep.points, max_rate), max_rate, get_target_min_excess_cost()
+    )
     thresholds = _thresholds_reported(sweep, filing_status, tax_year, irmaa_inflation_rate)
     return replace(found, irmaa_thresholds=thresholds)

@@ -67,15 +67,16 @@ function createTargetPanel({ endpoint, onChange, inflationControls = {} }) {
   }
 
   function renderTable() {
-    const rows = targets ? targetLegRows(targets.legs) : [];
-    el('target-points-body').innerHTML = rows.map((r) => `<tr>
+    const showOver = el('target_show_over').checked;
+    const rows = targets ? targetTableRows(targets, showOver) : [];
+    el('target-points-body').innerHTML = rows.map((r) => `<tr${r.over ? ' class="target-over"' : ''}>
         <td>${escHtml(r.from)}</td>
         <td>${escHtml(r.to)}</td>
         <td>${escHtml(r.average)}</td>
         <td>${escHtml(r.cost)}</td>
         <td>${escHtml(r.causes)}</td>
       </tr>`).join('');
-    if (targets && !rows.length) setNote('No leg averages at or below the max EMR.');
+    if (targets && !targets.legs.length) setNote('No leg averages at or below the max EMR.');
     renderRangeHint();
   }
 
@@ -108,6 +109,10 @@ function createTargetPanel({ endpoint, onChange, inflationControls = {} }) {
         el(wrapId).classList.toggle('hidden', !el(adjustId).checked);
       });
       el('target-toggle').addEventListener('change', onChange);
+      el('target_show_over').addEventListener('change', () => {
+        renderTable();
+        onChange();
+      });
     },
 
     // Asks for the targets of a new calculation and fills the table. `sweepMaxMagi` is the
@@ -128,7 +133,7 @@ function createTargetPanel({ endpoint, onChange, inflationControls = {} }) {
       if (!el('target-toggle')?.checked || !targets) {
         return { traces: [], shapes: [], annotations: [] };
       }
-      return targetChartMarkers(targets);
+      return targetChartMarkers(targets, el('target_show_over').checked);
     },
 
     // The IRMAA thresholds to draw: those the targets were placed with, else `published`.

@@ -96,9 +96,95 @@ class TestCliff:
         # 25,000 over 100,000
         assert result.legs[1].average_emr == D("0.2500")
 
-    def test_a_leg_whose_cliff_pushes_it_over_the_maximum_is_dropped(self):
+    def test_a_leg_whose_cliff_pushes_it_over_the_maximum_stops_before_the_cliff(self):
+        result = find_target_points(self.points, D("0.21"))
+        assert [(leg.from_income, leg.to_income) for leg in result.legs] == [(D("0"), D("100000"))]
+
+    def test_a_costly_cliff_leg_is_not_merged_into_the_leg_before_it(self):
+        # The cliff leg alone averages 25%; 0 to 200,000 would average 22.5%, but the legs
+        # stay separate, as segments between targets.
         result = find_target_points(self.points, D("0.24"))
         assert [(leg.from_income, leg.to_income) for leg in result.legs] == [(D("0"), D("100000"))]
+
+
+class TestOverMaxLegs:
+    # 10% to 50,000, then 40% for 10,000, then 10% to 100,000.
+    points = [
+        CostPoint(D("0"), D("0"), D("0.10")),
+        CostPoint(D("50000"), D("5000"), D("0.40")),
+        CostPoint(D("60000"), D("9000"), D("0.10")),
+        CostPoint(D("100000"), D("13000"), D("0.10")),
+    ]
+
+    def test_the_span_through_the_stretch_is_listed_with_its_average(self):
+        result = find_target_points(self.points, D("0.12"))
+        assert [(leg.from_income, leg.to_income) for leg in result.over_max_legs] == [
+            (D("50000"), D("100000"))
+        ]
+        assert result.over_max_legs[0].average_emr == D("0.1600")
+
+    def test_a_span_within_the_maximum_is_not_listed(self):
+        assert find_target_points(self.points, D("0.20")).over_max_legs == []
+
+    def test_every_neighbouring_span_is_either_a_leg_or_over_the_maximum(self):
+        result = find_target_points(self.points, D("0.12"))
+        assert len(result.legs) + len(result.over_max_legs) == len(result.targets) - 1
+
+
+class TestUnreachableLegs:
+    # 10% to 50,000, an 80% stretch to 100,000, 20% to 150,000, then a cliff and a cheap 10%
+    # leg to 200,000. No later target brings the average from 50,000 under a 30% maximum,
+    # so the cheap last leg could only be reached by paying the 80% stretch.
+    points = [
+        CostPoint(D("0"), D("0"), D("0.10")),
+        CostPoint(D("50000"), D("5000"), D("0.80")),
+        CostPoint(D("100000"), D("45000"), D("0.20")),
+        CostPoint(D("150000"), D("55000"), D("5.0")),
+        CostPoint(D("150001"), D("56000"), D("0.10")),
+        CostPoint(D("200000"), D("60999.90"), D("0.10")),
+    ]
+
+    def test_a_leg_beyond_an_unrecovered_costly_span_is_not_listed(self):
+        result = find_target_points(self.points, D("0.30"))
+        assert result.targets == [D("0"), D("50000"), D("150000"), D("200000")]
+        assert [(leg.from_income, leg.to_income) for leg in result.legs] == [(D("0"), D("50000"))]
+
+    def test_a_cheap_span_beyond_the_blocked_one_is_listed_as_unreachable(self):
+        result = find_target_points(self.points, D("0.30"))
+        assert [(leg.from_income, leg.to_income) for leg in result.unreachable_legs] == [
+            (D("150000"), D("200000"))
+        ]
+
+    def test_nothing_is_unreachable_when_every_leg_can_be_reached(self):
+        assert find_target_points(self.points, D("0.60")).unreachable_legs == []
+
+    def test_the_costly_span_is_still_shown_as_over_the_maximum(self):
+        result = find_target_points(self.points, D("0.30"))
+        assert [(leg.from_income, leg.to_income) for leg in result.over_max_legs] == [
+            (D("50000"), D("150000"))
+        ]
+
+
+class TestMinimumExcess:
+    # 10% to 10,000, then 22% for 1,000 (a dollar-level excess over 20%), then 10%.
+    points = [
+        CostPoint(D("0"), D("0"), D("0.10")),
+        CostPoint(D("10000"), D("1000"), D("0.22")),
+        CostPoint(D("11000"), D("1220"), D("0.10")),
+        CostPoint(D("20000"), D("2120"), D("0.10")),
+    ]
+
+    def test_a_stretch_costing_little_over_the_maximum_opens_no_target(self):
+        result = find_target_points(self.points, D("0.20"), D("50"))
+        assert result.targets == [D("0"), D("20000")]
+
+    def test_the_same_stretch_opens_a_target_when_no_minimum_is_set(self):
+        result = find_target_points(self.points, D("0.20"))
+        assert result.targets == [D("0"), D("10000"), D("20000")]
+
+    def test_a_stretch_over_the_minimum_still_opens_a_target(self):
+        result = find_target_points(self.points, D("0.20"), D("10"))
+        assert D("10000") in result.targets
 
 
 class TestSeveralStretches:
@@ -129,9 +215,20 @@ class TestEdges:
         assert result.legs[0].average_emr == D("0.1300")
 
     def test_sweep_that_ends_inside_a_costly_stretch(self):
-        result = find_target_points(_curve((90000, "0.10"), (10000, "0.40")), D("0.25"))
+        result = find_target_points(_curve((90000, "0.10"), (10000, "2.00")), D("0.25"))
         assert result.targets == [D("0"), D("90000"), D("100000")]
         assert [(leg.from_income, leg.to_income) for leg in result.legs] == [(D("0"), D("90000"))]
+
+    def test_a_costly_span_is_skipped_to_reach_cheaper_income_beyond_it(self):
+        # 10% to 10,000, then 60% for 10,000, then 0% for 80,000 (max 25%). The costly span
+        # alone is 60%, but from 10,000 to the end averages 6.7%: reach it through the span.
+        result = find_target_points(
+            _curve((10000, "0.10"), (10000, "0.60"), (80000, "0.0")), D("0.25")
+        )
+        assert [(leg.from_income, leg.to_income) for leg in result.legs][-1] == (
+            D("10000"),
+            D("100000"),
+        )
 
     def test_one_point_has_a_target_and_no_legs(self):
         result = find_target_points([CostPoint(D("5"), D("1"), D("0"))], D("0.25"))

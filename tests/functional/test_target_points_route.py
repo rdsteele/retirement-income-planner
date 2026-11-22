@@ -44,6 +44,8 @@ class TestHappyPath:
             "max_emr",
             "targets",
             "legs",
+            "over_max_legs",
+            "unreachable_legs",
             "irmaa_thresholds",
         }
         assert self.body["max_emr"] == 0.30
@@ -62,6 +64,18 @@ class TestHappyPath:
     def test_every_leg_is_within_the_maximum(self):
         assert self.body["legs"]
         assert all(leg["average_emr"] <= self.body["max_emr"] for leg in self.body["legs"])
+
+    def test_over_max_legs_are_between_neighbouring_targets_and_above_the_maximum(self):
+        targets = self.body["targets"]
+        for leg in self.body["over_max_legs"]:
+            assert targets.index(leg["to_income"]) == targets.index(leg["from_income"]) + 1
+            assert leg["average_emr"] > self.body["max_emr"]
+
+    def test_unreachable_legs_are_within_the_maximum_and_past_every_leg(self):
+        last_end = max((leg["to_income"] for leg in self.body["legs"]), default=0.0)
+        for leg in self.body["unreachable_legs"]:
+            assert leg["average_emr"] <= self.body["max_emr"]
+            assert leg["from_income"] > last_end
 
     def test_legs_are_between_targets(self):
         for leg in self.body["legs"]:

@@ -62,9 +62,49 @@ test('causes are listed with readable names and a dash when there are none', () 
 
 test('each desirable leg becomes a row of display strings', () => {
   assertEqual(targetLegRows(SAMPLE_TARGETS.legs), [
-    { from: '$0', to: '$56,000', average: '14.2%', cost: '$7,952', causes: '—' },
-    { from: '$56,000', to: '$130,000', average: '23.31%', cost: '$17,249', causes: 'SS torpedo, IRMAA' },
+    { from: '$0', to: '$56,000', average: '14.2%', cost: '$7,952', causes: '—', over: false },
+    { from: '$56,000', to: '$130,000', average: '23.31%', cost: '$17,249', causes: 'SS torpedo, IRMAA', over: false },
   ]);
+});
+
+test('legs over the max are labelled in the table and drawn dotted red on the chart', () => {
+  const over = [{ from_income: 15000, to_income: 23000, average_emr: 0.225, cost: 1800, causes: ['aca'] }];
+  const row = targetLegRows(over, 'Over max')[0];
+  assertEqual([row.causes, row.over], ['Over max: ACA subsidy loss', true]);
+  const result = { ...SAMPLE_TARGETS, over_max_legs: over };
+  assertEqual(targetChartMarkers(result).shapes.length, 3);
+  const shown = targetChartMarkers(result, true);
+  assertEqual(shown.shapes[shown.shapes.length - 1].line.dash, 'dot');
+  assertEqual(shown.annotations[shown.annotations.length - 1].text, '22.5%');
+});
+
+const BLOCKED = {
+  max_emr: 0.32,
+  targets: [0, 23000, 70000, 98000],
+  legs: [{ from_income: 0, to_income: 23000, average_emr: 0.1842, cost: 4295, causes: [] }],
+  over_max_legs: [{ from_income: 23000, to_income: 70000, average_emr: 0.4136, cost: 19192, causes: ['aca'] }],
+  unreachable_legs: [{ from_income: 70000, to_income: 98000, average_emr: 0.2885, cost: 8078, causes: ['irmaa'] }],
+};
+
+test('the table lists only reachable legs until the extra segments are asked for', () => {
+  assertEqual(targetTableRows(BLOCKED).map((r) => r.from), ['$0']);
+});
+
+test('the extra segments are listed in income order, labelled, and told apart', () => {
+  const rows = targetTableRows(BLOCKED, true);
+  assertEqual(rows.map((r) => r.from), ['$0', '$23,000', '$70,000']);
+  assertEqual(rows.map((r) => r.over), [false, true, false]);
+  assertEqual(rows.map((r) => r.ok), [false, false, true]);
+  assertEqual(rows[2].causes, 'Past an over-max span: IRMAA');
+});
+
+test('segments past an over-max span are drawn green and dotted when asked for', () => {
+  assertEqual(targetChartMarkers(BLOCKED).shapes.length, 2);
+  const { shapes, annotations } = targetChartMarkers(BLOCKED, true);
+  const last = shapes[shapes.length - 1];
+  assertEqual([last.x0, last.x1, last.line.dash], [70000, 98000, 'dot']);
+  assertEqual(last.line.color, shapes[1].line.color);
+  assertEqual(annotations[annotations.length - 1].text, '28.85%');
 });
 
 test('chart markers put dots on the max EMR line and a labelled green line on each leg', () => {

@@ -16,6 +16,7 @@ const TARGET_CAUSE_LABELS = {
 
 const TARGET_GREEN = '#16a34a';
 const TARGET_DARK = '#212529';
+const TARGET_OVER = '#dc2626';
 
 // The max EMR box holds a percent; the API takes a rate. Null when blank or invalid.
 function parseMaxEmrPercent(text) {
@@ -70,19 +71,36 @@ function targetCauseText(causes) {
 }
 
 // One table row per desirable leg, as display strings.
-function targetLegRows(legs) {
+// ``label`` (for the legs over the max) is shown in front of what each leg includes.
+function targetLegRows(legs, label = '') {
   return legs.map((leg) => ({
     from: fmt$(leg.from_income),
     to: fmt$(leg.to_income),
     average: formatRatePercent(leg.average_emr),
     cost: fmt$(leg.cost),
-    causes: targetCauseText(leg.causes),
+    causes: label ? `${label}: ${targetCauseText(leg.causes)}` : targetCauseText(leg.causes),
+    over: label !== '',
   }));
+}
+
+// The table rows for a response, in income order. With ``showExtra`` the legs over the max
+// (red) and the legs only reached by paying an over-max span are listed too.
+function targetTableRows(result, showExtra = false) {
+  const entries = result.legs.map((leg) => ({ leg, label: '' }));
+  if (showExtra) {
+    entries.push(...(result.over_max_legs ?? []).map((leg) => ({ leg, label: 'Over max' })));
+    entries.push(...(result.unreachable_legs ?? []).map((leg) => ({ leg, label: 'Past an over-max span', ok: true })));
+  }
+  entries.sort((a, b) => a.leg.from_income - b.leg.from_income || a.leg.to_income - b.leg.to_income);
+  return entries.map(({ leg, label, ok }) => {
+    const row = targetLegRows([leg], label)[0];
+    return { ...row, over: label === 'Over max', ok: ok === true };
+  });
 }
 
 // Chart pieces for a response: dots on the max EMR line at each target, the dashed max
 // EMR line, and a green line per desirable leg at its average rate, labelled.
-function targetChartMarkers(result) {
+function targetChartMarkers(result, showOver = false) {
   const maxEmr = result.max_emr;
   const dots = {
     type: 'scatter',
@@ -102,10 +120,22 @@ function targetChartMarkers(result) {
     y0: leg.average_emr, y1: leg.average_emr,
     line: { color: TARGET_GREEN, width: 4 },
   }));
-  const labels = result.legs.map((leg) => ({
+  const over = showOver ? result.over_max_legs ?? [] : [];
+  const overLines = over.map((leg) => ({
+    type: 'line', x0: leg.from_income, x1: leg.to_income,
+    y0: leg.average_emr, y1: leg.average_emr,
+    line: { color: TARGET_OVER, width: 3, dash: 'dot' },
+  }));
+  const beyond = showOver ? result.unreachable_legs ?? [] : [];
+  const beyondLines = beyond.map((leg) => ({
+    type: 'line', x0: leg.from_income, x1: leg.to_income,
+    y0: leg.average_emr, y1: leg.average_emr,
+    line: { color: TARGET_GREEN, width: 3, dash: 'dot' },
+  }));
+  const labels = [...result.legs, ...over, ...beyond].map((leg) => ({
     x: (leg.from_income + leg.to_income) / 2, y: leg.average_emr, yshift: 12,
     text: formatRatePercent(leg.average_emr), showarrow: false,
-    font: { size: 11, color: TARGET_GREEN },
+    font: { size: 11, color: leg.average_emr > maxEmr ? TARGET_OVER : TARGET_GREEN },
   }));
-  return { traces: [dots], shapes: [maxLine, ...legLines], annotations: labels };
+  return { traces: [dots], shapes: [maxLine, ...legLines, ...overLines, ...beyondLines], annotations: labels };
 }

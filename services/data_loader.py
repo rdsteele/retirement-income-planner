@@ -117,6 +117,11 @@ def get_irmaa_lookback_years() -> int:
     return int(load_config()["irmaa_lookback_years"])
 
 
+def get_target_min_excess_cost() -> Decimal:
+    """Dollars a stretch must cost over the max EMR to open a target point."""
+    return Decimal(str(load_config()["target_min_excess_cost"]))
+
+
 def get_irmaa_inflation_default() -> Decimal:
     """Return the default yearly growth of IRMAA thresholds when projecting them (config.json)."""
     return Decimal(str(load_config()["irmaa_inflation_default"]))

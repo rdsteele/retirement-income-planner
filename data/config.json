@@ -1,5 +1,6 @@
 {
   "irmaa_inflation_default": 0.025,
+  "target_min_excess_cost": 100,
   "y_axis_max_emr": 0.5,
   "sweep_step_default": 100,
   "filing_statuses": [

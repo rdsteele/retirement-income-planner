@@ -17,9 +17,11 @@
   }
  ],
  "max_emr": 0.25,
+ "over_max_legs": [],
  "targets": [
   0.0,
   20000.0
  ],
- "tax_year": 2027
+ "tax_year": 2027,
+ "unreachable_legs": []
 }

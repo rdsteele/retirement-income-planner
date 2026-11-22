@@ -37,4 +37,6 @@ class TargetPointsResponse(BaseModel):
     max_emr: float
     targets: list[float]
     legs: list[TargetLegResponse]
+    over_max_legs: list[TargetLegResponse]  # spans between targets averaging above the max
+    unreachable_legs: list[TargetLegResponse]  # within the max, but past an unrecovered span
     irmaa_thresholds: list[float]  # IRMAA thresholds for the requested growth
