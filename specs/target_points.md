@@ -95,7 +95,8 @@ works on a list of cost points so it can be tested and used alone.
   data file says, with the top threshold not indexed. The request can override the rate or
   turn the growth off (rate 0).
 - **Enrollees** is an explicit number of people, not derived from the 65+ flags: income two
-  years before enrollment is what counts. Default is the filing status's filer count.
+  years before enrollment is what counts, so exposure starts at the age before Medicare. The
+  API default is the filing status's filer count; the pages always send the count.
 - MAGI is AGI plus tax-exempt interest.
 - Surcharge amounts come from the planning year's file and are not inflated.
 
@@ -148,8 +149,12 @@ logic. An invalid sweep mode or negative maximum is a 422.
 One card, one panel (`createTargetPanel`), the same element ids on both pages:
 
 1. **Max EMR** input, defaulted from `/api/config`.
-2. **Include IRMAA**, **Medicare enrollees**, and the IRMAA growth controls (on the EMR page
-   these live in the chart toolbar).
+2. **IRMAA exposure checkboxes**: "Age 63 or older (IRMAA)" for the taxpayer and the same
+   for a spouse (shown only for a status with more than one filer, like the 65+ spouse box).
+   Both are unticked by default, which leaves IRMAA out of the costs and the targets. The
+   number ticked is the enrollee count, and the chart's IRMAA lines follow it: ticking a box
+   turns the lines on, and the lines checkbox can still be changed by hand. The growth
+   controls sit beside them (on the EMR page, in the chart toolbar).
 3. **Show segments over max** (off by default). Adds the over-max segments (red) and the
    unreachable ones (labelled "Past an over-max span", green) to the table and the chart,
    without a new request.

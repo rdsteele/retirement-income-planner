@@ -19,10 +19,12 @@ function populateFilingStatuses(statuses) {
   updateSpouseCheckbox();
 }
 
-// The spouse's age checkbox shows only for a status with more than one person filing.
+// The spouse's age checkboxes show only for a status with more than one person filing.
 function updateSpouseCheckbox() {
   const filers = filersByStatus[el('filing_status')?.value];
-  el('spouse-65-wrap')?.classList.toggle('hidden', !(filers > 1));
+  ['spouse-65-wrap', 'target-irmaa-spouse-wrap'].forEach((id) => {
+    el(id)?.classList.toggle('hidden', !(filers > 1));
+  });
 }
 
 // First and last tax year the senior deduction exists, from the API's config.

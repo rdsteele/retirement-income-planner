@@ -30,6 +30,20 @@ function createTargetPanel({ endpoint, onChange, inflationControls = {} }) {
     note.appendChild(p);
   }
 
+  function currentEnrollees() {
+    const spouseShown = !el('target-irmaa-spouse-wrap').classList.contains('hidden');
+    return irmaaEnrollees(
+      el('target_irmaa_taxpayer').checked,
+      el('target_irmaa_spouse').checked,
+      spouseShown,
+    );
+  }
+
+  // The IRMAA lines on the chart follow who is on Medicare; the box can still be changed.
+  function syncIrmaaLines() {
+    el('irmaa-toggle').checked = currentEnrollees() > 0;
+  }
+
   // The settings as the request needs them, or null with the reason shown when one is
   // invalid.
   function readSettings() {
@@ -43,12 +57,8 @@ function createTargetPanel({ endpoint, onChange, inflationControls = {} }) {
       setNote('Enter an IRMAA growth rate of 0% or more.');
       return null;
     }
-    return {
-      maxEmr,
-      includeIrmaa: el('target_include_irmaa').checked,
-      enrollees: parseEnrollees(el('target_irmaa_enrollees').value),
-      inflationRate,
-    };
+    const enrollees = currentEnrollees();
+    return { maxEmr, includeIrmaa: enrollees > 0, enrollees, inflationRate };
   }
 
   // A failure is shown beside the table and never hides the page's chart.
@@ -103,8 +113,14 @@ function createTargetPanel({ endpoint, onChange, inflationControls = {} }) {
 
     // Connects the card's controls; any change asks again with the last request.
     wire() {
-      ['target_max_emr', 'target_include_irmaa', 'target_irmaa_enrollees', adjustId, rateId]
+      ['target_max_emr', adjustId, rateId]
         .forEach((id) => el(id).addEventListener('change', refresh));
+      ['target_irmaa_taxpayer', 'target_irmaa_spouse'].forEach((id) => {
+        el(id).addEventListener('change', () => {
+          syncIrmaaLines();
+          refresh();
+        });
+      });
       el(adjustId).addEventListener('change', () => {
         el(wrapId).classList.toggle('hidden', !el(adjustId).checked);
       });

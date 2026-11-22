@@ -29,11 +29,12 @@ test('a rate is shown in the box as a clean percent', () => {
   assertEqual(percentInputValue(0.07), '7');
 });
 
-test('a blank enrollee box means everyone, so it is sent as null', () => {
-  assertEqual(parseEnrollees(''), null);
-  assertEqual(parseEnrollees('0'), 0);
-  assertEqual(parseEnrollees('2'), 2);
-  assertEqual(parseEnrollees('-1'), null);
+test('enrollees are the ticked people, counting the spouse only when that box is shown', () => {
+  assertEqual(irmaaEnrollees(false, false, true), 0);
+  assertEqual(irmaaEnrollees(true, false, true), 1);
+  assertEqual(irmaaEnrollees(false, true, true), 1);
+  assertEqual(irmaaEnrollees(true, true, true), 2);
+  assertEqual(irmaaEnrollees(true, true, false), 1);
 });
 
 test('the target points request adds the settings to the Calculate request', () => {
@@ -146,7 +147,7 @@ const tick = (id, on = true) => {
 async function calculated(configure) {
   const app = await startPage('income', (server, page) => {
     FX.config.target_emr_rate_default = 0.31;
-    tick('target_include_irmaa');
+    tick('target_irmaa_taxpayer');
     tick('target-toggle');
     if (configure) configure(server, page);
   });
@@ -166,7 +167,7 @@ test('income: Calculate asks for target points with the same inputs plus the set
   const posts = app.server.callsMatching('POST', '/api/target-points');
   assertEqual(posts.length, 1);
   assertEqual(posts[0].body, {
-    ...calc.body, max_emr: 0.31, include_irmaa: true, irmaa_enrollees: null,
+    ...calc.body, max_emr: 0.31, include_irmaa: true, irmaa_enrollees: 1,
     irmaa_inflation_rate: 0,
   });
 });
@@ -208,14 +209,38 @@ test('income: changing the max EMR asks again using the last Calculate inputs', 
   assertEqual(posts[1].body.pension, posts[0].body.pension);
 });
 
-test('income: Medicare enrollees and Include IRMAA are sent', async () => {
+test('income: IRMAA is left out until someone is ticked', async () => {
+  const app = await startPage('income', () => { FX.config.target_emr_rate_default = 0.31; });
+  await app.el('calc-btn').click();
+  await settle();
+  const first = app.server.callsMatching('POST', '/api/target-points')[0];
+  assertEqual([first.body.irmaa_enrollees, first.body.include_irmaa], [0, false]);
+  assertEqual(app.el('irmaa-toggle').checked, false);
+});
+
+test('income: ticking the taxpayer includes IRMAA for one person and turns the lines on', async () => {
   const app = await calculated();
-  app.el('target_irmaa_enrollees').value = '1';
-  tick('target_include_irmaa', false);
-  await app.el('target_irmaa_enrollees').dispatch('change');
+  tick('target_irmaa_taxpayer');
+  await app.el('target_irmaa_taxpayer').dispatch('change');
   await settle();
   const last = app.server.callsMatching('POST', '/api/target-points').pop();
-  assertEqual([last.body.irmaa_enrollees, last.body.include_irmaa], [1, false]);
+  assertEqual([last.body.irmaa_enrollees, last.body.include_irmaa], [1, true]);
+  assertEqual(app.el('irmaa-toggle').checked, true);
+});
+
+test('income: the spouse box adds a second enrollee only when it is shown', async () => {
+  const app = await calculated();
+  tick('target_irmaa_spouse');
+  app.el('target-irmaa-spouse-wrap').classList.add('hidden');
+  await app.el('target_irmaa_spouse').dispatch('change');
+  await settle();
+  let last = app.server.callsMatching('POST', '/api/target-points').pop();
+  assertEqual(last.body.irmaa_enrollees, 1);
+  app.el('target-irmaa-spouse-wrap').classList.remove('hidden');
+  await app.el('target_irmaa_spouse').dispatch('change');
+  await settle();
+  last = app.server.callsMatching('POST', '/api/target-points').pop();
+  assertEqual(last.body.irmaa_enrollees, 2);
 });
 
 test('income: an invalid max EMR is explained and nothing is requested', async () => {
@@ -278,7 +303,7 @@ test('income: an invalid growth rate is explained and nothing is requested', asy
 async function calculatedWithIrmaaLines(inflation) {
   const app = await startPage('income', () => {
     tick('irmaa-toggle');
-    tick('target_include_irmaa');
+    tick('target_irmaa_taxpayer');
     tick('target_irmaa_inflation_adj', inflation > 0);
     FX.config.irmaa_lookback_years = 2;
     const r = FX.income_plan_calculate;
@@ -376,7 +401,7 @@ const sweepPosts = (app) => app.server.calls.filter(
 async function emrRun(configure) {
   return startPage('emr', (server, page) => {
     FX.config.target_emr_rate_default = 0.31;
-    tick('target_include_irmaa');
+    tick('target_irmaa_taxpayer');
     tick('target-toggle');
     if (configure) configure(server, page);
   });
@@ -393,7 +418,7 @@ test('emr: the run asks for target points with the same request plus the setting
   const posts = sweepPosts(app);
   assertEqual(posts.length, 1);
   assertEqual(posts[0].body, {
-    ...run.body, max_emr: 0.31, include_irmaa: true, irmaa_enrollees: null,
+    ...run.body, max_emr: 0.31, include_irmaa: true, irmaa_enrollees: 1,
     irmaa_inflation_rate: 0,
   });
 });

@@ -29,10 +29,10 @@ function percentInputValue(rate) {
   return String(Number((rate * 100).toFixed(2)));
 }
 
-// Blank means everyone on the return pays (the server's default), so it is sent as null.
-function parseEnrollees(text) {
-  const count = parseInt(text, 10);
-  return Number.isInteger(count) && count >= 0 ? count : null;
+// People who will be on Medicare when this income is looked at: the taxpayer and, when the
+// spouse's box is shown, the spouse. IRMAA counts only when this is above zero.
+function irmaaEnrollees(taxpayerTicked, spouseTicked, spouseShown) {
+  return (taxpayerTicked ? 1 : 0) + (spouseShown && spouseTicked ? 1 : 0);
 }
 
 // The IRMAA threshold growth to send: the typed percent when adjusting for inflation,

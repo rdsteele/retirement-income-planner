@@ -774,7 +774,7 @@
           <button class="toggle-btn active" id="btn-stacked">Stacked Area</button>
           <button class="toggle-btn" id="btn-lines">Lines</button>
           <label class="irmaa-toggle">
-            <input type="checkbox" id="irmaa-toggle" checked>
+            <input type="checkbox" id="irmaa-toggle">
             IRMAA Thresholds
           </label>
           <label class="irmaa-toggle">
@@ -812,13 +812,13 @@
             <input type="checkbox" id="target_show_over">
             Show segments over max
           </label>
-          <label class="irmaa-toggle">
-            <input type="checkbox" id="target_include_irmaa" checked>
-            Include IRMAA
+          <label class="irmaa-toggle" title="Medicare looks back two years, so income counts for IRMAA from the year before this age">
+            <input type="checkbox" id="target_irmaa_taxpayer">
+            Age 63 or older (IRMAA)
           </label>
-          <label title="People on Medicare who pay the surcharge; blank means everyone on the return">
-            Medicare enrollees
-            <input type="number" id="target_irmaa_enrollees" min="0" step="1" placeholder="all">
+          <label class="irmaa-toggle" id="target-irmaa-spouse-wrap">
+            <input type="checkbox" id="target_irmaa_spouse">
+            Spouse age 63 or older (IRMAA)
           </label>
           <label class="irmaa-toggle">
             <input type="checkbox" id="target_irmaa_inflation_adj">
