@@ -55,7 +55,7 @@ router in `api/routers/` and its own independent tests.
 | `emr` | Effective marginal rate sweep, all components, boundary point insertion |
 | `aca` | ACA subsidy from schedule-based interpolation, cliff detection |
 | `total_cost` | Combines tax EMR + ACA subsidy loss + IRMAA surcharge into total cost EMR |
-| `target_points` | Given a max EMR, the income points just before each costly stretch and the desirable legs between them |
+| `target_points` | Given a max EMR, the income points just before each costly stretch and the desirable legs between them (Pfau's tax map method); also the over-max and unreachable segments. Rules in `specs/target_points.md`; `target_min_excess_cost` in `data/config.json` |
 | `accounts` | Account inventory CRUD (taxable/traditional/roth/hsa) |
 | `scenarios` | Save/load/export/import named planning scenarios |
 | `data_loader` | Shared bracket and threshold data loading |
